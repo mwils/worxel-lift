@@ -1,0 +1,284 @@
+import type { SNSHandler } from "aws-lambda";
+import { connectDb } from "@lift/shared/db";
+import {
+  AiInteraction,
+  Customer,
+  MESSAGE_CLASSIFICATIONS,
+  Message,
+  RepairOrder,
+  RO_OPEN_STATUSES,
+  Shop,
+  User,
+  type MessageClassification,
+  type RoStatus,
+} from "@lift/shared";
+import {
+  CLASSIFY_INBOUND_PROMPT_VERSION,
+  STATUS_REPLY_PROMPT_VERSION,
+  buildClassifyInboundPrompt,
+  buildStatusReplyPrompt,
+} from "@lift/shared/prompts";
+import { invokeClaude, modelClassify, modelDraft } from "../../lib/bedrock.js";
+import { sendSms } from "../../lib/sms.js";
+
+interface InboundSnsPayload {
+  originationNumber: string;
+  destinationNumber: string;
+  messageBody: string;
+  messageId: string;
+}
+
+function parseClassification(text: string): {
+  classification: MessageClassification;
+  confidence: number;
+} {
+  // The prompt asks for raw JSON, but be defensive: strip code fences/prose,
+  // pull the first {...} block, and validate against the allowed enum.
+  const stripped = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  const raw = match ? match[0] : stripped;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { classification: "other", confidence: 0 };
+  }
+  const obj = parsed as { classification?: string; confidence?: number };
+  const cls = obj?.classification as MessageClassification | undefined;
+  const valid = cls && (MESSAGE_CLASSIFICATIONS as readonly string[]).includes(cls);
+  return {
+    classification: valid ? (cls as MessageClassification) : "other",
+    confidence: typeof obj?.confidence === "number" ? obj.confidence : 0,
+  };
+}
+
+/**
+ * Subscriber for the SNS topic that AWS End User Messaging publishes
+ * inbound SMS messages to. Resolve shop → customer, persist inbound
+ * Message, classify with Haiku, and either auto-reply (status check /
+ * approval) or leave the message in the owner's inbox.
+ */
+export const handler: SNSHandler = async (event) => {
+  await connectDb();
+
+  for (const rec of event.Records) {
+    try {
+      const payload = JSON.parse(rec.Sns.Message) as InboundSnsPayload;
+      const { originationNumber, destinationNumber, messageBody, messageId } = payload;
+
+      console.log("[snsInbound] received", {
+        from: originationNumber,
+        to: destinationNumber,
+        messageId,
+      });
+
+      // 1) Resolve shop by destinationNumber. No tenant filter here — this is
+      //    how we *find* the tenant. All subsequent queries are shop-scoped.
+      const shop = await Shop.findOne({ "sms.phoneNumber": destinationNumber }).lean();
+      if (!shop) {
+        console.log("[snsInbound] no shop matches destinationNumber", destinationNumber);
+        continue;
+      }
+
+      // 2) Resolve customer by (shopId, phone). We do NOT auto-create
+      //    customers from random inbound texts.
+      const customer = await Customer.findOne({
+        shopId: shop._id,
+        phone: originationNumber,
+      }).lean();
+      if (!customer) {
+        console.log("[snsInbound] no customer matches phone for shop", {
+          shopId: String(shop._id),
+          phone: originationNumber,
+        });
+        continue;
+      }
+
+      // 3) Insert inbound Message.
+      const inboundMsg = await Message.create({
+        shopId: shop._id,
+        customerId: customer._id,
+        direction: "in",
+        body: messageBody,
+        awsMessageId: messageId,
+      });
+
+      // 4) Look up the customer's most recent OPEN repair order.
+      const openRo = await RepairOrder.findOne({
+        shopId: shop._id,
+        customerId: customer._id,
+        status: { $in: RO_OPEN_STATUSES as RoStatus[] },
+      })
+        .sort({ updatedAt: -1 })
+        .exec();
+
+      const hasActiveRo = !!openRo;
+      const hasOpenEstimate =
+        !!openRo?.estimate?.sentAt && !openRo?.estimate?.approvedAt;
+
+      // 5) Classify via Haiku.
+      const classifyPrompt = buildClassifyInboundPrompt({
+        body: messageBody,
+        hasActiveRo,
+        hasOpenEstimate,
+      });
+
+      const classifyModel = modelClassify();
+      const classifyStart = Date.now();
+      let classification: MessageClassification = "other";
+      let confidence = 0;
+      let classifyResult: Awaited<ReturnType<typeof invokeClaude>> | null = null;
+      let classifyError: string | undefined;
+
+      try {
+        classifyResult = await invokeClaude({
+          modelId: classifyModel,
+          prompt: classifyPrompt,
+          maxTokens: 100,
+          temperature: 0,
+        });
+        const parsed = parseClassification(classifyResult.text);
+        classification = parsed.classification;
+        confidence = parsed.confidence;
+      } catch (err) {
+        classifyError = (err as Error).message;
+        console.error("[snsInbound] classify failed", err);
+      }
+
+      await AiInteraction.create({
+        shopId: shop._id,
+        kind: "classify_inbound",
+        model: classifyModel,
+        promptVersion: CLASSIFY_INBOUND_PROMPT_VERSION,
+        inputTokens: classifyResult?.inputTokens,
+        outputTokens: classifyResult?.outputTokens,
+        durationMs: Date.now() - classifyStart,
+        error: classifyError,
+      });
+
+      // 6) Persist the classification on the inbound message.
+      inboundMsg.inboundClassification = classification;
+      await inboundMsg.save();
+
+      console.log("[snsInbound] classified", {
+        messageId: String(inboundMsg._id),
+        classification,
+        confidence,
+        hasActiveRo,
+        hasOpenEstimate,
+      });
+
+      // 7) Per-shop kill switch.
+      if (!shop.settings?.autoReplyEnabled) {
+        console.log("[snsInbound] auto-reply disabled for shop", String(shop._id));
+        continue;
+      }
+
+      // 8) Look up the owner email for SMS mock fallback (when MOCK_SMS=1).
+      const ownerUser = shop.ownerUserId
+        ? await User.findById(shop.ownerUserId).lean()
+        : null;
+      const mockEmailRecipient = customer.email ?? ownerUser?.email ?? undefined;
+
+      // 9) Branch on classification.
+      if (classification === "status_check" && openRo) {
+        const statusPrompt = buildStatusReplyPrompt({
+          customerFirstName: customer.firstName,
+          shopName: shop.name,
+          roStatus: openRo.status,
+          aiTone: shop.settings?.aiTone === "friendly" ? "friendly" : "plain",
+        });
+
+        const draftModel = modelDraft();
+        const draftStart = Date.now();
+        let replyBody = "";
+        let draftResult: Awaited<ReturnType<typeof invokeClaude>> | null = null;
+        let draftError: string | undefined;
+
+        try {
+          draftResult = await invokeClaude({
+            modelId: draftModel,
+            prompt: statusPrompt,
+            maxTokens: 200,
+            temperature: 0.4,
+          });
+          replyBody = draftResult.text.trim().replace(/^["']|["']$/g, "");
+        } catch (err) {
+          draftError = (err as Error).message;
+          console.error("[snsInbound] status reply draft failed", err);
+        }
+
+        await AiInteraction.create({
+          shopId: shop._id,
+          kind: "status_reply",
+          model: draftModel,
+          promptVersion: STATUS_REPLY_PROMPT_VERSION,
+          inputTokens: draftResult?.inputTokens,
+          outputTokens: draftResult?.outputTokens,
+          durationMs: Date.now() - draftStart,
+          error: draftError,
+        });
+
+        if (replyBody) {
+          const sendResult = await sendSms({
+            to: customer.phone,
+            from: shop.sms?.phoneNumber ?? undefined,
+            body: replyBody,
+            mockEmailRecipient,
+          });
+
+          await Message.create({
+            shopId: shop._id,
+            customerId: customer._id,
+            repairOrderId: openRo._id,
+            direction: "out",
+            body: replyBody,
+            awsMessageId: sendResult.messageId,
+            aiDrafted: true,
+            aiModel: draftModel,
+            aiPromptVersion: STATUS_REPLY_PROMPT_VERSION,
+            autoReplied: true,
+          });
+        }
+        continue;
+      }
+
+      if (classification === "approval" && openRo && hasOpenEstimate) {
+        openRo.estimate = openRo.estimate ?? {};
+        openRo.estimate.approvedAt = new Date();
+        openRo.status = "in_repair";
+        await openRo.save();
+
+        const replyBody = "Got it — approved. We'll text you when she's ready.";
+        const sendResult = await sendSms({
+          to: customer.phone,
+          from: shop.sms?.phoneNumber ?? undefined,
+          body: replyBody,
+          mockEmailRecipient,
+        });
+
+        await Message.create({
+          shopId: shop._id,
+          customerId: customer._id,
+          repairOrderId: openRo._id,
+          direction: "out",
+          body: replyBody,
+          awsMessageId: sendResult.messageId,
+          aiDrafted: false,
+          autoReplied: true,
+        });
+        continue;
+      }
+
+      // question / other / classification w/o matching context: do nothing.
+      // The message sits in the owner's inbox for manual reply.
+      console.log("[snsInbound] no auto-reply branch matched", {
+        classification,
+        hasActiveRo,
+        hasOpenEstimate,
+      });
+    } catch (err) {
+      console.error("[snsInbound] failed", err);
+    }
+  }
+};

@@ -1,0 +1,29 @@
+{
+  "name": "lift",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shop management app for 1-3 bay independent auto repair shops",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "sst dev",
+    "dev:web": "pnpm --filter @lift/web dev",
+    "dev:marketing": "pnpm --filter @lift/marketing dev",
+    "dev:api": "pnpm --filter @lift/api dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @lift/web build",
+    "build:marketing": "pnpm --filter @lift/marketing build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "deploy:dev": "sst deploy --stage dev",
+    "deploy:prod": "sst deploy --stage prod"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "sst": "^3.3.0",
+    "typescript": "^5.5.0"
+  }
+}
