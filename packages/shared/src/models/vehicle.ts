@@ -20,6 +20,7 @@ const VehicleSchema = new Schema(
 
 VehicleSchema.index({ shopId: 1, customerId: 1 });
 VehicleSchema.index({ shopId: 1, vin: 1 }, { sparse: true });
+VehicleSchema.index({ shopId: 1, plate: 1 }, { sparse: true });
 
 export type VehicleDoc = InferSchemaType<typeof VehicleSchema> & { _id: mongoose.Types.ObjectId };
 

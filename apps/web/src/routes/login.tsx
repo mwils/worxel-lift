@@ -1,26 +1,21 @@
 import { useState } from "react";
-import { Button, Container, Paper, SegmentedControl, Stack, Text, TextInput, Title } from "@mantine/core";
+import { Button, Container, Paper, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { api } from "../lib/api";
 
-type Method = "email" | "sms";
-
+// Phone sign-in is hidden until the AWS End User Messaging 10DLC campaign
+// is approved. Re-introduce the SegmentedControl + phone branch when ready.
 export function LoginRoute() {
-  const [method, setMethod] = useState<Method>("email");
   const [sent, setSent] = useState(false);
 
   const form = useForm({
-    initialValues: { email: "", phone: "" },
+    initialValues: { email: "" },
   });
 
   async function onSubmit(values: typeof form.values) {
     try {
-      if (method === "email") {
-        await api.post("/auth/magic-link", { email: values.email });
-      } else {
-        await api.post("/auth/sms-code", { phone: values.phone });
-      }
+      await api.post("/auth/magic-link", { email: values.email });
       setSent(true);
     } catch (err) {
       notifications.show({
@@ -33,57 +28,40 @@ export function LoginRoute() {
 
   return (
     <Container size={420} py="xl">
-      <Stack align="center" mb="xl">
+      <Stack align="center" mb="xl" gap="xs">
         <Title order={1}>Lift</Title>
-        <Text c="dimmed" size="sm">
-          The shop app for 1–3 bay independents.
+        <Text c="dimmed" size="sm" ta="center">
+          Sign in — or start a 14-day free trial. No password, no card.
         </Text>
       </Stack>
 
       <Paper p="lg" withBorder radius="md">
         {sent ? (
           <Stack>
-            <Title order={3}>Check your {method === "email" ? "inbox" : "phone"}</Title>
+            <Title order={3}>Check your inbox</Title>
             <Text c="dimmed">
-              We sent a {method === "email" ? "sign-in link" : "6-digit code"}. It expires in{" "}
-              {method === "email" ? "15" : "5"} minutes.
+              We sent a sign-in link. It expires in 15 minutes.
             </Text>
             <Button variant="subtle" onClick={() => setSent(false)}>
-              Use a different {method === "email" ? "email" : "phone"}
+              Use a different email
             </Button>
           </Stack>
         ) : (
           <form onSubmit={form.onSubmit(onSubmit)}>
             <Stack>
-              <SegmentedControl
-                value={method}
-                onChange={(v) => setMethod(v as Method)}
-                data={[
-                  { label: "Email", value: "email" },
-                  { label: "Phone", value: "sms" },
-                ]}
-                fullWidth
+              <TextInput
+                label="Email"
+                placeholder="mike@shopname.com"
+                type="email"
+                required
+                {...form.getInputProps("email")}
               />
-              {method === "email" ? (
-                <TextInput
-                  label="Email"
-                  placeholder="mike@shopname.com"
-                  type="email"
-                  required
-                  {...form.getInputProps("email")}
-                />
-              ) : (
-                <TextInput
-                  label="Phone"
-                  placeholder="+15551234567"
-                  type="tel"
-                  required
-                  {...form.getInputProps("phone")}
-                />
-              )}
               <Button type="submit" fullWidth>
-                Send sign-in {method === "email" ? "link" : "code"}
+                Email me a link
               </Button>
+              <Text c="dimmed" size="xs" ta="center">
+                New here? We'll create your shop after you confirm.
+              </Text>
             </Stack>
           </form>
         )}

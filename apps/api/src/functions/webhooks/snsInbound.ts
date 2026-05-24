@@ -28,6 +28,24 @@ interface InboundSnsPayload {
   messageId: string;
 }
 
+const STOP_KEYWORDS = new Set(["STOP", "STOPALL", "UNSUBSCRIBE", "END", "QUIT"]);
+
+function isStopKeyword(body: string): boolean {
+  // Carriers also honor STOP at their layer; the local flip prevents Lift
+  // from queuing further outbound (reminders, drafts) for an opted-out customer.
+  //
+  // Note: CANCEL is intentionally NOT in this list — for a customer with an
+  // upcoming booking, "cancel" means "cancel my appointment," handled below.
+  // A bare CANCEL with no booking still falls through to classification.
+  const first = body.trim().split(/\s+/)[0] ?? "";
+  return STOP_KEYWORDS.has(first.toUpperCase());
+}
+
+const BOOKING_KEYWORD_RE = /\b(cancel|reschedul\w*)\b/i;
+function isBookingKeyword(body: string): boolean {
+  return BOOKING_KEYWORD_RE.test(body);
+}
+
 function parseClassification(text: string): {
   classification: MessageClassification;
   confidence: number;
@@ -102,6 +120,71 @@ export const handler: SNSHandler = async (event) => {
         body: messageBody,
         awsMessageId: messageId,
       });
+
+      // 3a) STOP-keyword short-circuit. Flip the opt-out flag and skip
+      //     classification/auto-reply entirely — we never want to spend
+      //     Bedrock tokens or send a follow-up to a customer who just opted out.
+      if (isStopKeyword(messageBody)) {
+        await Customer.updateOne(
+          { _id: customer._id, shopId: shop._id },
+          { $set: { smsOptOutAt: new Date() } }
+        );
+        inboundMsg.inboundClassification = "opt_out";
+        await inboundMsg.save();
+        console.log("[snsInbound] STOP keyword — opted customer out", {
+          shopId: String(shop._id),
+          customerId: String(customer._id),
+        });
+        continue;
+      }
+
+      // 3b) Booking-keyword short-circuit. If the message looks like
+      //     "cancel" / "reschedule" AND the customer has an upcoming scheduled
+      //     RO with a bookingToken, reply with the manage link and skip
+      //     classification. This is deterministic — we don't want Bedrock
+      //     guessing whether "reschedule" means "tell me the price."
+      if (isBookingKeyword(messageBody)) {
+        const upcomingBooking = await RepairOrder.findOne({
+          shopId: shop._id,
+          customerId: customer._id,
+          status: "scheduled",
+          bookingToken: { $exists: true, $ne: null },
+          scheduledFor: { $gte: new Date() },
+        })
+          .sort({ scheduledFor: 1 })
+          .lean();
+
+        if (upcomingBooking?.bookingToken) {
+          const manageUrl = `${process.env.MARKETING_URL ?? ""}/booking/${upcomingBooking.bookingToken}`;
+          const replyBody = `No problem — change or cancel here: ${manageUrl}`;
+
+          const ownerForMock = shop.ownerUserId
+            ? await User.findById(shop.ownerUserId).lean()
+            : null;
+          const sendResult = await sendSms({
+            to: customer.phone,
+            from: shop.sms?.phoneNumber ?? undefined,
+            body: replyBody,
+            mockEmailRecipient: customer.email ?? ownerForMock?.email ?? undefined,
+          });
+          await Message.create({
+            shopId: shop._id,
+            customerId: customer._id,
+            repairOrderId: upcomingBooking._id,
+            direction: "out",
+            body: replyBody,
+            awsMessageId: sendResult.messageId,
+            autoReplied: true,
+          });
+          console.log("[snsInbound] booking keyword — sent manage link", {
+            shopId: String(shop._id),
+            customerId: String(customer._id),
+            bookingRoId: String(upcomingBooking._id),
+          });
+          continue;
+        }
+        // Falls through to classification if no upcoming booking matches.
+      }
 
       // 4) Look up the customer's most recent OPEN repair order.
       const openRo = await RepairOrder.findOne({

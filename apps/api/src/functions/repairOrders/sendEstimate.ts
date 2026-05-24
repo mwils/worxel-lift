@@ -25,14 +25,24 @@ function publicEstimateUrl(token: string): string {
   return `${base}/public/estimate/${token}`;
 }
 
+function publicInspectionUrl(token: string): string {
+  const base = (process.env.WEB_APP_URL ?? "https://app.lift.com").replace(/\/+$/, "");
+  return `${base}/public/inspection/${token}`;
+}
+
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
     const id = event.pathParameters?.id;
     if (!id) return badRequest("Missing repair order id");
 
-    // Body is optional ({ draftOverride?, useAi? }). Treat empty body as {}.
-    let dto: { draftOverride?: string; useAi?: boolean } = {};
+    // Body is optional ({ draftOverride?, useAi?, combineWithInspection? }).
+    // Treat empty body as {}.
+    let dto: {
+      draftOverride?: string;
+      useAi?: boolean;
+      combineWithInspection?: boolean;
+    } = {};
     if (event.body && event.body.trim().length > 0) {
       dto = await parseBody(event, SendEstimateDto);
     }
@@ -51,11 +61,31 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (!customer) return notFound("Customer not found");
     if (!shop) return notFound("Shop not found");
 
-    // Mint a publicToken if absent.
-    if (!ro.publicToken) {
-      ro.publicToken = randomBytes(24).toString("base64url");
+    // Mint estimate.publicToken if absent (legacy ro.publicToken also kept in sync).
+    let estimatePublicToken = ro.estimate?.publicToken;
+    if (!estimatePublicToken) {
+      estimatePublicToken = randomBytes(24).toString("base64url");
+      ro.estimate = {
+        ...(ro.estimate ?? {}),
+        publicToken: estimatePublicToken,
+      } as typeof ro.estimate;
     }
-    const approveLinkUrl = publicEstimateUrl(ro.publicToken);
+    if (!ro.publicToken) {
+      ro.publicToken = estimatePublicToken;
+    }
+
+    // If combineWithInspection AND there are inspection items, route the
+    // customer to the inspection page (which embeds the estimate + approve).
+    const inspection: any = (ro as any).inspection;
+    const hasInspectionItems =
+      !!inspection && Array.isArray(inspection.items) && inspection.items.length > 0;
+    const useInspectionLink = !!dto.combineWithInspection && hasInspectionItems;
+    if (useInspectionLink && !inspection.publicToken) {
+      inspection.publicToken = randomBytes(24).toString("base64url");
+    }
+    const approveLinkUrl = useInspectionLink
+      ? publicInspectionUrl(inspection.publicToken)
+      : publicEstimateUrl(estimatePublicToken);
 
     const aiTone = (shop.settings?.aiTone ?? "plain") as "plain" | "friendly";
     const model = modelDraft();

@@ -138,12 +138,29 @@ Avoid: "Click here", "Learn more", "Get started today!"
 
 ## 10. Visual identity
 
-- **Logo concept:** lightning-bolt mark inside a filled square, paired with the wordmark "Lift". Reuse the `IconBolt` motif from the landing page if generating header art.
-- **Primary brand color:** Lift blue `#0f4e95` (deep nautical blue). Hover/lighter `#3d7bd5`. Background tint `#eef5ff`.
-- **Accent:** green `#37b24d` for confirmations/approvals (matches AI-approved badges in product).
-- **Type:** system stack — `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`. No custom webfont needed.
-- **Imagery:** phone mockups of SMS threads outperform stock shop photos. If you need a shop photo, prefer a single-bay independent garage with one car on a lift — *not* a 10-bay dealership service drive.
-- **Tone of UI screenshots:** show the AiDraftSheet with editable text and a "Send" button; show inbound SMS auto-reply tagged "Auto-replied · status check".
+The landing page (`apps/marketing/src/Landing.tsx`) uses a **"Service Manual"** aesthetic — 1970s Haynes repair manual crossed with garage signage and editorial magazine. Cold email should match this visual language so the transition from inbox to landing page feels like one brand, not two.
+
+- **Logo / wordmark:** plain **"LIFT"** wordmark set in Archivo Black, all caps, tight negative letter-spacing (`-0.02em`). No bolt icon, no enclosing square — the previous `IconBolt` motif has been retired.
+- **Palette ("Service Counter"):**
+  - Background: newsprint cream `#f4eedf` (and a slightly aged shade `#ecdfca` for alternating section bands)
+  - Ink (text and rules): warm black `#1a1714` (never pure `#000`)
+  - Soft ink (dimmed text): `#605849`
+  - Hairline / faint ink: `#8c8270`
+  - Spot accent — **Snap-On enamel red** `#c8261d` for primary CTAs, highlighted words, and "AI" markers
+  - Stamp blue `#1e3a6b` for secondary editorial accents (used sparingly)
+- **Type:**
+  - Display / headlines: **Archivo Black** (Google Fonts), all caps, tight `letter-spacing: -0.02em`
+  - Body / editorial: **Spectral** (Google Fonts), regular + italic for pull quotes
+  - Technical / labels / section numbers / specs: **Space Mono** (Google Fonts), uppercase, `letter-spacing: 0.15em–0.2em`
+  - Email fallback: most email clients don't honor webfonts reliably. Spec: `font-family: 'Archivo Black', 'Helvetica Neue', Helvetica, Arial, sans-serif` for headers and `font-family: Spectral, Georgia, 'Times New Roman', serif` for body — clients that support webfonts will get them; the rest fall back gracefully.
+- **Layout cues to reuse in email:**
+  - Numbered mono section labels: `§ 01 / THE WEDGE`, `§ 02 / THE PERSONA`
+  - Hairline horizontal rules (1px ink) between sections
+  - Hard, square corners — `border-radius: 0` everywhere. No pills, no rounded cards.
+  - CTAs: solid `#c8261d` background, paper-cream text, square corners, hard 4px offset shadow in ink black, mono uppercase label
+  - Optional "printer's registration crosshair" (+) marks at card corners for emphasis (decorative only)
+- **Imagery:** phone mockups of SMS threads outperform stock shop photos. If you need a shop photo, prefer a single-bay independent garage with one car on a lift — *not* a 10-bay dealership service drive. Halftone-dot textures are on-brand; gradients and glow effects are not.
+- **Tone of UI screenshots:** show the AiDraftSheet with editable text and a "Send" button; show inbound SMS auto-reply tagged "Auto-replied · status check". Auto-reply bubbles get a red 1px border to mark AI-touched messages — preserve that convention.
 
 ---
 

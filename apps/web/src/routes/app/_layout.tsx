@@ -1,14 +1,23 @@
 import { AppShell, Group, Title, NavLink, Burger, Box } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconLayoutBoard, IconUsers, IconMessage2, IconSettings, IconLogout } from "@tabler/icons-react";
+import {
+  IconLayoutBoard,
+  IconUsers,
+  IconMessage2,
+  IconSettings,
+  IconLogout,
+  IconClipboardList,
+} from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { GlobalSearchBar, useHasCustomers } from "../../features/history/GlobalSearchBar";
 
 const NAV = [
   { to: "/", label: "Board", icon: IconLayoutBoard, end: true },
   { to: "/customers", label: "Customers", icon: IconUsers },
   { to: "/messages", label: "Messages", icon: IconMessage2 },
+  { to: "/templates", label: "Saved jobs", icon: IconClipboardList },
   { to: "/settings", label: "Settings", icon: IconSettings },
 ];
 
@@ -17,6 +26,7 @@ export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const hasCustomers = useHasCustomers();
 
   async function logout() {
     await api.post("/auth/logout");
@@ -36,6 +46,7 @@ export function AppLayout() {
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Title order={3}>Lift</Title>
           </Group>
+          {hasCustomers && <GlobalSearchBar />}
         </Group>
       </AppShell.Header>
 

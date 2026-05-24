@@ -43,7 +43,32 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         takenAt: p.takenAt,
         caption: p.caption ?? null,
       })),
-      estimate: ro.estimate ?? null,
+      estimate: ro.estimate
+        ? {
+            sentAt: ro.estimate.sentAt ?? null,
+            approvedAt: ro.estimate.approvedAt ?? null,
+            declinedAt: ro.estimate.declinedAt ?? null,
+            // publicToken intentionally omitted — server-side only.
+          }
+        : null,
+      inspection: (ro as any).inspection
+        ? {
+            status: (ro as any).inspection.status ?? "draft",
+            sentAt: (ro as any).inspection.sentAt ?? null,
+            viewedAt: (ro as any).inspection.viewedAt ?? null,
+            items: ((ro as any).inspection.items ?? []).map((it: any) => ({
+              id: String(it._id),
+              title: it.title,
+              severity: it.severity,
+              note: it.note ?? null,
+              photoIds: (it.photoIds ?? []).map((pid: any) => String(pid)),
+              order: it.order ?? 0,
+              createdAt: it.createdAt ?? null,
+              updatedAt: it.updatedAt ?? null,
+            })),
+            // publicToken intentionally omitted — server-side only.
+          }
+        : { status: "draft", sentAt: null, viewedAt: null, items: [] },
       payment: ro.payment ?? null,
       publicToken: ro.publicToken ?? null,
       scheduledFor: ro.scheduledFor ?? null,

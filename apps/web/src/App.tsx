@@ -20,6 +20,9 @@ const CustomersRoute = lazy(() =>
 const CustomerDetailRoute = lazy(() =>
   import("./routes/app/customers/detail").then((m) => ({ default: m.CustomerDetailRoute }))
 );
+const VehicleDetailRoute = lazy(() =>
+  import("./routes/app/vehicles/detail").then((m) => ({ default: m.VehicleDetailRoute }))
+);
 const MessagesInboxRoute = lazy(() =>
   import("./routes/app/messages").then((m) => ({ default: m.MessagesInboxRoute }))
 );
@@ -29,6 +32,9 @@ const ConversationRoute = lazy(() =>
 const SettingsRoute = lazy(() =>
   import("./routes/app/settings").then((m) => ({ default: m.SettingsRoute }))
 );
+const TemplatesRoute = lazy(() =>
+  import("./routes/app/templates").then((m) => ({ default: m.TemplatesRoute }))
+);
 const OnboardingRoute = lazy(() =>
   import("./routes/onboarding").then((m) => ({ default: m.OnboardingRoute }))
 );
@@ -37,6 +43,9 @@ const PublicEstimateRoute = lazy(() =>
 );
 const PublicPayRoute = lazy(() =>
   import("./routes/public/pay").then((m) => ({ default: m.PublicPayRoute }))
+);
+const PublicInspectionRoute = lazy(() =>
+  import("./routes/public/inspection").then((m) => ({ default: m.PublicInspectionRoute }))
 );
 
 function RouteFallback() {
@@ -64,6 +73,7 @@ export function App() {
         {/* Public (no auth) */}
         <Route path="/public/estimate/:token" element={<PublicEstimateRoute />} />
         <Route path="/public/pay/:token" element={<PublicPayRoute />} />
+        <Route path="/public/inspection/:token" element={<PublicInspectionRoute />} />
 
         {/* Auth flow */}
         <Route path="/login" element={me ? <Navigate to="/" replace /> : <LoginRoute />} />
@@ -101,8 +111,10 @@ export function App() {
           <Route path="ro/:id" element={<RoDetailRoute />} />
           <Route path="customers" element={<CustomersRoute />} />
           <Route path="customers/:id" element={<CustomerDetailRoute />} />
+          <Route path="vehicles/:id" element={<VehicleDetailRoute />} />
           <Route path="messages" element={<MessagesInboxRoute />} />
           <Route path="messages/:customerId" element={<ConversationRoute />} />
+          <Route path="templates" element={<TemplatesRoute />} />
           <Route path="settings" element={<SettingsRoute />} />
         </Route>
       </Routes>

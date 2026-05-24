@@ -34,7 +34,6 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       caption: dto.caption,
     };
     (ro.photos as any).push(photoDoc);
-    await ro.save();
 
     const photoArr = ro.photos as unknown as PhotoLike[];
     const saved = photoArr[photoArr.length - 1];
@@ -43,6 +42,17 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       throw new Error("Failed to read back saved photo");
     }
 
+    let attachedToItem: string | null = null;
+    if (dto.inspectionItemId) {
+      const inspection: any = (ro as any).inspection;
+      const item = inspection?.items?.id?.(dto.inspectionItemId);
+      if (!item) return badRequest("Inspection item not found on this RO");
+      item.photoIds.push(saved._id);
+      attachedToItem = dto.inspectionItemId;
+    }
+
+    await ro.save();
+
     return created({
       photo: {
         id: String(saved._id),
@@ -50,6 +60,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         takenAt: saved.takenAt,
         caption: saved.caption ?? null,
       },
+      inspectionItemId: attachedToItem,
     });
   } catch (err) {
     const known = handleKnownErrors(err);

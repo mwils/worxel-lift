@@ -2,32 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { LineItemDto, RepairOrder, UpdateLineItemDto } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound, ok } from "../../lib/response.js";
-
-interface LineItemLike {
-  _id: unknown;
-  kind: string;
-  description: string;
-  hours?: number;
-  rate?: number;
-  qty?: number;
-  unitPrice?: number;
-  total: number;
-}
-
-/**
- * Recompute laborTotal / partsTotal / total from the RO's current line items.
- * "fee" items roll into partsTotal — they're flat-line, not labor — so the
- * board still shows the right grand total. Tax is unmanaged in v1.
- */
-function recomputeTotals(items: LineItemLike[]): { laborTotal: number; partsTotal: number; total: number } {
-  let laborTotal = 0;
-  let partsTotal = 0;
-  for (const item of items) {
-    if (item.kind === "labor") laborTotal += item.total;
-    else partsTotal += item.total;
-  }
-  return { laborTotal, partsTotal, total: laborTotal + partsTotal };
-}
+import { recomputeTotals, type LineItemLike } from "./_totals.js";
 
 function serializeLineItem(li: LineItemLike) {
   return {

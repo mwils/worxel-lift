@@ -1,10 +1,13 @@
 import { z } from "zod";
 import {
   AI_TONES,
+  INSPECTION_SEVERITIES,
   LINE_ITEM_KINDS,
   MESSAGE_CLASSIFICATIONS,
   PAYMENT_STATUSES,
   RO_STATUSES,
+  SERVICE_CATEGORIES,
+  SHOP_SLUG_REGEX,
   USER_ROLES,
 } from "../constants.js";
 
@@ -39,17 +42,47 @@ export const OnboardShopDto = z.object({
 });
 
 // ── shop ────────────────────────────────────────────────────────
+export const BookingHoursDto = z.object({
+  day: z.number().int().min(0).max(6),
+  open: z.string().regex(/^\d{2}:\d{2}$/),
+  close: z.string().regex(/^\d{2}:\d{2}$/),
+  closed: z.boolean().default(false),
+});
+
+export const BookingSettingsDto = z.object({
+  enabled: z.boolean().optional(),
+  slotMinutes: z.number().int().min(15).max(240).optional(),
+  maxPerSlot: z.number().int().min(1).max(10).optional(),
+  leadTimeHours: z.number().int().min(0).max(168).optional(),
+  horizonDays: z.number().int().min(1).max(60).optional(),
+  hours: z.array(BookingHoursDto).max(7).optional(),
+  confirmationMessage: z.string().max(320).optional(),
+});
+
+export const ShopSlugDto = z
+  .string()
+  .min(2)
+  .max(42)
+  .regex(SHOP_SLUG_REGEX, "slug must be lowercase letters, digits, or hyphens");
+
 export const UpdateShopDto = z.object({
   name: z.string().min(2).optional(),
+  slug: ShopSlugDto.optional(),
   address: OnboardShopDto.shape.address,
   timezone: z.string().optional(),
   settings: z
     .object({
       aiTone: z.enum(AI_TONES).optional(),
       autoReplyEnabled: z.boolean().optional(),
+      defaultLaborRate: money.optional(),
+      serviceRemindersEnabled: z.boolean().optional(),
+      booking: BookingSettingsDto.optional(),
     })
     .optional(),
 });
+
+export type BookingHoursInput = z.infer<typeof BookingHoursDto>;
+export type BookingSettingsInput = z.infer<typeof BookingSettingsDto>;
 
 // ── customers ───────────────────────────────────────────────────
 export const CreateCustomerDto = z.object({
@@ -111,6 +144,8 @@ export const PresignPhotoDto = z.object({
 export const ConfirmPhotoDto = z.object({
   s3Key: z.string().min(1),
   caption: z.string().max(500).optional(),
+  // Optional: auto-attach the photo to a DVI inspection item on this RO.
+  inspectionItemId: objectId.optional(),
 });
 
 export const SendEstimateDto = z.object({
@@ -118,7 +153,93 @@ export const SendEstimateDto = z.object({
   // When true and no override is provided, the server drafts via Bedrock
   // instead of the deterministic template. Default behavior is template.
   useAi: z.boolean().optional(),
+  // When true and the RO has inspection items, the SMS links to the inspection
+  // public URL (which embeds the estimate) instead of the bare estimate URL.
+  combineWithInspection: z.boolean().optional(),
 });
+
+export const ConfirmPhotoQueryDto = z.object({
+  inspectionItemId: objectId.optional(),
+});
+
+// ── inspection (DVI) ────────────────────────────────────────────
+export const InspectionItemDto = z.object({
+  title: z.string().min(1).max(120),
+  severity: z.enum(INSPECTION_SEVERITIES),
+  note: z.string().max(500).optional(),
+  photoIds: z.array(objectId).default([]),
+  order: z.number().int().nonnegative().optional(),
+});
+
+export const UpdateInspectionItemDto = InspectionItemDto.partial();
+
+export const SendInspectionDto = z.object({
+  includeEstimate: z.boolean().default(true),
+  draftOverride: z.string().optional(),
+});
+
+export type InspectionItemInput = z.infer<typeof InspectionItemDto>;
+export type UpdateInspectionItemInput = z.infer<typeof UpdateInspectionItemDto>;
+export type SendInspectionInput = z.infer<typeof SendInspectionDto>;
+
+// ── job templates ───────────────────────────────────────────────
+export const JobTemplateLineItemDto = z.object({
+  kind: z.enum(LINE_ITEM_KINDS),
+  description: z.string().min(1),
+  hours: z.number().nonnegative().optional(),
+  rate: money.optional(),
+  qty: z.number().nonnegative().optional(),
+  unitPrice: money.optional(),
+});
+
+export const CreateJobTemplateDto = z.object({
+  name: z.string().min(1),
+  category: z.string().optional(),
+  notes: z.string().optional(),
+  lineItems: z.array(JobTemplateLineItemDto).default([]),
+});
+
+export const UpdateJobTemplateDto = z.object({
+  name: z.string().min(1).optional(),
+  category: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  lineItems: z.array(JobTemplateLineItemDto).optional(),
+});
+
+export const ApplyJobTemplateDto = z.object({
+  repairOrderId: objectId,
+  overrides: z
+    .record(z.string().regex(/^\d+$/), JobTemplateLineItemDto.partial())
+    .optional(),
+});
+
+export const ImportStarterTemplatesDto = z.object({
+  starterKeys: z.array(z.string().min(1)).min(1),
+});
+
+export type JobTemplateLineItemInput = z.infer<typeof JobTemplateLineItemDto>;
+export type CreateJobTemplateInput = z.infer<typeof CreateJobTemplateDto>;
+export type UpdateJobTemplateInput = z.infer<typeof UpdateJobTemplateDto>;
+export type ApplyJobTemplateInput = z.infer<typeof ApplyJobTemplateDto>;
+export type ImportStarterTemplatesInput = z.infer<typeof ImportStarterTemplatesDto>;
+
+// ── service reminders ───────────────────────────────────────────
+export const UpdateServiceReminderDto = z.object({
+  // Owner-driven transitions only:
+  //   - dismissed: Mike says "don't bug this customer about this service"
+  //   - pending: Mike un-dismisses (snooze flow flips back to pending + new dueAt)
+  status: z.enum(["dismissed", "pending"]).optional(),
+  dueAt: z.string().datetime().optional(),
+});
+
+export const DisableServiceForVehicleDto = z.object({
+  vehicleId: objectId,
+  // When omitted, every pending reminder for that vehicle is dismissed.
+  category: z.enum(SERVICE_CATEGORIES).optional(),
+});
+
+export type UpdateServiceReminderInput = z.infer<typeof UpdateServiceReminderDto>;
+export type DisableServiceForVehicleInput = z.infer<typeof DisableServiceForVehicleDto>;
 
 // ── messages ────────────────────────────────────────────────────
 export const DraftMessageDto = z.object({
@@ -150,6 +271,36 @@ export const DeclineEstimateDto = z.object({
   token: z.string().min(8),
   reason: z.string().optional(),
 });
+
+// ── public booking ──────────────────────────────────────────────
+export const CreateBookingDto = z.object({
+  start: z.string().datetime(),
+  customer: z.object({
+    firstName: z.string().min(1).max(80),
+    lastName: z.string().max(80).optional(),
+    phone: e164,
+    email: z.string().email().optional(),
+  }),
+  vehicle: z.object({
+    year: z.number().int().min(1900).max(2100),
+    make: z.string().min(1).max(40),
+    model: z.string().min(1).max(40),
+  }),
+  concern: z.string().min(3).max(500),
+});
+
+export const RescheduleBookingDto = z.object({
+  start: z.string().datetime(),
+});
+
+export const BookSlotsQueryDto = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "from must be YYYY-MM-DD"),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "to must be YYYY-MM-DD"),
+});
+
+export type CreateBookingInput = z.infer<typeof CreateBookingDto>;
+export type RescheduleBookingInput = z.infer<typeof RescheduleBookingDto>;
+export type BookSlotsQueryInput = z.infer<typeof BookSlotsQueryDto>;
 
 // ── re-exports for type inference at call sites ─────────────────
 export type CreateRepairOrderInput = z.infer<typeof CreateRepairOrderDto>;

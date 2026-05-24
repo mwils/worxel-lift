@@ -18,6 +18,10 @@ const MessageSchema = new Schema(
     aiModel: String,
     aiPromptVersion: String,
 
+    // Set on outbound messages sent by the service-reminder cron so the
+    // conversation view and reporting can attribute them back to a reminder.
+    serviceReminderId: { type: Schema.Types.ObjectId, ref: "ServiceReminder" },
+
     inboundClassification: { type: String, enum: MESSAGE_CLASSIFICATIONS },
     autoReplied: { type: Boolean, default: false },
 

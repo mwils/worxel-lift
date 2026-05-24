@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { z } from "zod";
-import { Customer } from "@lift/shared";
+import { Customer, Vehicle } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok } from "../../lib/response.js";
 
@@ -14,15 +14,63 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizePlate(s: string): string {
+  return s.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+const PLATE_VIN_SCAN_CAP = 200;
+
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
     const { q, page, pageSize } = parseQuery(event, ListQuery);
 
     const filter: Record<string, unknown> = { shopId: user.shopId };
-    if (q && q.trim().length > 0) {
-      const rx = new RegExp(escapeRegex(q.trim()), "i");
-      filter.$or = [{ firstName: rx }, { lastName: rx }, { phone: rx }, { email: rx }];
+    const trimmed = q?.trim() ?? "";
+    if (trimmed.length > 0) {
+      const rx = new RegExp(escapeRegex(trimmed), "i");
+      const plateNorm = normalizePlate(trimmed);
+
+      // Find customer IDs whose vehicles match by plate (normalized) or VIN
+      // (suffix). Union them into the $or filter so plate/VIN search returns
+      // their owners.
+      const [vinMatches, plateCandidates] = await Promise.all([
+        plateNorm.length >= 3
+          ? Vehicle.find(
+              {
+                shopId: user.shopId,
+                vin: new RegExp(escapeRegex(plateNorm) + "$", "i"),
+              },
+              { customerId: 1 }
+            )
+              .limit(PLATE_VIN_SCAN_CAP)
+              .lean()
+          : Promise.resolve([]),
+        plateNorm.length > 0
+          ? Vehicle.find(
+              { shopId: user.shopId, plate: { $exists: true, $ne: null } },
+              { customerId: 1, plate: 1 }
+            )
+              .limit(PLATE_VIN_SCAN_CAP)
+              .lean()
+          : Promise.resolve([]),
+      ]);
+
+      const plateCustomerIds = plateCandidates
+        .filter((v) => normalizePlate(v.plate ?? "").includes(plateNorm))
+        .map((v) => v.customerId);
+      const matchedCustomerIds = [
+        ...vinMatches.map((v) => v.customerId),
+        ...plateCustomerIds,
+      ];
+
+      filter.$or = [
+        { firstName: rx },
+        { lastName: rx },
+        { phone: rx },
+        { email: rx },
+        ...(matchedCustomerIds.length > 0 ? [{ _id: { $in: matchedCustomerIds } }] : []),
+      ];
     }
 
     const [total, rows] = await Promise.all([

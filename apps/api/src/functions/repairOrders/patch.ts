@@ -2,6 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { RepairOrder, UpdateRepairOrderDto } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { inferServiceReminders } from "./_inferReminders.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
@@ -38,6 +39,21 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       { new: true }
     ).lean();
     if (!ro) return notFound("Repair order not found");
+
+    // Fire-and-forget the service-reminder inference when the RO is closed.
+    // The reminder upsert reads the now-saved RO + line items; a failure here
+    // must not break the patch response, so swallow errors locally.
+    if (dto.status === "picked_up") {
+      void inferServiceReminders({
+        shopId: String(user.shopId),
+        repairOrderId: String(ro._id),
+      }).catch((err) => {
+        console.error("[ro.patch] inferServiceReminders failed", {
+          repairOrderId: String(ro._id),
+          error: (err as Error).message,
+        });
+      });
+    }
 
     return ok({
       repairOrder: {

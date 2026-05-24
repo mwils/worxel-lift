@@ -18,7 +18,14 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconCopy, IconCreditCard, IconSend, IconSparkles } from "@tabler/icons-react";
+import {
+  IconCopy,
+  IconCreditCard,
+  IconSend,
+  IconSparkles,
+  IconClipboardList,
+  IconChecklist,
+} from "@tabler/icons-react";
 import { RO_STATUSES, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { formatMoney, formatPhone, formatRoNumber } from "../../../lib/format";
@@ -30,6 +37,11 @@ import {
 import { PhotoCapture, type CapturedPhoto } from "../../../features/ro/PhotoCapture";
 import { PhotoGallery, type GalleryPhoto } from "../../../features/ro/PhotoGallery";
 import { VoiceCapture, type VoiceDraft } from "../../../features/ro/VoiceCapture";
+import { TemplatePicker } from "../../../features/jobTemplates/TemplatePicker";
+import type { JobTemplate } from "../../../features/jobTemplates/types";
+import { InspectionEditor } from "../../../features/inspection/InspectionEditor";
+import { SendInspectionModal } from "../../../features/inspection/SendInspectionModal";
+import type { InspectionState } from "../../../features/inspection/types";
 
 interface RoDetail {
   repairOrder: {
@@ -46,6 +58,7 @@ interface RoDetail {
     photos: GalleryPhoto[];
     publicToken: string | null;
     estimate: { sentAt?: string; approvedAt?: string; declinedAt?: string } | null;
+    inspection: InspectionState;
     customer: {
       id: string;
       firstName: string;
@@ -111,6 +124,24 @@ export function RoDetailRoute() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ro", id] }),
     onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
   });
+
+  // ── Saved-job template apply ────────────────────────────────────────────
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const applyTemplate = useMutation({
+    mutationFn: (templateId: string) =>
+      api.post(`/job-templates/${templateId}/apply`, { repairOrderId: id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ro", id] });
+      qc.invalidateQueries({ queryKey: ["jobTemplates"] });
+    },
+    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+  });
+
+  async function pickTemplate(t: JobTemplate) {
+    await applyTemplate.mutateAsync(t.id);
+    setTemplatePickerOpen(false);
+    notifications.show({ color: "green", message: `Added ${t.name}.` });
+  }
 
   // ── Send estimate ────────────────────────────────────────────────────────
   // Default: fetch the deterministic template (no AI cost) and let the owner
@@ -186,6 +217,9 @@ export function RoDetailRoute() {
     onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
   });
 
+  // ── Send inspection ──────────────────────────────────────────────────────
+  const [sendInspectionOpen, setSendInspectionOpen] = useState(false);
+
   // ── Pay link ─────────────────────────────────────────────────────────────
   const [payOpen, setPayOpen] = useState(false);
   const [payUrl, setPayUrl] = useState<string | null>(null);
@@ -260,6 +294,15 @@ export function RoDetailRoute() {
     ? [ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(" ")
     : "—";
 
+  const photoSrc = (photoId: string): string | null => {
+    const photo = ro.photos.find((p) => p.id === photoId);
+    if (!photo) return null;
+    const host = (import.meta.env as any).VITE_PHOTOS_CDN ?? "TODO-photos-cdn";
+    return `https://${host}/${photo.s3Key}`;
+  };
+
+  const inspectionItemCount = ro.inspection?.items.length ?? 0;
+
   return (
     <Stack>
       <Group justify="space-between" align="flex-start" wrap="wrap">
@@ -320,6 +363,16 @@ export function RoDetailRoute() {
           }}
         />
 
+        <Group>
+          <Button
+            variant="default"
+            leftSection={<IconClipboardList size={16} />}
+            onClick={() => setTemplatePickerOpen(true)}
+          >
+            + Template
+          </Button>
+        </Group>
+
         <Divider my="sm" />
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
@@ -358,6 +411,59 @@ export function RoDetailRoute() {
           Generate pay link
         </Button>
       </Group>
+
+      <Card withBorder>
+        <Group justify="space-between" mb="xs" wrap="wrap">
+          <Group gap="xs">
+            <IconChecklist size={18} />
+            <Title order={5}>Inspection (DVI)</Title>
+            {ro.inspection?.status === "sent" && (
+              <Badge variant="light" color="blue">
+                Sent{ro.inspection.viewedAt ? " · viewed" : ""}
+              </Badge>
+            )}
+          </Group>
+          <Group gap="xs">
+            <Button
+              variant="default"
+              size="xs"
+              leftSection={<IconSend size={14} />}
+              onClick={() => setSendInspectionOpen(true)}
+              disabled={inspectionItemCount === 0 || !ro.customer}
+            >
+              Send inspection
+            </Button>
+          </Group>
+        </Group>
+        {inspectionItemCount === 0 ? (
+          <Text size="sm" c="dimmed">
+            Group your photos into inspection items so the customer sees what they're paying
+            for. Add inspection item using the button below.
+          </Text>
+        ) : null}
+        <InspectionEditor
+          repairOrderId={id!}
+          inspection={
+            ro.inspection ?? { status: "draft", items: [], sentAt: null, viewedAt: null }
+          }
+          photoSrc={photoSrc}
+          onPhotoAttached={(p) => {
+            qc.setQueryData<RoDetail | undefined>(["ro", id], (prev) => {
+              if (!prev) return prev;
+              if (prev.repairOrder.photos.some((existing) => existing.id === p.id)) {
+                return prev;
+              }
+              return {
+                ...prev,
+                repairOrder: {
+                  ...prev.repairOrder,
+                  photos: [...prev.repairOrder.photos, p as GalleryPhoto],
+                },
+              };
+            });
+          }}
+        />
+      </Card>
 
       <Card withBorder>
         <Group justify="space-between" mb="xs">
@@ -465,6 +571,24 @@ export function RoDetailRoute() {
           </Group>
         </Stack>
       </Modal>
+
+      <SendInspectionModal
+        opened={sendInspectionOpen}
+        onClose={() => setSendInspectionOpen(false)}
+        repairOrderId={id!}
+        customerFirstName={ro.customer?.firstName ?? "there"}
+        vehicleSummary={vehicleSummary}
+        itemCount={inspectionItemCount}
+        totalCents={ro.total}
+        hasLineItems={ro.lineItems.length > 0}
+        onSent={() => qc.invalidateQueries({ queryKey: ["ro", id] })}
+      />
+
+      <TemplatePicker
+        opened={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        onPick={pickTemplate}
+      />
 
       {/* Voice draft review modal */}
       <Modal

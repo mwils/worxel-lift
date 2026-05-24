@@ -65,7 +65,7 @@ function computeTotal(draft: {
   return Math.round(draft.unitPrice ?? 0);
 }
 
-interface EditState {
+export interface EditState {
   kind: LineItemKind;
   description: string;
   hours: number | undefined;
@@ -74,18 +74,18 @@ interface EditState {
   unitPriceDollars: number | undefined;
 }
 
-function blankEdit(): EditState {
+export function blankEdit(defaultRateDollars?: number): EditState {
   return {
     kind: "labor",
     description: "",
     hours: undefined,
-    rateDollars: undefined,
+    rateDollars: defaultRateDollars,
     qty: undefined,
     unitPriceDollars: undefined,
   };
 }
 
-function rowToEdit(row: LineItemRow): EditState {
+export function rowToEdit(row: LineItemRow): EditState {
   return {
     kind: row.kind,
     description: row.description,
@@ -96,7 +96,7 @@ function rowToEdit(row: LineItemRow): EditState {
   };
 }
 
-function editToDraft(state: EditState): LineItemDraft {
+export function editToDraft(state: EditState): LineItemDraft {
   const draft = {
     kind: state.kind,
     description: state.description.trim(),
@@ -114,12 +114,12 @@ function editToDraft(state: EditState): LineItemDraft {
   return draft;
 }
 
-interface RowEditorProps {
+export interface RowEditorProps {
   state: EditState;
   setState: (s: EditState) => void;
 }
 
-function RowEditor({ state, setState }: RowEditorProps) {
+export function RowEditor({ state, setState }: RowEditorProps) {
   return (
     <Stack gap="xs">
       <Group grow>

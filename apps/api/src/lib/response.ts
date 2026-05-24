@@ -52,6 +52,14 @@ export function notFound(message = "Not found"): APIGatewayProxyStructuredResult
   };
 }
 
+export function conflict(message: string, details?: unknown): APIGatewayProxyStructuredResultV2 {
+  return {
+    statusCode: 409,
+    headers: DEFAULT_HEADERS,
+    body: JSON.stringify({ error: { code: "conflict", message, details } }),
+  };
+}
+
 export function serverError(message: string, details?: unknown): APIGatewayProxyStructuredResultV2 {
   return {
     statusCode: 500,

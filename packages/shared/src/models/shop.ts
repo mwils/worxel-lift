@@ -3,6 +3,13 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 const ShopSchema = new Schema(
   {
     name: { type: String, required: true },
+    // Public booking URL slug. Sparse-unique so existing shops can backfill at
+    // their own pace; onboarding will populate this from `name` when added.
+    slug: { type: String, unique: true, sparse: true, index: true },
+    // Previous slugs are retained for a v1.1 90-day redirect window. Capped at
+    // 5 entries in PATCH /shop. v1 just stores the list — redirect serving is
+    // a follow-up.
+    oldSlugs: { type: [String], default: [] },
     address: {
       line1: String,
       line2: String,
@@ -34,6 +41,10 @@ const ShopSchema = new Schema(
     settings: {
       aiTone: { type: String, enum: ["plain", "friendly"], default: "plain" },
       autoReplyEnabled: { type: Boolean, default: true },
+      defaultLaborRate: { type: Number }, // cents per hour; set by owner on first template create
+      // Kill switch for service-due reminders. Defaults on; flipped off in
+      // Settings if Mike wants to handle follow-ups manually.
+      serviceRemindersEnabled: { type: Boolean, default: true },
       businessHours: {
         // 0 = Sun … 6 = Sat
         type: [
@@ -45,6 +56,28 @@ const ShopSchema = new Schema(
           },
         ],
         default: [],
+      },
+      // Online appointment booking config. `enabled=false` hides the public
+      // booking URL even if `slug` is set. `hours` defaults to a copy of
+      // `businessHours` the first time the owner toggles booking on.
+      booking: {
+        enabled: { type: Boolean, default: false },
+        slotMinutes: { type: Number, default: 60 },
+        maxPerSlot: { type: Number, default: 1 },
+        leadTimeHours: { type: Number, default: 2 },
+        horizonDays: { type: Number, default: 14 },
+        hours: {
+          type: [
+            {
+              day: { type: Number, min: 0, max: 6 },
+              open: String, // "HH:mm"
+              close: String,
+              closed: { type: Boolean, default: false },
+            },
+          ],
+          default: [],
+        },
+        confirmationMessage: { type: String },
       },
     },
 

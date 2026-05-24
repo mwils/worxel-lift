@@ -363,7 +363,7 @@ Sections (in scroll order):
    - "Why not Shopmonkey?" (you don't need 90% of what they ship; you do need to stop drowning)
 9. **Footer** — small print, contact, TOS/privacy, status page link
 
-Tech: same Mantine theme as the app for visual continuity. Pre-rendered HTML for SEO (target queries: "auto repair shop software small shop", "alternative to shopmonkey", "1 bay auto repair management"). One form on the page (start trial) posts to `apps/api`.
+Tech: Mantine v7 with a dedicated "Service Manual" theme — newsprint-cream paper, warm ink, Snap-On enamel red, Archivo Black display + Spectral body + Space Mono labels. Deliberately diverged from the in-app theme so the landing page has its own editorial identity; cold email should match the landing, not the app (see `docs/EMAIL_CAMPAIGN_BRIEF.md` § 10). Pre-rendered HTML for SEO (target queries: "auto repair shop software small shop", "alternative to shopmonkey", "1 bay auto repair management"). One form on the page (start trial) posts to `apps/api`.
 
 ---
 

@@ -7,3 +7,5 @@ export * from "./message.js";
 export * from "./payment.js";
 export * from "./aiInteraction.js";
 export * from "./subscriptionEvent.js";
+export * from "./jobTemplate.js";
+export * from "./serviceReminder.js";

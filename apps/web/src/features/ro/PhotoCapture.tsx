@@ -14,6 +14,10 @@ export interface CapturedPhoto {
 export interface PhotoCaptureProps {
   repairOrderId: string;
   onUploaded: (photo: CapturedPhoto) => void;
+  /** When set, the confirm call attaches the photo to this DVI item. */
+  inspectionItemId?: string;
+  /** Override the default "Add photo" button label. */
+  label?: string;
 }
 
 interface PresignResponse {
@@ -24,9 +28,15 @@ interface PresignResponse {
 
 interface ConfirmResponse {
   photo: CapturedPhoto;
+  inspectionItemId?: string | null;
 }
 
-export function PhotoCapture({ repairOrderId, onUploaded }: PhotoCaptureProps) {
+export function PhotoCapture({
+  repairOrderId,
+  onUploaded,
+  inspectionItemId,
+  label,
+}: PhotoCaptureProps) {
   const [busy, setBusy] = useState(false);
 
   async function handleFile(file: File | null) {
@@ -52,7 +62,10 @@ export function PhotoCapture({ repairOrderId, onUploaded }: PhotoCaptureProps) {
       // 3. Tell the API the upload landed; it appends the photo to the RO.
       const confirmed = await api.post<ConfirmResponse>(
         `/repair-orders/${repairOrderId}/photos/confirm`,
-        { s3Key: presign.s3Key }
+        {
+          s3Key: presign.s3Key,
+          ...(inspectionItemId ? { inspectionItemId } : {}),
+        }
       );
 
       onUploaded(confirmed.photo);
@@ -77,7 +90,7 @@ export function PhotoCapture({ repairOrderId, onUploaded }: PhotoCaptureProps) {
       >
         {(props) => (
           <Button {...props} leftSection={<IconCamera size={16} />} variant="default">
-            Add photo
+            {label ?? "Add photo"}
           </Button>
         )}
       </FileButton>

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { formatMoney, formatRoNumber, relativeTime } from "../../lib/format";
 import type { RoStatus } from "@lift/shared/constants";
+import { StarterLibraryPrompt } from "../../features/jobTemplates/StarterLibraryPrompt";
 
 interface BoardRO {
   id: string;
@@ -45,6 +46,8 @@ export function BoardRoute() {
           New RO
         </Button>
       </Group>
+
+      <StarterLibraryPrompt />
 
       {isPending ? (
         <Text c="dimmed">Loading…</Text>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import {
@@ -8,12 +8,14 @@ import {
   Center,
   Group,
   Loader,
+  SegmentedControl,
   Stack,
   Text,
   Title,
 } from "@mantine/core";
 import { api } from "../../lib/api";
 import { formatPhone, relativeTime } from "../../lib/format";
+import { RemindersList } from "../../features/reminders/RemindersList";
 
 interface CustomerRow {
   id: string;
@@ -53,6 +55,29 @@ interface ConvoSummary {
 }
 
 export function MessagesInboxRoute() {
+  // Two sub-views, one route. Reminders explicitly live HERE (not as a new
+  // top-level nav item) — same surface, different lens on customer comms.
+  const [tab, setTab] = useState<"inbox" | "reminders">("inbox");
+
+  return (
+    <Stack>
+      <Group justify="space-between" wrap="nowrap">
+        <Title order={2}>Messages</Title>
+        <SegmentedControl
+          value={tab}
+          onChange={(v) => setTab(v as "inbox" | "reminders")}
+          data={[
+            { value: "inbox", label: "Inbox" },
+            { value: "reminders", label: "Reminders" },
+          ]}
+        />
+      </Group>
+      {tab === "inbox" ? <InboxTab /> : <RemindersList />}
+    </Stack>
+  );
+}
+
+function InboxTab() {
   // v1 inbox: list customers + grab the single latest message per customer.
   // Cheap-and-cheerful aggregation: server-side conversations endpoint would
   // be the right answer once message volume justifies it (see Slice H).
@@ -106,9 +131,7 @@ export function MessagesInboxRoute() {
   }
 
   return (
-    <Stack>
-      <Title order={2}>Messages</Title>
-
+    <Stack gap="sm">
       {conversations.length === 0 ? (
         <Center py="xl">
           <Stack align="center" gap="xs">

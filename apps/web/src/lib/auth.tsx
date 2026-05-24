@@ -7,10 +7,35 @@ export interface Me {
   shop: {
     id: string;
     name: string;
-    settings: { aiTone: "plain" | "friendly"; autoReplyEnabled: boolean };
+    slug?: string | null;
+    settings: {
+      aiTone: "plain" | "friendly";
+      autoReplyEnabled: boolean;
+      defaultLaborRate?: number | null;
+      serviceRemindersEnabled?: boolean;
+      booking?: BookingSettings;
+      businessHours?: BookingHour[];
+    };
     billing: { plan: string; trialEndsAt?: string };
     sms: { phoneNumber?: string };
   } | null;
+}
+
+export interface BookingHour {
+  day: number;
+  open?: string;
+  close?: string;
+  closed?: boolean;
+}
+
+export interface BookingSettings {
+  enabled?: boolean;
+  slotMinutes?: number;
+  maxPerSlot?: number;
+  leadTimeHours?: number;
+  horizonDays?: number;
+  hours?: BookingHour[];
+  confirmationMessage?: string;
 }
 
 const Ctx = createContext<{ me: Me | null; loading: boolean }>({ me: null, loading: true });

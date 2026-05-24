@@ -1,5 +1,11 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
-import { LINE_ITEM_KINDS, PAYMENT_STATUSES, RO_STATUSES } from "../constants.js";
+import {
+  INSPECTION_SEVERITIES,
+  INSPECTION_STATUSES,
+  LINE_ITEM_KINDS,
+  PAYMENT_STATUSES,
+  RO_STATUSES,
+} from "../constants.js";
 
 const LineItemSchema = new Schema(
   {
@@ -21,6 +27,17 @@ const PhotoSchema = new Schema(
     caption: String,
   },
   { _id: true }
+);
+
+const InspectionItemSchema = new Schema(
+  {
+    title: { type: String, required: true, maxlength: 120 },
+    severity: { type: String, enum: INSPECTION_SEVERITIES, required: true },
+    note: { type: String, maxlength: 500 },
+    photoIds: { type: [Schema.Types.ObjectId], default: [] },
+    order: { type: Number, default: 0 },
+  },
+  { _id: true, timestamps: true }
 );
 
 const RepairOrderSchema = new Schema(
@@ -50,6 +67,14 @@ const RepairOrderSchema = new Schema(
       publicToken: String,
     },
 
+    inspection: {
+      status: { type: String, enum: INSPECTION_STATUSES, default: "draft" },
+      publicToken: { type: String },
+      items: { type: [InspectionItemSchema], default: [] },
+      sentAt: Date,
+      viewedAt: Date,
+    },
+
     payment: {
       status: { type: String, enum: PAYMENT_STATUSES, default: "unpaid" },
       stripePaymentIntentId: String,
@@ -57,6 +82,13 @@ const RepairOrderSchema = new Schema(
     },
 
     publicToken: { type: String, index: true }, // for pay/estimate links
+
+    // Where this RO came from. `manual` = the owner created it in the app;
+    // `booking` = a customer self-booked via the public URL.
+    source: { type: String, enum: ["manual", "booking"], default: "manual" },
+    // Customer-side token for the public manage page (reschedule / cancel).
+    // Distinct from `publicToken` so revoking one doesn't break the other.
+    bookingToken: { type: String, index: true, sparse: true },
 
     scheduledFor: Date,
     completedAt: Date,
@@ -67,6 +99,10 @@ const RepairOrderSchema = new Schema(
 RepairOrderSchema.index({ shopId: 1, status: 1, updatedAt: -1 });
 RepairOrderSchema.index({ shopId: 1, number: 1 }, { unique: true });
 RepairOrderSchema.index({ shopId: 1, customerId: 1, createdAt: -1 });
+RepairOrderSchema.index({ shopId: 1, vehicleId: 1, createdAt: -1 });
+RepairOrderSchema.index({ "inspection.publicToken": 1 }, { sparse: true });
+// Slot lookup query: range over scheduledFor, filtered by shop + open status.
+RepairOrderSchema.index({ shopId: 1, scheduledFor: 1, status: 1 });
 
 export type RepairOrderDoc = InferSchemaType<typeof RepairOrderSchema> & {
   _id: mongoose.Types.ObjectId;

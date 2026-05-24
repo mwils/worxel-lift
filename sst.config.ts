@@ -21,7 +21,10 @@ export default $config({
       removal: input?.stage === "prod" ? "retain" : "remove",
       home: "aws",
       providers: {
-        aws: { region: process.env.AWS_REGION || "us-east-1" },
+        aws: {
+          region: process.env.AWS_REGION || "us-east-1",
+          profile: process.env.AWS_PROFILE || "matthew",
+        },
       },
     };
   },
@@ -179,6 +182,13 @@ export default $config({
     api.route("POST /vehicles", fn("apps/api/src/functions/vehicles/create.handler"));
     api.route("PATCH /vehicles/{id}", fn("apps/api/src/functions/vehicles/patch.handler"));
     api.route("POST /vehicles/decode-vin", fn("apps/api/src/functions/vehicles/decodeVin.handler"));
+    api.route(
+      "GET /vehicles/{id}/history",
+      fn("apps/api/src/functions/vehicles/history.handler")
+    );
+
+    // global lookup (Spotlight)
+    api.route("GET /lookup", fn("apps/api/src/functions/lookup.handler"));
 
     // repair orders
     api.route("GET /repair-orders", fn("apps/api/src/functions/repairOrders/list.handler"));
@@ -217,6 +227,55 @@ export default $config({
       "POST /repair-orders/{id}/send-estimate",
       fn("apps/api/src/functions/repairOrders/sendEstimate.handler")
     );
+    api.route(
+      "POST /repair-orders/{id}/inspection/items",
+      fn("apps/api/src/functions/repairOrders/inspectionItem.createHandler")
+    );
+    api.route(
+      "PATCH /repair-orders/{id}/inspection/items/{itemId}",
+      fn("apps/api/src/functions/repairOrders/inspectionItem.patchHandler")
+    );
+    api.route(
+      "DELETE /repair-orders/{id}/inspection/items/{itemId}",
+      fn("apps/api/src/functions/repairOrders/inspectionItem.deleteHandler")
+    );
+    api.route(
+      "POST /repair-orders/{id}/send-inspection",
+      fn("apps/api/src/functions/repairOrders/sendInspection.handler")
+    );
+
+    // job templates (saved jobs)
+    api.route("GET /job-templates", fn("apps/api/src/functions/jobTemplates/list.handler"));
+    api.route("POST /job-templates", fn("apps/api/src/functions/jobTemplates/create.handler"));
+    api.route(
+      "GET /job-templates/starter-library",
+      fn("apps/api/src/functions/jobTemplates/starterLibrary.handler")
+    );
+    api.route(
+      "POST /job-templates/import-starter",
+      fn("apps/api/src/functions/jobTemplates/importStarter.handler")
+    );
+    api.route("GET /job-templates/{id}", fn("apps/api/src/functions/jobTemplates/get.handler"));
+    api.route("PATCH /job-templates/{id}", fn("apps/api/src/functions/jobTemplates/patch.handler"));
+    api.route("DELETE /job-templates/{id}", fn("apps/api/src/functions/jobTemplates/del.handler"));
+    api.route(
+      "POST /job-templates/{id}/apply",
+      fn("apps/api/src/functions/jobTemplates/apply.handler")
+    );
+
+    // service-due reminders
+    api.route(
+      "GET /service-reminders",
+      fn("apps/api/src/functions/serviceReminders/list.handler")
+    );
+    api.route(
+      "PATCH /service-reminders/{id}",
+      fn("apps/api/src/functions/serviceReminders/patch.handler")
+    );
+    api.route(
+      "POST /service-reminders/disable-for-vehicle",
+      fn("apps/api/src/functions/serviceReminders/disableForVehicle.handler")
+    );
 
     // messages
     api.route(
@@ -249,6 +308,30 @@ export default $config({
     );
     api.route("GET /public/pay/{token}", fn("apps/api/src/functions/public/getPay.handler"));
     api.route("POST /public/pay/{token}", fn("apps/api/src/functions/public/pay.handler"));
+    api.route(
+      "GET /public/inspection/{token}",
+      fn("apps/api/src/functions/public/getInspection.handler")
+    );
+
+    // public booking (token + slug scoped, no auth)
+    api.route("GET /public/book/{slug}", fn("apps/api/src/functions/public/getBook.handler"));
+    api.route(
+      "GET /public/book/{slug}/slots",
+      fn("apps/api/src/functions/public/getBookSlots.handler")
+    );
+    api.route("POST /public/book/{slug}", fn("apps/api/src/functions/public/book.handler"));
+    api.route(
+      "GET /public/booking/{token}",
+      fn("apps/api/src/functions/public/getBooking.handler")
+    );
+    api.route(
+      "POST /public/booking/{token}/reschedule",
+      fn("apps/api/src/functions/public/rescheduleBooking.handler")
+    );
+    api.route(
+      "POST /public/booking/{token}/cancel",
+      fn("apps/api/src/functions/public/cancelBooking.handler")
+    );
 
     // ── SNS subscribers ─────────────────────────────────────────
     smsInboundTopic.subscribe(
@@ -260,12 +343,28 @@ export default $config({
       fn("apps/api/src/functions/webhooks/snsDelivery.handler")
     );
 
+    // ── Scheduled jobs ──────────────────────────────────────────
+    // First cron in the stack — service-reminder dailyScan. Runs daily at
+    // 16:00 UTC (~10am Central). The handler itself short-circuits when
+    // MOCK_SMS=1 so this is safe to provision before the 10DLC campaign
+    // clears review.
+    new sst.aws.Cron("ServiceReminderDailyScan", {
+      schedule: "cron(0 16 * * ? *)",
+      function: {
+        ...fn("apps/api/src/functions/serviceReminders/dailyScan.handler"),
+        // The scan can fan out to 200 reminders × (Bedrock + SMS) sequentially.
+        // The 15s default is too tight; bump to 5 minutes.
+        timeout: "5 minutes" as const,
+        memory: "1024 MB" as const,
+      },
+    });
+
     // ── Static sites ────────────────────────────────────────────
     const web = new sst.aws.StaticSite("Web", {
       path: "apps/web",
       domain: domains.web,
       build: { command: "pnpm build", output: "dist" },
-      environment: { VITE_API_URL: urls.api },
+      environment: { VITE_API_URL: urls.api, VITE_MARKETING_URL: urls.marketing },
     });
 
     const marketing = new sst.aws.StaticSite("Marketing", {
