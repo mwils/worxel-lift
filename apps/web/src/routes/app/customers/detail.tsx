@@ -22,6 +22,7 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
+import { notifyError } from "../../../lib/notify";
 import { formatMoney, formatPhone, formatRoNumber, relativeTime } from "../../../lib/format";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
 import { VehicleCard } from "../../../features/vehicle/VehicleCard";
@@ -111,13 +112,29 @@ export function CustomerDetailRoute() {
       notifications.show({ color: "green", message: "Vehicle added" });
       vehicleModalCtl.close();
     },
-    onError: (err) => {
-      notifications.show({ color: "red", message: (err as Error).message });
-    },
+    onError: (err) => notifyError(err, { title: "Couldn't add vehicle" }),
   });
 
   if (isPending) return <Text c="dimmed">Loading…</Text>;
-  if (!data) return <Text c="dimmed">Customer not found.</Text>;
+  if (!data)
+    return (
+      <Stack align="center">
+        <Text>Can't find that customer.</Text>
+        <Button component={Link} to="/app/customers" variant="light">
+          Back to customers
+        </Button>
+      </Stack>
+    );
+
+  const STATUS_LABEL: Record<string, string> = {
+    scheduled: "Scheduled",
+    in: "In",
+    diagnosing: "Diagnosing",
+    awaiting_parts: "Awaiting parts",
+    in_repair: "In repair",
+    ready: "Ready",
+    picked_up: "Picked up",
+  };
 
   const { customer, stats, vehicles, recentRepairOrders, recentMessages } = data;
   const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(" ");
@@ -245,7 +262,7 @@ export function CustomerDetailRoute() {
                 <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
                   <Text fw={600}>{formatRoNumber(r.number)}</Text>
                   <Badge variant="light" size="sm">
-                    {r.status}
+                    {STATUS_LABEL[r.status] ?? r.status}
                   </Badge>
                   {r.paymentStatus === "paid" && (
                     <Badge variant="light" color="green" size="sm">

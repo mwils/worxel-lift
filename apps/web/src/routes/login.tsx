@@ -1,28 +1,28 @@
 import { useState } from "react";
 import { Button, Container, Paper, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { notifications } from "@mantine/notifications";
 import { api } from "../lib/api";
+import { notifyError } from "../lib/notify";
 
 // Phone sign-in is hidden until the AWS End User Messaging 10DLC campaign
 // is approved. Re-introduce the SegmentedControl + phone branch when ready.
 export function LoginRoute() {
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const form = useForm({
     initialValues: { email: "" },
   });
 
   async function onSubmit(values: typeof form.values) {
+    setSending(true);
     try {
       await api.post("/auth/magic-link", { email: values.email });
       setSent(true);
     } catch (err) {
-      notifications.show({
-        color: "red",
-        title: "Couldn't send",
-        message: (err as Error).message,
-      });
+      notifyError(err, { title: "Couldn't send", fallback: "Try again in a second." });
+    } finally {
+      setSending(false);
     }
   }
 
@@ -54,13 +54,21 @@ export function LoginRoute() {
                 placeholder="mike@shopname.com"
                 type="email"
                 required
+                disabled={sending}
                 {...form.getInputProps("email")}
               />
-              <Button type="submit" fullWidth>
-                Email me a link
+              <Button
+                type="submit"
+                fullWidth
+                loading={sending}
+                loaderProps={{ type: "bars" }}
+              >
+                {sending ? "Sending your link…" : "Email me a link"}
               </Button>
               <Text c="dimmed" size="xs" ta="center">
-                New here? We'll create your shop after you confirm.
+                {sending
+                  ? "Hang tight — the first send takes a couple seconds."
+                  : "New here? We'll create your shop after you confirm."}
               </Text>
             </Stack>
           </form>

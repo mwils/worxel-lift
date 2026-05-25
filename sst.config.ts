@@ -18,7 +18,11 @@ export default $config({
   app(input) {
     return {
       name: "lift",
-      removal: input?.stage === "prod" ? "retain" : "remove",
+      // Live customer traffic runs on stage `dev` (only one environment for v1).
+      // Retain unconditionally so a `sst remove` or accidental cleanup can't
+      // destroy the photos S3 bucket, SNS topics, etc. When we split into a
+      // proper dev/prod, revert to stage-conditional.
+      removal: "retain",
       home: "aws",
       providers: {
         aws: {

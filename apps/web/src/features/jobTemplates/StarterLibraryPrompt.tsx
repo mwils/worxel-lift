@@ -10,11 +10,12 @@ import {
   Text,
   Loader,
 } from "@mantine/core";
-import { IconSparkles, IconX } from "@tabler/icons-react";
+import { IconClipboardList, IconX } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { formatMoney } from "../../lib/format";
 import type { JobTemplate, StarterTemplate } from "./types";
 
@@ -45,16 +46,19 @@ export function StarterLibraryPrompt() {
       api.post("/job-templates/import-starter", { starterKeys }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobTemplates"] });
-      notifications.show({ color: "green", message: "Starter jobs added." });
+      notifications.show({ color: "green", message: "Added to your saved jobs." });
       dismiss();
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't import saved jobs" }),
   });
 
   const visible = useMemo(() => {
     if (dismissed) return false;
     if (templatesQ.isPending || startersQ.isPending) return false;
-    return (templatesQ.data?.templates.length ?? 0) === 0;
+    if (templatesQ.isError || startersQ.isError) return false;
+    const noExisting = (templatesQ.data?.templates.length ?? 0) === 0;
+    const hasStarters = (startersQ.data?.starters.length ?? 0) > 0;
+    return noExisting && hasStarters;
   }, [dismissed, templatesQ, startersQ]);
 
   function dismiss() {
@@ -83,16 +87,16 @@ export function StarterLibraryPrompt() {
     <Card withBorder shadow="xs">
       <Group justify="space-between" mb="xs">
         <Group gap={6}>
-          <IconSparkles size={18} />
-          <Text fw={600}>Add a starter library?</Text>
+          <IconClipboardList size={18} />
+          <Text fw={600}>Add 12 common jobs to start?</Text>
         </Group>
         <ActionIcon variant="subtle" onClick={dismiss} aria-label="Dismiss">
           <IconX size={16} />
         </ActionIcon>
       </Group>
       <Text size="sm" c="dimmed" mb="sm">
-        Twelve common jobs with placeholder pricing. Pick the ones you do and we'll add them.
-        Edit hours and prices any time.
+        Twelve common shop jobs with rough prices you can edit any time. Pick the ones you do
+        and we'll add them to your saved jobs.
       </Text>
 
       {startersQ.isPending ? (

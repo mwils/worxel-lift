@@ -16,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { IconCar, IconClock, IconDotsVertical, IconX } from "@tabler/icons-react";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { formatPhone } from "../../lib/format";
 import {
   CATEGORY_LABELS,
@@ -52,7 +53,7 @@ function dueLabel(r: ServiceReminderRow): string {
 }
 
 function customerName(c: ServiceReminderRow["customer"]): string {
-  if (!c) return "(deleted customer)";
+  if (!c) return "Customer removed";
   return [c.firstName, c.lastName].filter(Boolean).join(" ");
 }
 
@@ -93,8 +94,7 @@ export function RemindersList() {
       notifications.show({ color: "green", message: "Snoozed 30 days." });
       invalidate();
     },
-    onError: (err) =>
-      notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't snooze" }),
   });
 
   const dismiss = useMutation({
@@ -104,8 +104,7 @@ export function RemindersList() {
       notifications.show({ color: "green", message: "Dismissed." });
       invalidate();
     },
-    onError: (err) =>
-      notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't dismiss" }),
   });
 
   const disableForVehicle = useMutation({
@@ -118,8 +117,7 @@ export function RemindersList() {
       notifications.show({ color: "green", message: "Disabled for this vehicle." });
       invalidate();
     },
-    onError: (err) =>
-      notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't disable reminders" }),
   });
 
   const reminders = data?.reminders ?? [];

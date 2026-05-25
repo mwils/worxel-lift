@@ -16,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { api } from "../lib/api";
+import { notifyError } from "../lib/notify";
 import { PaymentSheet } from "../features/payments/PaymentSheet";
 
 interface StripeSetupResp {
@@ -43,7 +44,7 @@ export function OnboardingRoute() {
       });
       setStep(1);
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Couldn't create shop" });
     }
   }
 
@@ -59,7 +60,7 @@ export function OnboardingRoute() {
         await finish();
       }
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Couldn't finish setup" });
     } finally {
       setBusy(false);
     }
@@ -73,13 +74,13 @@ export function OnboardingRoute() {
   return (
     <Container size={600} py="xl">
       <Stack mb="lg">
-        <Title order={1}>Welcome to Lift</Title>
-        <Text c="dimmed">A few minutes and you're set up.</Text>
+        <Title order={1}>Let's get your shop on Lift</Title>
+        <Text c="dimmed">Three quick screens, then you're sending estimates.</Text>
       </Stack>
 
       <Paper p="lg" withBorder>
         <Stepper active={step}>
-          <Stepper.Step label="Shop">
+          <Stepper.Step label="Your shop">
             <Stack mt="md">
               <TextInput
                 label="Shop name"
@@ -97,22 +98,22 @@ export function OnboardingRoute() {
                 />
               </Group>
               <Button onClick={createShop} disabled={!shopName}>
-                Continue
+                Next: shop number
               </Button>
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="SMS number">
+          <Stepper.Step label="Shop number">
             <Stack mt="md">
               <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
-                You'll get a dedicated shop phone number once our 10DLC campaign is approved.
-                Until then SMS is mocked to your email so you can see exactly what customers would receive.
+                Your shop gets a dedicated SMS number for customers to text. We set it up right
+                after you finish onboarding.
               </Alert>
-              <Button onClick={() => setStep(2)}>Continue</Button>
+              <Button onClick={() => setStep(2)}>Next: card</Button>
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Trial + card">
+          <Stepper.Step label="Start trial">
             <Stack mt="md">
               <Text>
                 14-day free trial. Add a card on file — we'll only charge after the trial unless
@@ -123,7 +124,7 @@ export function OnboardingRoute() {
                   Add card & start trial
                 </Button>
                 <Button variant="subtle" onClick={finish}>
-                  Skip for now
+                  Skip — add card later
                 </Button>
               </Group>
             </Stack>

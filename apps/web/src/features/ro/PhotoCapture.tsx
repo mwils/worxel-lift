@@ -3,6 +3,7 @@ import { Button, FileButton, Group, Loader, Text } from "@mantine/core";
 import { IconCamera } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 
 export interface CapturedPhoto {
   id: string;
@@ -56,7 +57,7 @@ export function PhotoCapture({
         headers: { "Content-Type": file.type || "image/jpeg" },
       });
       if (!putRes.ok) {
-        throw new Error(`S3 upload failed (${putRes.status})`);
+        throw new Error("Photo upload didn't go through. Try again.");
       }
 
       // 3. Tell the API the upload landed; it appends the photo to the RO.
@@ -71,7 +72,7 @@ export function PhotoCapture({
       onUploaded(confirmed.photo);
       notifications.show({ color: "green", message: "Photo uploaded" });
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Photo upload failed" });
     } finally {
       setBusy(false);
     }

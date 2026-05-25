@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button, Group, Modal, Stack, Switch, Text, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { formatMoney } from "../../lib/format";
 
 export interface SendInspectionModalProps {
@@ -88,15 +89,14 @@ export function SendInspectionModal({
       onSent?.();
       onClose();
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't send inspection" }),
   });
 
   return (
     <Modal opened={opened} onClose={onClose} title="Send inspection" size="lg">
       <Stack>
         <Text size="sm" c="dimmed">
-          Customer receives this as SMS (mocked → email until the 10DLC campaign clears). The
-          real public link is added by the server when you send.
+          Customer gets this as a text. The link is added when you send.
         </Text>
         <Switch
           checked={includeEstimate}
@@ -108,7 +108,7 @@ export function SendInspectionModal({
           label="Include estimate in this message"
           description={
             hasLineItems
-              ? "Inspection page will show line items + Approve / Decline buttons."
+              ? "Customer can approve or decline right from the link."
               : "No line items on this RO yet — the inspection page won't show an estimate."
           }
           disabled={!hasLineItems && !includeEstimate}

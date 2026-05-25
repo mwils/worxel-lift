@@ -1,4 +1,5 @@
-import { AppShell, Group, Title, NavLink, Burger, Box } from "@mantine/core";
+import { useState } from "react";
+import { AppShell, Group, Title, NavLink, Burger, Box, Loader } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconLayoutBoard,
@@ -8,8 +9,7 @@ import {
   IconLogout,
   IconClipboardList,
 } from "@tabler/icons-react";
-import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { NavLink as RouterLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../../lib/api";
 import { GlobalSearchBar, useHasCustomers } from "../../features/history/GlobalSearchBar";
 
@@ -24,14 +24,24 @@ const NAV = [
 export function AppLayout() {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
   const hasCustomers = useHasCustomers();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
-    await api.post("/auth/logout");
-    qc.clear();
-    navigate("/login", { replace: true });
+    if (loggingOut) return;
+    setLoggingOut(true);
+    // Best-effort: await the Set-Cookie response so the browser drops the
+    // session cookie before we navigate. If the API hiccups, still bounce.
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // intentionally swallow — don't trap Mike on the app shell
+    }
+    // Hard reload to /login. Bypasses all in-memory React + TanStack Query
+    // state — guarantees the next page load sees a fresh /auth/me against
+    // the now-cleared cookie. Avoids the brief "app shell with stale `me`"
+    // flash that a soft navigate causes.
+    window.location.href = "/login";
   }
 
   return (
@@ -69,7 +79,12 @@ export function AppLayout() {
             />
           ))}
         </Box>
-        <NavLink label="Sign out" leftSection={<IconLogout size={18} />} onClick={logout} />
+        <NavLink
+          label={loggingOut ? "Signing out…" : "Sign out"}
+          leftSection={loggingOut ? <Loader size="xs" /> : <IconLogout size={18} />}
+          onClick={logout}
+          disabled={loggingOut}
+        />
       </AppShell.Navbar>
 
       <AppShell.Main>

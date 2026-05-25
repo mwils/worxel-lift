@@ -42,7 +42,21 @@ export async function signSessionCookie(claims: SessionClaims): Promise<string> 
 }
 
 export function clearSessionCookie(): string {
-  return `${COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`;
+  // MUST mirror the attributes set in signSessionCookie — browsers identify
+  // cookies by (name, domain, path). If we omit Domain here the browser sees
+  // this as a different cookie and the original session cookie stays alive.
+  const isLocalDev = process.env.LIFT_LOCAL_DEV === "1";
+  return [
+    `${COOKIE_NAME}=`,
+    "Max-Age=0",
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    isLocalDev ? "" : "Secure",
+    process.env.COOKIE_DOMAIN ? `Domain=${process.env.COOKIE_DOMAIN}` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
 }
 
 export async function verifySessionCookie(cookieHeader: string): Promise<SessionClaims | null> {

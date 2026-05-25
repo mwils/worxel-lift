@@ -6,7 +6,21 @@ Guidance for Claude Code sessions in this repo. Read this first.
 
 **Lift** — shop management app for 1–3 bay independent auto repair shops. Owner-operator persona ("Mike"). The wedge is **AI-handled customer SMS** so the owner stays in the bay. Flat **$79/mo**, mobile-first PWA.
 
-Full v1 product plan: [`docs/PLAN.md`](docs/PLAN.md). Read it before making product decisions.
+- Full v1 product plan: [`docs/PLAN.md`](docs/PLAN.md). Read it before making product decisions.
+- Canonical Mike persona: [`docs/PERSONA.md`](docs/PERSONA.md). Read it before writing copy, designing UI, prompt-engineering AI features, or making any audience-facing decision.
+- Email campaign brief (voice/tone, anti-features, objections): [`docs/EMAIL_CAMPAIGN_BRIEF.md`](docs/EMAIL_CAMPAIGN_BRIEF.md).
+
+## AI-DLC (AWS AI-Driven Development Life Cycle)
+
+This repo has the [awslabs/aidlc-workflows](https://github.com/awslabs/aidlc-workflows) rule set installed at [`.aidlc/aidlc-rules/`](.aidlc/aidlc-rules/) (v0.1.8).
+
+**Activation:** When the user begins a request with `"Using AI-DLC, ..."`, treat this as a hard signal to follow the AI-DLC workflow. Read [`.aidlc/aidlc-rules/aws-aidlc-rules/core-workflow.md`](.aidlc/aidlc-rules/aws-aidlc-rules/core-workflow.md) first, then load the relevant `common/` rules and proceed by phase (Inception → Construction → Operations).
+
+**Rule details path:** `.aidlc/aidlc-rules/aws-aidlc-rule-details/` (this matches the first entry in core-workflow.md's lookup list; no override needed).
+
+**Opt-in extensions installed:** `security/baseline`, `testing/property-based`. The workflow loads only the `.opt-in.md` triggers by default — full extension rules load on user request.
+
+**Not yet installed:** the design-review pre-tool-use hook (experimental — needs Bash 4.0+, optionally `yq` + Python3/PyYAML). Ask the user before installing.
 
 ## Stack
 

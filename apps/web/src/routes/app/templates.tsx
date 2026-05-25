@@ -16,6 +16,7 @@ import { IconArchive, IconPencil, IconPlus, IconSearch } from "@tabler/icons-rea
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { formatMoney } from "../../lib/format";
 import { TemplateForm } from "../../features/jobTemplates/TemplateForm";
 import type { JobTemplate } from "../../features/jobTemplates/types";
@@ -35,9 +36,9 @@ export function TemplatesRoute() {
     mutationFn: (id: string) => api.del(`/job-templates/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobTemplates"] });
-      notifications.show({ color: "green", message: "Template archived." });
+      notifications.show({ color: "green", message: "Saved job archived." });
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't archive saved job" }),
   });
 
   const filtered = (templatesQ.data?.templates ?? []).filter((t) => {
@@ -59,12 +60,12 @@ export function TemplatesRoute() {
           </Text>
         </Stack>
         <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>
-          New template
+          New saved job
         </Button>
       </Group>
 
       <TextInput
-        placeholder="Search templates"
+        placeholder="Search saved jobs"
         value={q}
         onChange={(e) => setQ(e.currentTarget.value)}
         leftSection={<IconSearch size={16} />}
@@ -74,7 +75,7 @@ export function TemplatesRoute() {
         <Loader />
       ) : filtered.length === 0 ? (
         <Text c="dimmed">
-          {q ? "No matching templates." : "No saved jobs yet. Click ‘New template’ to start."}
+          {q ? "No matching saved jobs." : "No saved jobs yet. Tap ‘New saved job’ to add one."}
         </Text>
       ) : (
         <Stack gap="xs">
@@ -124,7 +125,7 @@ export function TemplatesRoute() {
       <Modal
         opened={creating}
         onClose={() => setCreating(false)}
-        title="New template"
+        title="New saved job"
         size="lg"
       >
         <TemplateForm
@@ -137,7 +138,7 @@ export function TemplatesRoute() {
       <Modal
         opened={!!editing}
         onClose={() => setEditing(null)}
-        title={editing ? `Edit “${editing.name}”` : "Edit template"}
+        title={editing ? `Edit “${editing.name}”` : "Edit saved job"}
         size="lg"
       >
         {editing && (

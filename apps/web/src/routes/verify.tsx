@@ -89,9 +89,14 @@ export function VerifyRoute() {
   return (
     <Center h="100vh">
       <Stack align="center">
-        <Title order={3}>Something went wrong</Title>
-        <Text c="red">{errMsg}</Text>
-        <Button onClick={() => navigate("/login")}>Try again</Button>
+        <Title order={3}>That link didn't work</Title>
+        <Text size="sm" c="dimmed">Links expire after 15 minutes.</Text>
+        <Button onClick={() => navigate("/login")}>Send a new link</Button>
+        {errMsg && (
+          <Text size="xs" c="dimmed" mt="md">
+            {errMsg}
+          </Text>
+        )}
       </Stack>
     </Center>
   );

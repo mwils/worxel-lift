@@ -13,6 +13,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { IconPlus } from "@tabler/icons-react";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import type { CapturedPhoto } from "../ro/PhotoCapture";
 import { InspectionItemCard } from "./InspectionItemCard";
 import {
@@ -55,21 +56,21 @@ export function InspectionEditor({
         photoIds: [],
       }),
     onSuccess: () => invalidate(),
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't add inspection item" }),
   });
 
   const patchItem = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Partial<InspectionItem> }) =>
       api.patch(`/repair-orders/${repairOrderId}/inspection/items/${id}`, patch),
     onSuccess: () => invalidate(),
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't save inspection item" }),
   });
 
   const deleteItem = useMutation({
     mutationFn: (id: string) =>
       api.del(`/repair-orders/${repairOrderId}/inspection/items/${id}`),
     onSuccess: () => invalidate(),
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't remove inspection item" }),
   });
 
   const [pendingDelete, setPendingDelete] = useState<InspectionItem | null>(null);
@@ -133,7 +134,7 @@ export function InspectionEditor({
                     }}
                   />
                   <Text fw={500} lineClamp={1}>
-                    {item.title || "Untitled item"}
+                    {item.title || "(no title yet)"}
                   </Text>
                 </Group>
               </Accordion.Control>

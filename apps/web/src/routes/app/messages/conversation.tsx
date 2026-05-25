@@ -134,7 +134,7 @@ export function ConversationRoute() {
           ) : allMessages.length === 0 ? (
             <Center py="lg">
               <Text c="dimmed" size="sm">
-                No messages yet. Say hi.
+                No messages yet. Text them first below.
               </Text>
             </Center>
           ) : (

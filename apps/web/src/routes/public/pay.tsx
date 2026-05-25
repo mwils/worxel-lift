@@ -62,7 +62,7 @@ export function PublicPayRoute() {
   if (!data) {
     return (
       <Container py="xl" size={520}>
-        <Text>Pay link not found or already closed.</Text>
+        <Text>This pay link has expired or already been paid. Reply to the shop's text if you have questions.</Text>
       </Container>
     );
   }

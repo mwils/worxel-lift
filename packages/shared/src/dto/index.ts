@@ -13,7 +13,27 @@ import {
 
 // ── shared primitives ───────────────────────────────────────────
 export const objectId = z.string().regex(/^[a-f0-9]{24}$/i, "invalid id");
-export const e164 = z.string().regex(/^\+[1-9]\d{6,14}$/, "must be E.164 (e.g. +15551234567)");
+// US-only phone input. Accepts any common format and normalizes to E.164.
+// Inputs that all produce "+15554443333":
+//   "+15554443333" / "15554443333" / "5554443333"
+//   "(555) 444-3333" / "555-444-3333" / "555.444.3333"
+// Anything else (wrong digit count, non-US international) is rejected with a
+// Mike-language message — no "E.164" jargon.
+export const e164 = z
+  .string()
+  .trim()
+  .transform((s, ctx) => {
+    let digits = s.replace(/\D/g, "");
+    if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+    if (digits.length !== 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a 10-digit US phone number",
+      });
+      return z.NEVER;
+    }
+    return `+1${digits}`;
+  });
 export const money = z.number().int().nonnegative(); // cents
 
 // ── auth ────────────────────────────────────────────────────────

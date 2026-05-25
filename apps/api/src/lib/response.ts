@@ -12,8 +12,15 @@ export function ok(body: unknown, init?: { headers?: Record<string, string> }): 
   };
 }
 
-export function created(body: unknown): APIGatewayProxyStructuredResultV2 {
-  return { statusCode: 201, headers: DEFAULT_HEADERS, body: JSON.stringify(body) };
+export function created(
+  body: unknown,
+  init?: { headers?: Record<string, string> }
+): APIGatewayProxyStructuredResultV2 {
+  return {
+    statusCode: 201,
+    headers: { ...DEFAULT_HEADERS, ...init?.headers },
+    body: JSON.stringify(body),
+  };
 }
 
 export function noContent(): APIGatewayProxyStructuredResultV2 {

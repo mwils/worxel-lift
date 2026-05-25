@@ -4,7 +4,8 @@ import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconSend } from "@tabler/icons-react";
-import { api, ApiError } from "../../lib/api";
+import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 
 export interface AiDraftSheetProps {
   opened: boolean;
@@ -74,10 +75,7 @@ export function AiDraftSheet({
       onSent?.(resp.message);
       onClose();
     },
-    onError: (err) => {
-      const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      notifications.show({ color: "red", message: msg });
-    },
+    onError: (err) => notifyError(err, { title: "Couldn't send message" }),
   });
 
   const canSend = body.trim().length > 0 && !sendMut.isPending;
@@ -121,7 +119,7 @@ export function AiDraftSheet({
     </Stack>
   );
 
-  const sheetTitle = title ?? (aiDrafted ? "Review AI draft" : "New message");
+  const sheetTitle = title ?? (aiDrafted ? "Review AI draft" : "Text to customer");
 
   if (isMobile) {
     return (

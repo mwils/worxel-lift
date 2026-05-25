@@ -26,6 +26,7 @@ import {
 } from "@lift/shared/constants";
 import { useAuth, type BookingHour, type BookingSettings } from "../../lib/auth";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL ?? "https://lift.worxel.com";
@@ -68,9 +69,9 @@ export function SettingsRoute() {
     }) => api.patch("/shop", patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
-      notifications.show({ color: "green", message: "Saved." });
+      notifications.show({ color: "green", message: "Settings saved." });
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't save settings" }),
   });
 
   const initialRate = me?.shop?.settings.defaultLaborRate ?? null;
@@ -83,7 +84,7 @@ export function SettingsRoute() {
     onSuccess: (res) => {
       window.location.href = res.url;
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't open billing" }),
   });
 
   function exportData() {
@@ -175,7 +176,7 @@ export function SettingsRoute() {
             settings: { serviceRemindersEnabled: e.currentTarget.checked },
           })
         }
-        description="When you close out one of these jobs, we'll text the customer at the suggested interval to schedule the next one. One customer, one car — operational follow-up, not marketing."
+        description="When you close one of these jobs, we'll text the customer when they're due back. One nudge per car — never a blast."
       />
       <List size="sm" spacing={4} c="dimmed">
         {SERVICE_CATEGORIES.map((cat) => {
@@ -267,7 +268,7 @@ export function SettingsRoute() {
               onChange={(v) => typeof v === "number" && patchBooking({ leadTimeHours: v })}
             />
             <NumberInput
-              label="Booking horizon (days)"
+              label="Book up to (days ahead)"
               description="How far out customers can book."
               min={1}
               max={60}
@@ -386,14 +387,14 @@ export function SettingsRoute() {
           onClick={() => openBillingPortal.mutate()}
           loading={openBillingPortal.isPending}
         >
-          Open Stripe billing portal
+          Manage billing
         </Button>
       </Group>
 
       <Divider label="Data" />
       <Group>
         <Button variant="default" onClick={exportData}>
-          Export all data (CSV zip)
+          Export everything as CSV
         </Button>
       </Group>
     </Stack>

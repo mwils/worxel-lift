@@ -18,6 +18,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { IconSearch } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
+import { notifyError } from "../../../lib/notify";
 import { formatPhone } from "../../../lib/format";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
@@ -104,7 +105,7 @@ export function NewRoRoute() {
       setCustomerMode("existing");
       setStep(1);
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't add customer" }),
   });
 
   const createVehicle = useMutation({
@@ -116,7 +117,7 @@ export function NewRoRoute() {
       setVehicleMode("existing");
       setStep(2);
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't add vehicle" }),
   });
 
   const createRo = useMutation({
@@ -130,7 +131,7 @@ export function NewRoRoute() {
       qc.invalidateQueries({ queryKey: ["ros"] });
       navigate(`/ro/${res.repairOrder.id}`);
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't create RO" }),
   });
 
   const customerOptions = customerList?.customers ?? [];
@@ -147,7 +148,7 @@ export function NewRoRoute() {
 
   return (
     <Stack>
-      <Title order={2}>New repair order</Title>
+      <Title order={2}>New RO</Title>
 
       <Stepper active={step} onStepClick={setStep}>
         <Stepper.Step label="Customer">
@@ -209,7 +210,7 @@ export function NewRoRoute() {
                 )}
                 <Group justify="flex-end">
                   <Button onClick={() => setStep(1)} disabled={!canContinueStep1}>
-                    Continue
+                    Pick vehicle
                   </Button>
                 </Group>
               </Stack>
@@ -283,7 +284,7 @@ export function NewRoRoute() {
                     Back
                   </Button>
                   <Button onClick={() => setStep(2)} disabled={!canContinueStep2}>
-                    Continue
+                    Add concern
                   </Button>
                 </Group>
               </Stack>

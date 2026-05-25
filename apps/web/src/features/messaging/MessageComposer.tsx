@@ -3,7 +3,8 @@ import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { IconSend, IconSparkles } from "@tabler/icons-react";
-import { api, ApiError } from "../../lib/api";
+import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { AiDraftSheet } from "./AiDraftSheet";
 
 export interface MessageComposerProps {
@@ -45,10 +46,7 @@ export function MessageComposer({ customerId, repairOrderId, onSent }: MessageCo
       setSheetAi(true);
       setSheetOpened(true);
     },
-    onError: (err) => {
-      const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      notifications.show({ color: "red", message: msg });
-    },
+    onError: (err) => notifyError(err, { title: "Couldn't draft message" }),
   });
 
   const sendMut = useMutation({
@@ -67,10 +65,7 @@ export function MessageComposer({ customerId, repairOrderId, onSent }: MessageCo
       notifications.show({ color: "green", message: "Message sent" });
       onSent?.();
     },
-    onError: (err) => {
-      const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      notifications.show({ color: "red", message: msg });
-    },
+    onError: (err) => notifyError(err, { title: "Couldn't send message" }),
   });
 
   const canSend = body.trim().length > 0 && !sendMut.isPending;
@@ -83,7 +78,7 @@ export function MessageComposer({ customerId, repairOrderId, onSent }: MessageCo
         maxRows={6}
         value={body}
         onChange={(e) => setBody(e.currentTarget.value)}
-        placeholder="Type a message, or click Draft with AI…"
+        placeholder="Type a message — or let AI draft one."
       />
       <Group justify="space-between" wrap="wrap">
         <Button

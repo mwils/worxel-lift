@@ -139,7 +139,7 @@ function InboxTab() {
               No conversations yet — they'll appear here when customers text you.
             </Text>
             <Button component={Link} to="/customers" variant="default">
-              Manage customers
+              See customers
             </Button>
           </Stack>
         </Center>

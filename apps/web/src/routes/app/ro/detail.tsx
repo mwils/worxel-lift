@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -29,6 +29,7 @@ import {
 import { RO_STATUSES, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { formatMoney, formatPhone, formatRoNumber } from "../../../lib/format";
+import { notifyError } from "../../../lib/notify";
 import {
   LineItemEditor,
   type LineItemDraft,
@@ -102,27 +103,27 @@ export function RoDetailRoute() {
       qc.invalidateQueries({ queryKey: ["ro", id] });
       qc.invalidateQueries({ queryKey: ["ros"] });
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
   });
 
   const createLine = useMutation({
     mutationFn: (draft: LineItemDraft) =>
       api.post<LineItemMutationResp>(`/repair-orders/${id}/line-items`, draft),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ro", id] }),
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't add line" }),
   });
 
   const patchLine = useMutation({
     mutationFn: ({ lineId, draft }: { lineId: string; draft: LineItemDraft }) =>
       api.patch<LineItemMutationResp>(`/repair-orders/${id}/line-items/${lineId}`, draft),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ro", id] }),
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't update line" }),
   });
 
   const deleteLine = useMutation({
     mutationFn: (lineId: string) => api.del(`/repair-orders/${id}/line-items/${lineId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ro", id] }),
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't delete line" }),
   });
 
   // ── Saved-job template apply ────────────────────────────────────────────
@@ -134,7 +135,7 @@ export function RoDetailRoute() {
       qc.invalidateQueries({ queryKey: ["ro", id] });
       qc.invalidateQueries({ queryKey: ["jobTemplates"] });
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't apply saved job" }),
   });
 
   async function pickTemplate(t: JobTemplate) {
@@ -172,7 +173,7 @@ export function RoDetailRoute() {
       setAiPolished(false);
       setEstimateOpen(true);
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Couldn't draft estimate" });
     } finally {
       setEstimateLoading(false);
     }
@@ -197,7 +198,7 @@ export function RoDetailRoute() {
       setEstimateDraft(res.draft);
       setAiPolished(true);
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Couldn't polish estimate" });
     } finally {
       setPolishLoading(false);
     }
@@ -214,7 +215,7 @@ export function RoDetailRoute() {
       setEstimateOpen(false);
       qc.invalidateQueries({ queryKey: ["ro", id] });
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't send estimate" }),
   });
 
   // ── Send inspection ──────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ export function RoDetailRoute() {
       setPayUrl(res.url);
       setPayOpen(true);
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't text pay link" }),
   });
 
   // ── Voice-to-RO accept-all → posts each line item via existing endpoint ──
@@ -261,7 +262,7 @@ export function RoDetailRoute() {
       qc.invalidateQueries({ queryKey: ["ro", id] });
       notifications.show({ color: "green", message: "Added voice draft to RO." });
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Voice draft didn't work" });
     }
   }
 
@@ -270,22 +271,43 @@ export function RoDetailRoute() {
     const err = roQ.error;
     const isNotFound = err instanceof ApiError && err.status === 404;
     if (isNotFound) {
-      return <Text c="dimmed">Repair order not found.</Text>;
+      return (
+        <Stack gap="xs" align="flex-start">
+          <Text c="dimmed">Can't find that RO.</Text>
+          <Button component={Link} to="/app/board" variant="default" size="xs">
+            Back to board
+          </Button>
+        </Stack>
+      );
     }
     return (
-      <Alert color="red" title="Couldn't load this repair order">
+      <Alert color="red" title="Couldn't open this RO">
         <Stack gap="xs">
-          <Text size="sm">{(err as Error).message}</Text>
+          <Text size="sm">Network hiccup — try again in a second.</Text>
           <Group>
             <Button variant="default" size="xs" onClick={() => roQ.refetch()}>
               Retry
             </Button>
+            <Button component={Link} to="/app/board" variant="default" size="xs">
+              Back to board
+            </Button>
           </Group>
+          <Text size="xs" c="dimmed" mt="md">
+            {(err as Error).message}
+          </Text>
         </Stack>
       </Alert>
     );
   }
-  if (!data) return <Text c="dimmed">Repair order not found.</Text>;
+  if (!data)
+    return (
+      <Stack gap="xs" align="flex-start">
+        <Text c="dimmed">Can't find that RO.</Text>
+        <Button component={Link} to="/app/board" variant="default" size="xs">
+          Back to board
+        </Button>
+      </Stack>
+    );
   const { repairOrder: ro } = data;
   const customerName = ro.customer
     ? [ro.customer.firstName, ro.customer.lastName].filter(Boolean).join(" ")
@@ -369,7 +391,7 @@ export function RoDetailRoute() {
             leftSection={<IconClipboardList size={16} />}
             onClick={() => setTemplatePickerOpen(true)}
           >
-            + Template
+            + Saved job
           </Button>
         </Group>
 
@@ -408,7 +430,7 @@ export function RoDetailRoute() {
           loading={createPayLink.isPending}
           disabled={ro.total === 0}
         >
-          Generate pay link
+          Text pay link
         </Button>
       </Group>
 
@@ -416,7 +438,7 @@ export function RoDetailRoute() {
         <Group justify="space-between" mb="xs" wrap="wrap">
           <Group gap="xs">
             <IconChecklist size={18} />
-            <Title order={5}>Inspection (DVI)</Title>
+            <Title order={5}>Inspection</Title>
             {ro.inspection?.status === "sent" && (
               <Badge variant="light" color="blue">
                 Sent{ro.inspection.viewedAt ? " · viewed" : ""}
@@ -438,7 +460,7 @@ export function RoDetailRoute() {
         {inspectionItemCount === 0 ? (
           <Text size="sm" c="dimmed">
             Group your photos into inspection items so the customer sees what they're paying
-            for. Add inspection item using the button below.
+            for.
           </Text>
         ) : null}
         <InspectionEditor
@@ -499,8 +521,7 @@ export function RoDetailRoute() {
         <Stack>
           <Group justify="space-between" wrap="wrap">
             <Text size="sm" c="dimmed">
-              Edit before sending. Customer receives this as SMS (mocked → email until the
-              10DLC campaign clears).
+              Edit before sending. Customer gets this as a text.
             </Text>
             <Group gap="xs">
               {aiPolished && (
@@ -516,7 +537,7 @@ export function RoDetailRoute() {
                 loading={polishLoading}
                 leftSection={<IconSparkles size={14} />}
               >
-                {aiPolished ? "Revert to template" : "Polish with AI"}
+                {aiPolished ? "Use my version" : "Polish with AI"}
               </Button>
             </Group>
           </Group>

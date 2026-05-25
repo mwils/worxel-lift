@@ -26,6 +26,7 @@ import {
 } from "../ro/LineItemEditor";
 import { formatMoney } from "../../lib/format";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { useAuth } from "../../lib/auth";
 import type { JobTemplate, JobTemplateLineItem } from "./types";
 
@@ -128,7 +129,7 @@ export function TemplateForm({ template, onSaved, onCancel }: TemplateFormProps)
       setShowRatePrompt(false);
       notifications.show({ color: "green", message: "Default labor rate saved." });
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't save labor rate" }),
   });
 
   function startAdd() {
@@ -175,10 +176,10 @@ export function TemplateForm({ template, onSaved, onCancel }: TemplateFormProps)
     },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["jobTemplates"] });
-      notifications.show({ color: "green", message: template ? "Template saved." : "Template created." });
+      notifications.show({ color: "green", message: template ? "Saved job updated." : "Saved job created." });
       onSaved(res.template);
     },
-    onError: (err) => notifications.show({ color: "red", message: (err as Error).message }),
+    onError: (err) => notifyError(err, { title: "Couldn't save" }),
   });
 
   function submit() {

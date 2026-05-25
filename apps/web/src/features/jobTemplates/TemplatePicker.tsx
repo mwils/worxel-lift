@@ -112,7 +112,7 @@ function PickerBody({ onPick, busy, onClose }: PickerBodyProps) {
   return (
     <Stack gap="sm">
       <TextInput
-        placeholder="Search templates"
+        placeholder="Search saved jobs"
         value={q}
         onChange={(e) => setQ(e.currentTarget.value)}
         leftSection={<IconSearch size={16} />}
@@ -163,7 +163,7 @@ function PickerBody({ onPick, busy, onClose }: PickerBodyProps) {
 
       <Group justify="space-between" pt="xs">
         <Anchor component={Link} to="/templates" size="sm" onClick={onClose}>
-          Manage templates
+          Edit saved jobs
         </Anchor>
         <Button variant="subtle" onClick={onClose}>
           Close

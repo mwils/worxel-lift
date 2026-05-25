@@ -52,9 +52,16 @@ export function PublicEstimateRoute() {
   return (
     <Container size={520} py="lg">
       <Stack>
-        <Title order={2}>{data.shop?.name}</Title>
+        <Stack gap={0}>
+          {data.shop?.name && (
+            <Text size="sm" c="dimmed" tt="uppercase" fw={600}>
+              {data.shop.name}
+            </Text>
+          )}
+          <Title order={2}>Estimate</Title>
+        </Stack>
         <Text c="dimmed">
-          Estimate for {data.customer?.firstName} · {data.vehicle?.year} {data.vehicle?.make} {data.vehicle?.model}
+          For {data.customer?.firstName} · {data.vehicle?.year} {data.vehicle?.make} {data.vehicle?.model}
         </Text>
 
         <Card>

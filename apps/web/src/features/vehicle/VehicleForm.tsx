@@ -3,9 +3,11 @@ import { Button, Group, NumberInput, Stack, Textarea, TextInput } from "@mantine
 import { useForm } from "@mantine/form";
 import { zodResolver } from "mantine-form-zod-resolver";
 import { notifications } from "@mantine/notifications";
+import { IconBarcode } from "@tabler/icons-react";
 import { CreateVehicleDto } from "@lift/shared/dto";
 import type { z } from "zod";
 import { api } from "../../lib/api";
+import { VinScanner, isVinScannerSupported } from "./VinScanner";
 
 type VehicleInput = z.infer<typeof CreateVehicleDto>;
 
@@ -53,20 +55,22 @@ export function VehicleForm({
   loading,
 }: VehicleFormProps) {
   const [decoding, setDecoding] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const scanSupported = isVinScannerSupported();
   const form = useForm<VehicleInput>({
     initialValues: { ...emptyValues(customerId), ...initialValues },
     validate: zodResolver(CreateVehicleDto),
   });
 
-  async function decodeVin() {
-    const vin = (form.values.vin ?? "").trim();
-    if (vin.length !== 17) {
+  async function runDecode(vin: string) {
+    const cleaned = vin.trim().toUpperCase();
+    if (cleaned.length !== 17) {
       notifications.show({ color: "yellow", message: "VIN must be 17 characters" });
       return;
     }
     setDecoding(true);
     try {
-      const res = await api.post<VinDecodeResponse>("/vehicles/decode-vin", { vin });
+      const res = await api.post<VinDecodeResponse>("/vehicles/decode-vin", { vin: cleaned });
       form.setValues((prev) => ({
         ...prev,
         year: res.year ?? prev.year,
@@ -76,10 +80,24 @@ export function VehicleForm({
         engine: res.engine ?? prev.engine,
       }));
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      const raw = (err as Error)?.message?.trim();
+      notifications.show({
+        color: "red",
+        title: "Couldn't decode that VIN",
+        message: raw || "Check the VIN and try again.",
+      });
     } finally {
       setDecoding(false);
     }
+  }
+
+  function decodeVin() {
+    void runDecode(form.values.vin ?? "");
+  }
+
+  function handleScan(vin: string) {
+    form.setFieldValue("vin", vin);
+    void runDecode(vin);
   }
 
   return (
@@ -108,10 +126,28 @@ export function VehicleForm({
             style={{ flex: 1 }}
             {...form.getInputProps("vin")}
           />
+          {scanSupported && (
+            <Button
+              variant="default"
+              leftSection={<IconBarcode size={16} />}
+              onClick={() => setScannerOpen(true)}
+              type="button"
+            >
+              Scan
+            </Button>
+          )}
           <Button variant="default" onClick={decodeVin} loading={decoding} type="button">
             Decode VIN
           </Button>
         </Group>
+
+        {scanSupported && (
+          <VinScanner
+            opened={scannerOpen}
+            onClose={() => setScannerOpen(false)}
+            onScan={handleScan}
+          />
+        )}
         <Group grow>
           <NumberInput
             label="Year"

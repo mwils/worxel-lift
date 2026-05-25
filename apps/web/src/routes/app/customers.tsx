@@ -17,6 +17,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 import { formatPhone, relativeTime } from "../../lib/format";
 import { CustomerForm } from "../../features/customer/CustomerForm";
 import type { CreateCustomerInput } from "@lift/shared/dto";
@@ -58,9 +59,7 @@ export function CustomersRoute() {
       notifications.show({ color: "green", message: "Customer added" });
       close();
     },
-    onError: (err) => {
-      notifications.show({ color: "red", message: (err as Error).message });
-    },
+    onError: (err) => notifyError(err, { title: "Couldn't add customer" }),
   });
 
   return (
@@ -125,7 +124,6 @@ export function CustomersRoute() {
 
       <Modal opened={opened} onClose={close} title="New customer" centered>
         <CustomerForm
-          submitLabel="Create customer"
           loading={createMut.isPending}
           onCancel={close}
           onSubmit={async (values) => {

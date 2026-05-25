@@ -22,6 +22,7 @@ import { ActionIcon, Badge, Group, Loader, Stack, Text, Tooltip } from "@mantine
 import { IconMicrophone, IconPlayerStopFilled } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { api } from "../../lib/api";
+import { notifyError } from "../../lib/notify";
 
 export interface VoiceDraftLineItem {
   kind: "labor" | "part" | "fee";
@@ -132,12 +133,12 @@ export function VoiceCapture({ repairOrderId, onDraft }: VoiceCaptureProps) {
         notifications.show({
           color: "red",
           title: "Microphone blocked",
-          message: "Allow microphone access in your browser to dictate a repair order.",
+          message: "Allow microphone access in your browser to talk through the job.",
         });
       } else {
-        notifications.show({
-          color: "red",
-          message: (err as Error).message || "Could not start recording",
+        notifyError(err, {
+          title: "Couldn't start the mic",
+          fallback: "Check your browser permissions.",
         });
       }
       stopStream();
@@ -163,7 +164,7 @@ export function VoiceCapture({ repairOrderId, onDraft }: VoiceCaptureProps) {
     const blob = new Blob(chunksRef.current, { type: blobMime });
     chunksRef.current = [];
     if (blob.size === 0) {
-      notifications.show({ color: "red", message: "Empty recording" });
+      notifications.show({ color: "red", message: "Didn't catch anything — try again." });
       setPhase("idle");
       return;
     }
@@ -186,7 +187,7 @@ export function VoiceCapture({ repairOrderId, onDraft }: VoiceCaptureProps) {
         headers: { "Content-Type": "image/webm" },
       });
       if (!putRes.ok) {
-        throw new Error(`Upload failed (${putRes.status})`);
+        throw new Error("Voice memo didn't upload. Try again.");
       }
 
       setPhase("drafting");
@@ -202,7 +203,7 @@ export function VoiceCapture({ repairOrderId, onDraft }: VoiceCaptureProps) {
         }`,
       });
     } catch (err) {
-      notifications.show({ color: "red", message: (err as Error).message });
+      notifyError(err, { title: "Voice memo failed" });
     } finally {
       setPhase("idle");
       setElapsed(0);
@@ -215,7 +216,7 @@ export function VoiceCapture({ repairOrderId, onDraft }: VoiceCaptureProps) {
   return (
     <Stack gap="xs">
       <Group gap="sm" align="center">
-        <Tooltip label={recording ? "Stop recording" : "Dictate repair order"}>
+        <Tooltip label={recording ? "Stop recording" : "Talk through the job"}>
           <ActionIcon
             size={48}
             radius="xl"
@@ -257,13 +258,13 @@ export function VoiceCapture({ repairOrderId, onDraft }: VoiceCaptureProps) {
         {phase === "drafting" && (
           <Group gap={6}>
             <Loader size="xs" />
-            <Text size="sm" c="dimmed">Drafting line items…</Text>
+            <Text size="sm" c="dimmed">Writing it up…</Text>
           </Group>
         )}
 
         {phase === "idle" && (
           <Text size="sm" c="dimmed">
-            Tap to dictate a diagnosis.
+            Tap to talk it through.
           </Text>
         )}
       </Group>

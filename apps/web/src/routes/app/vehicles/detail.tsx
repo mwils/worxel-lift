@@ -86,7 +86,18 @@ export function VehicleDetailRoute() {
   if (query.isPending) return <Text c="dimmed">Loading…</Text>;
   const pages = query.data?.pages;
   const first: VehicleHistoryPage | undefined = pages?.[0];
-  if (!pages || !first) return <Text c="dimmed">Vehicle not found.</Text>;
+  if (!pages || !first) {
+    const customerId = pages?.[0]?.customer?.id;
+    const backTo = customerId ? `/app/customers/${customerId}` : "/app/customers";
+    return (
+      <Stack align="center">
+        <Text>Can't find that vehicle.</Text>
+        <Button component={Link} to={backTo} variant="light">
+          Back to customer
+        </Button>
+      </Stack>
+    );
+  }
 
   const { vehicle, customer, stats } = first;
   const allRepairOrders = pages.flatMap((p) => p.repairOrders);
@@ -142,7 +153,7 @@ export function VehicleDetailRoute() {
 
         {allRepairOrders.length === 0 ? (
           <Text c="dimmed" size="sm">
-            No repair orders yet.
+            No ROs yet.
           </Text>
         ) : (
           allRepairOrders.map((r) => <RepairOrderTimelineCard key={r.id} ro={r} />)

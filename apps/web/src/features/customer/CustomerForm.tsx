@@ -21,7 +21,7 @@ const EMPTY: CreateCustomerInput = {
 
 export function CustomerForm({
   initialValues,
-  submitLabel = "Save customer",
+  submitLabel = "Add customer",
   onSubmit,
   onCancel,
   loading,
@@ -57,7 +57,7 @@ export function CustomerForm({
           label="Phone"
           placeholder="+15551234567"
           required
-          description="E.164 format. Customer is opted in to SMS at creation."
+          description="Include the area code. Adding a customer opts them in to SMS."
           {...form.getInputProps("phone")}
         />
         <TextInput label="Email" type="email" {...form.getInputProps("email")} />

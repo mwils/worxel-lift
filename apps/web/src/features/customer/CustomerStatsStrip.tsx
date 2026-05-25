@@ -11,7 +11,7 @@ interface Props {
 export function CustomerStatsStrip({ vehicleCount, roCount, lifetimeSpendCents, lastVisitAt }: Props) {
   const chips: Array<{ label: string; value: string }> = [
     { label: "Lifetime spend", value: formatMoney(lifetimeSpendCents) },
-    { label: "Repair orders", value: String(roCount) },
+    { label: "ROs", value: String(roCount) },
     { label: "Vehicles", value: String(vehicleCount) },
     { label: "Last visit", value: lastVisitAt ? relativeTime(lastVisitAt) : "—" },
   ];
