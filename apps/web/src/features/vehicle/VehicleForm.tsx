@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Group, NumberInput, Stack, Textarea, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { useMediaQuery } from "@mantine/hooks";
 import { zodResolver } from "mantine-form-zod-resolver";
 import { notifications } from "@mantine/notifications";
 import { IconBarcode } from "@tabler/icons-react";
@@ -8,6 +9,11 @@ import { CreateVehicleDto } from "@lift/shared/dto";
 import type { z } from "zod";
 import { api } from "../../lib/api";
 import { VinScanner, isVinScannerSupported } from "./VinScanner";
+
+// VIN-barcode scanner is hidden while we debug the iPad Chrome UX.
+// Flip to `true` to re-enable — the component + handlers are kept in place
+// so re-enabling is a one-line change.
+const SCAN_ENABLED = false;
 
 type VehicleInput = z.infer<typeof CreateVehicleDto>;
 
@@ -56,7 +62,8 @@ export function VehicleForm({
 }: VehicleFormProps) {
   const [decoding, setDecoding] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const scanSupported = isVinScannerSupported();
+  const scanSupported = SCAN_ENABLED && isVinScannerSupported();
+  const isSmall = useMediaQuery("(max-width: 48em)");
   const form = useForm<VehicleInput>({
     initialValues: { ...emptyValues(customerId), ...initialValues },
     validate: zodResolver(CreateVehicleDto),
@@ -118,28 +125,59 @@ export function VehicleForm({
       })}
     >
       <Stack>
-        <Group align="flex-end">
-          <TextInput
-            label="VIN"
-            placeholder="17 chars"
-            maxLength={17}
-            style={{ flex: 1 }}
-            {...form.getInputProps("vin")}
-          />
-          {scanSupported && (
-            <Button
-              variant="default"
-              leftSection={<IconBarcode size={16} />}
-              onClick={() => setScannerOpen(true)}
-              type="button"
-            >
-              Scan
+        {isSmall ? (
+          <Stack gap="xs">
+            <TextInput
+              label="VIN"
+              placeholder="17 chars"
+              maxLength={17}
+              {...form.getInputProps("vin")}
+            />
+            <Group justify="flex-end">
+              {scanSupported && (
+                <Button
+                  variant="default"
+                  leftSection={<IconBarcode size={16} />}
+                  onClick={() => setScannerOpen(true)}
+                  type="button"
+                >
+                  Scan
+                </Button>
+              )}
+              <Button
+                variant="default"
+                onClick={decodeVin}
+                loading={decoding}
+                type="button"
+              >
+                Decode VIN
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          <Group align="flex-end">
+            <TextInput
+              label="VIN"
+              placeholder="17 chars"
+              maxLength={17}
+              style={{ flex: 1 }}
+              {...form.getInputProps("vin")}
+            />
+            {scanSupported && (
+              <Button
+                variant="default"
+                leftSection={<IconBarcode size={16} />}
+                onClick={() => setScannerOpen(true)}
+                type="button"
+              >
+                Scan
+              </Button>
+            )}
+            <Button variant="default" onClick={decodeVin} loading={decoding} type="button">
+              Decode VIN
             </Button>
-          )}
-          <Button variant="default" onClick={decodeVin} loading={decoding} type="button">
-            Decode VIN
-          </Button>
-        </Group>
+          </Group>
+        )}
 
         {scanSupported && (
           <VinScanner
