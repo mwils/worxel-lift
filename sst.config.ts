@@ -227,10 +227,13 @@ export default $config({
       "POST /repair-orders/{id}/voice/presign",
       fn("apps/api/src/functions/repairOrders/voicePresign.handler")
     );
-    api.route(
-      "POST /repair-orders/{id}/voice-to-ro",
-      fn("apps/api/src/functions/repairOrders/voiceToRo.handler")
-    );
+    api.route("POST /repair-orders/{id}/voice-to-ro", {
+      ...fn("apps/api/src/functions/repairOrders/voiceToRo.handler"),
+      // Transcribe job orchestration alone runs ~10-25s for short clips. API
+      // Gateway HTTP API caps integration at 30s, so we sit just under it and
+      // leave ~4s of headroom for Bedrock structuring.
+      timeout: "30 seconds" as const,
+    });
     api.route(
       "POST /repair-orders/{id}/send-estimate",
       fn("apps/api/src/functions/repairOrders/sendEstimate.handler")

@@ -18,7 +18,8 @@
  * Transcription strategy decision:
  *   Bedrock's Anthropic Claude models don't accept audio input on Bedrock today,
  *   so we use AWS Transcribe as a separate step. Transcribe is async (StartJob +
- *   poll), and Lambda timeout is 15s, so we keep the poll budget tight (~10s).
+ *   poll). Lambda timeout for this route is 30s (the API Gateway HTTP API cap),
+ *   so the poll budget is ~26s with ~4s reserved for Bedrock structuring.
  *   For deterministic testing (and as a graceful fallback when a job doesn't
  *   complete in time) the client may pass an explicit `transcript` string —
  *   if present we skip Transcribe entirely.
@@ -90,16 +91,18 @@ async function runTranscribe(s3Key: string): Promise<string> {
     })
   );
 
-  // Poll with a tight budget — Lambda timeout is 15s; we want to leave enough
-  // headroom for the Bedrock call afterward. ~10s max here.
+  // Lambda timeout is 30s (set in sst.config.ts for this route — API Gateway
+  // HTTP API hard-caps integration at 30s). Reserve ~4s for the Bedrock call
+  // after this, so the transcription poll budget is ~26s. Poll every 1s; even
+  // for short voice memos Transcribe rarely finishes faster than ~8s.
   const start = Date.now();
-  const budgetMs = 10_000;
+  const budgetMs = 26_000;
   // eslint-disable-next-line no-constant-condition
   while (true) {
     if (Date.now() - start > budgetMs) {
       throw new Error("Transcription timed out");
     }
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1000));
     const got = await transcribe().send(
       new GetTranscriptionJobCommand({ TranscriptionJobName: jobName })
     );
