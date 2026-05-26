@@ -29,6 +29,7 @@ import { z } from "zod";
 import {
   AiInteraction,
   RepairOrder,
+  Shop,
   Vehicle,
   buildVoiceToRoPrompt,
   VOICE_TO_RO_PROMPT_VERSION,
@@ -177,10 +178,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       return badRequest("s3Key is not scoped to this repair order");
     }
 
-    const vehicle = await Vehicle.findOne({
-      _id: ro.vehicleId,
-      shopId: user.shopId,
-    }).lean();
+    const [vehicle, shop] = await Promise.all([
+      Vehicle.findOne({ _id: ro.vehicleId, shopId: user.shopId }).lean(),
+      Shop.findById(user.shopId).lean(),
+    ]);
 
     // Step 1 — get the transcript. Honour the client-supplied transcript if
     // present (test / degraded mode); otherwise run AWS Transcribe.
@@ -207,6 +208,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
             model: vehicle.model ?? undefined,
           }
         : undefined,
+      defaultLaborRateCents: shop?.settings?.defaultLaborRate ?? undefined,
     });
 
     const modelId = modelDraft();
