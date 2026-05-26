@@ -265,7 +265,7 @@ export type DisableServiceForVehicleInput = z.infer<typeof DisableServiceForVehi
 export const DraftMessageDto = z.object({
   customerId: objectId,
   repairOrderId: objectId.optional(),
-  kind: z.enum(["estimate", "status_update", "ready_for_pickup", "freeform"]),
+  kind: z.enum(["estimate", "status_update", "ready_for_pickup", "freeform", "pay_link"]),
   context: z.string().optional(),
   // Default false — caller gets a deterministic template. Set true to
   // invoke Bedrock for the AI-polished version. The freeform kind requires
@@ -282,7 +282,16 @@ export const SendMessageDto = z.object({
 });
 
 // ── payments ────────────────────────────────────────────────────
-export const CreatePayLinkDto = z.object({ repairOrderId: objectId });
+export const CreatePayLinkDto = z.object({
+  repairOrderId: objectId,
+  // When set, the server sends the SMS using this owner-edited body and
+  // records a Message. When omitted, the server returns the pay URL without
+  // sending anything (legacy "just give me the link" behavior).
+  draftOverride: z.string().optional(),
+  // Marks provenance on the Message record when the owner sent an
+  // AI-polished version. Has no effect when draftOverride is omitted.
+  useAi: z.boolean().optional(),
+});
 export const SaveCardDto = z.object({ customerId: objectId });
 
 // ── public (token-scoped) ───────────────────────────────────────

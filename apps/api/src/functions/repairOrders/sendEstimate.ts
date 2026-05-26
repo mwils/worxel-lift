@@ -17,7 +17,7 @@ import {
 const TEMPLATE_VERSION = "estimate.template.v1";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
-import { invokeClaude, modelDraft } from "../../lib/bedrock.js";
+import { invokeModel, modelDraft } from "../../lib/bedrock.js";
 import { sendSms } from "../../lib/sms.js";
 
 function publicEstimateUrl(token: string): string {
@@ -132,7 +132,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       let invokeResult;
       let error: string | undefined;
       try {
-        invokeResult = await invokeClaude({
+        invokeResult = await invokeModel({
           modelId: model,
           prompt,
           maxTokens: 400,

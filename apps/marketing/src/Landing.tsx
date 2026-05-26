@@ -251,9 +251,8 @@ function Hero() {
                 margin: 0,
               }}
             >
-              Stop fielding<br />
-              <span style={{ color: COLORS.red }}>"is my car</span><br />
-              <span style={{ color: COLORS.red }}>ready"</span> calls.
+              Run the whole<br />
+              shop from <span style={{ color: COLORS.red }}>the bay</span>.
             </Title>
 
             <Text
@@ -266,8 +265,7 @@ function Hero() {
                 maxWidth: 560,
               }}
             >
-              Lift's AI auto-replies to status checks and drafts every other customer text.
-              You stay under the hood. The texts get handled.
+              Repair orders, photo inspections, status updates, invoices, pay links — all from your phone. The AI handles "is my car ready" so you stay under the hood.
             </Text>
 
             <Group gap="lg" align="center">
@@ -439,7 +437,7 @@ function ExplodedDiagram() {
 
         {/* Bottom plate */}
         <text x="230" y="500" textAnchor="middle" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft} letterSpacing="2">
-          FIG. 1 — LIFT MESSAGE FLOW
+          FIG. 1 — RO TO PAID, ONE PHONE
         </text>
       </svg>
     </Box>
@@ -490,11 +488,10 @@ function SectionWedge() {
             maxWidth: 760,
           }}
         >
-          Here's what happens while you're under a hood.
+          How a job goes through Lift.
         </Title>
         <Text style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "1.25rem", color: COLORS.inkSoft, maxWidth: 640, lineHeight: 1.5 }}>
-          Customers text your shop number. Lift answers the routine stuff and drafts a reply
-          for the rest. You skim, hit send, get back to work.
+          A car shows up. You snap an RO from your phone. Lift texts the estimate, the customer taps approve, and the pay link clears at pickup. You hit Send a couple of times. Otherwise, you stay in the bay.
         </Text>
 
         <Box className="lift-grid-2-top" mt={56}>
@@ -504,19 +501,24 @@ function SectionWedge() {
           <Box style={{ minWidth: 0 }}>
             <Stack gap={32}>
               <ManualFeature
-                tag="01.A"
+                tag="§01.A"
+                title="Snap the RO on your phone"
+                body="Photos from your camera. Line items in two taps — or narrate the job out loud, and Lift turns the voice memo into parts and labor you can edit before sending."
+              />
+              <ManualFeature
+                tag="§01.B"
+                title="AI texts the estimate. Customer taps approve."
+                body="Mechanic-speak in, plain English out. You read it, you hit Send. They tap a link, the RO flips to In Repair on its own."
+              />
+              <ManualFeature
+                tag="§01.C"
                 title="Auto-replies to 'is my car ready'"
-                body="Lift answers status checks with the current state of the RO. One toggle turns it off, anytime. You stay in control."
+                body="Lift answers status checks with the current state of the RO — by name, in plain English. One tap turns it off. You stay under the hood."
               />
               <ManualFeature
-                tag="01.B"
-                title="Drafts every other text in plain English"
-                body="Estimates, status updates, ready-for-pickup. Mechanic-speak in; clear customer text out. You approve before anything sends."
-              />
-              <ManualFeature
-                tag="01.C"
-                title="One-tap estimate approvals"
-                body="Customer taps the link, approves the work, and the RO flips to In Repair automatically. No more chasing yes/no."
+                tag="§01.D"
+                title="Pay link in the ready text. Car leaves paid."
+                body="Stripe pay link goes out with the ready-for-pickup message. Card-on-file pre-auth, too — no wallet-fumble at the counter."
               />
             </Stack>
           </Box>
@@ -707,7 +709,7 @@ function SectionFeatures() {
           Just what a 1–3 bay shop runs on.
         </Title>
         <Text style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "1.25rem", color: COLORS.inkSoft, maxWidth: 640 }}>
-          Nothing else. No bigger-shop features you'll never touch.
+          From customer in the door to paid invoice — same flow, same phone. No bigger-shop features you'll never touch.
         </Text>
 
         <Box mt={56} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 0, border: `1px solid ${COLORS.ink}` }}>
@@ -935,8 +937,7 @@ function FinalCTA() {
             Stay <span style={{ color: COLORS.red }}>in</span> the bay.
           </Title>
           <Text style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "1.25rem", color: COLORS.inkSoft, maxWidth: 540, textAlign: "center", lineHeight: 1.5 }}>
-            $79/mo flat. 14-day free trial. No card to start. Cancel in two taps. Take your data
-            with you if you do.
+            $79/mo flat. RO, AI texts, pay link — same phone, same afternoon. 14-day trial, no card. Cancel in two taps. Take your data with you if you do.
           </Text>
           <Box mt={8}>
             <a href={ctaHref("final")} className="lift-cta">Start your 14-day trial →</a>

@@ -1,7 +1,12 @@
 import {
   BedrockRuntimeClient,
-  InvokeModelCommand,
+  ConverseCommand,
 } from "@aws-sdk/client-bedrock-runtime";
+
+// Bedrock's Converse API is provider-agnostic — same request/response shape
+// for Claude, Llama, Cohere, Mistral, Titan, and Nova. We use it so swapping
+// `BEDROCK_MODEL_*` between providers (e.g. Anthropic ↔ Meta) is a pure
+// config change with no code path differences.
 
 let _client: BedrockRuntimeClient | null = null;
 
@@ -14,7 +19,7 @@ function client() {
   return _client;
 }
 
-export interface InvokeClaudeArgs {
+export interface InvokeModelArgs {
   modelId: string;
   prompt: string;
   maxTokens?: number;
@@ -22,7 +27,7 @@ export interface InvokeClaudeArgs {
   system?: string;
 }
 
-export interface InvokeClaudeResult {
+export interface InvokeModelResult {
   text: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -30,45 +35,37 @@ export interface InvokeClaudeResult {
 }
 
 /**
- * Invoke a Claude model on Bedrock using the messages API.
- * Returns the plain text content of the assistant turn.
+ * Invoke any Bedrock chat-capable model. Provider-agnostic via the Converse API.
  */
-export async function invokeClaude(args: InvokeClaudeArgs): Promise<InvokeClaudeResult> {
-  const body = {
-    anthropic_version: "bedrock-2023-05-31",
-    max_tokens: args.maxTokens ?? 1024,
-    temperature: args.temperature ?? 0.4,
-    system: args.system,
-    messages: [{ role: "user", content: [{ type: "text", text: args.prompt }] }],
-  };
-
+export async function invokeModel(args: InvokeModelArgs): Promise<InvokeModelResult> {
   const res = await client().send(
-    new InvokeModelCommand({
+    new ConverseCommand({
       modelId: args.modelId,
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify(body),
+      messages: [{ role: "user", content: [{ text: args.prompt }] }],
+      system: args.system ? [{ text: args.system }] : undefined,
+      inferenceConfig: {
+        maxTokens: args.maxTokens ?? 1024,
+        temperature: args.temperature ?? 0.4,
+      },
     })
   );
 
-  const json = JSON.parse(new TextDecoder().decode(res.body));
-  const text =
-    Array.isArray(json.content) && json.content[0]?.text
-      ? (json.content[0].text as string)
-      : "";
+  const text = res.output?.message?.content?.[0]?.text ?? "";
 
   return {
     text,
-    inputTokens: json.usage?.input_tokens,
-    outputTokens: json.usage?.output_tokens,
-    raw: json,
+    inputTokens: res.usage?.inputTokens,
+    outputTokens: res.usage?.outputTokens,
+    raw: res,
   };
 }
 
+const DEFAULT_MODEL = "us.meta.llama4-scout-17b-instruct-v1:0";
+
 export function modelDraft() {
-  return process.env.BEDROCK_MODEL_DRAFT ?? "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+  return process.env.BEDROCK_MODEL_DRAFT ?? DEFAULT_MODEL;
 }
 
 export function modelClassify() {
-  return process.env.BEDROCK_MODEL_CLASSIFY ?? "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+  return process.env.BEDROCK_MODEL_CLASSIFY ?? DEFAULT_MODEL;
 }

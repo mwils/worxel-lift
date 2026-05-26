@@ -18,7 +18,7 @@ import {
   buildClassifyInboundPrompt,
   buildStatusReplyPrompt,
 } from "@lift/shared/prompts";
-import { invokeClaude, modelClassify, modelDraft } from "../../lib/bedrock.js";
+import { invokeModel, modelClassify, modelDraft } from "../../lib/bedrock.js";
 import { sendSms } from "../../lib/sms.js";
 
 interface InboundSnsPayload {
@@ -210,11 +210,11 @@ export const handler: SNSHandler = async (event) => {
       const classifyStart = Date.now();
       let classification: MessageClassification = "other";
       let confidence = 0;
-      let classifyResult: Awaited<ReturnType<typeof invokeClaude>> | null = null;
+      let classifyResult: Awaited<ReturnType<typeof invokeModel>> | null = null;
       let classifyError: string | undefined;
 
       try {
-        classifyResult = await invokeClaude({
+        classifyResult = await invokeModel({
           modelId: classifyModel,
           prompt: classifyPrompt,
           maxTokens: 100,
@@ -275,11 +275,11 @@ export const handler: SNSHandler = async (event) => {
         const draftModel = modelDraft();
         const draftStart = Date.now();
         let replyBody = "";
-        let draftResult: Awaited<ReturnType<typeof invokeClaude>> | null = null;
+        let draftResult: Awaited<ReturnType<typeof invokeModel>> | null = null;
         let draftError: string | undefined;
 
         try {
-          draftResult = await invokeClaude({
+          draftResult = await invokeModel({
             modelId: draftModel,
             prompt: statusPrompt,
             maxTokens: 200,

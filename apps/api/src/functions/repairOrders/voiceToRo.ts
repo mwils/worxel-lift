@@ -40,7 +40,7 @@ import {
 } from "@aws-sdk/client-transcribe";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok, serverError } from "../../lib/response.js";
-import { invokeClaude, modelDraft } from "../../lib/bedrock.js";
+import { invokeModel, modelDraft } from "../../lib/bedrock.js";
 import { bucket } from "../../lib/s3.js";
 
 const VoiceToRoDto = z.object({
@@ -213,7 +213,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const startedAt = Date.now();
     let bedrockResult;
     try {
-      bedrockResult = await invokeClaude({
+      bedrockResult = await invokeModel({
         modelId,
         prompt,
         maxTokens: 1024,

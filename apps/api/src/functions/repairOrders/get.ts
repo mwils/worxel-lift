@@ -2,6 +2,11 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Customer, RepairOrder, Vehicle } from "@lift/shared";
 import { withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { presignDownload } from "../../lib/s3.js";
+
+// Photo URLs are presigned for ~1h. The frontend re-fetches the RO often
+// enough that the link gets refreshed well before it expires.
+const PHOTO_URL_TTL_SEC = 60 * 60;
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   if (!user.shopId) return badRequest("No shop on session");
@@ -15,6 +20,16 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     Customer.findOne({ _id: ro.customerId, shopId: user.shopId }).lean(),
     Vehicle.findOne({ _id: ro.vehicleId, shopId: user.shopId }).lean(),
   ]);
+
+  const photos = await Promise.all(
+    (ro.photos ?? []).map(async (p: any) => ({
+      id: String(p._id),
+      s3Key: p.s3Key,
+      url: await presignDownload(p.s3Key, PHOTO_URL_TTL_SEC),
+      takenAt: p.takenAt,
+      caption: p.caption ?? null,
+    }))
+  );
 
   return ok({
     repairOrder: {
@@ -37,12 +52,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       partsTotal: ro.partsTotal ?? 0,
       taxTotal: ro.taxTotal ?? 0,
       total: ro.total ?? 0,
-      photos: (ro.photos ?? []).map((p: any) => ({
-        id: String(p._id),
-        s3Key: p.s3Key,
-        takenAt: p.takenAt,
-        caption: p.caption ?? null,
-      })),
+      photos,
       estimate: ro.estimate
         ? {
             sentAt: ro.estimate.sentAt ?? null,

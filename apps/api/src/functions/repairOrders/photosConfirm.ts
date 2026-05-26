@@ -2,6 +2,9 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { ConfirmPhotoDto, RepairOrder } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
+import { presignDownload } from "../../lib/s3.js";
+
+const PHOTO_URL_TTL_SEC = 60 * 60;
 
 interface PhotoLike {
   _id: unknown;
@@ -53,10 +56,13 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
 
     await ro.save();
 
+    const url = await presignDownload(saved.s3Key, PHOTO_URL_TTL_SEC);
+
     return created({
       photo: {
         id: String(saved._id),
         s3Key: saved.s3Key,
+        url,
         takenAt: saved.takenAt,
         caption: saved.caption ?? null,
       },

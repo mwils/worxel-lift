@@ -6,7 +6,6 @@ import {
   Badge,
   Button,
   Card,
-  CopyButton,
   Divider,
   Group,
   Loader,
@@ -19,7 +18,6 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
-  IconCopy,
   IconCreditCard,
   IconSend,
   IconSparkles,
@@ -222,15 +220,74 @@ export function RoDetailRoute() {
   const [sendInspectionOpen, setSendInspectionOpen] = useState(false);
 
   // ── Pay link ─────────────────────────────────────────────────────────────
+  // Mirrors the Send Estimate flow: fetch a drafted SMS (containing the pay
+  // URL) and let the owner review/edit before it actually sends.
   const [payOpen, setPayOpen] = useState(false);
-  const [payUrl, setPayUrl] = useState<string | null>(null);
+  const [payDraft, setPayDraft] = useState("");
+  const [payTemplate, setPayTemplate] = useState("");
+  const [payAiPolished, setPayAiPolished] = useState(false);
+  const [payDraftLoading, setPayDraftLoading] = useState(false);
+  const [payPolishLoading, setPayPolishLoading] = useState(false);
 
-  const createPayLink = useMutation({
-    mutationFn: () =>
-      api.post<{ url: string }>("/payments/create-link", { repairOrderId: id }),
-    onSuccess: (res) => {
-      setPayUrl(res.url);
+  async function openSendPayLink() {
+    if (!data?.repairOrder.customer) return;
+    setPayDraftLoading(true);
+    try {
+      const res = await api.post<{ draft: string; source: "template" | "ai" }>(
+        "/messages/draft",
+        {
+          customerId: data.repairOrder.customer.id,
+          repairOrderId: id,
+          kind: "pay_link",
+          useAi: false,
+        }
+      );
+      setPayTemplate(res.draft);
+      setPayDraft(res.draft);
+      setPayAiPolished(false);
       setPayOpen(true);
+    } catch (err) {
+      notifyError(err, { title: "Couldn't draft pay link" });
+    } finally {
+      setPayDraftLoading(false);
+    }
+  }
+
+  async function togglePayPolish() {
+    if (!data?.repairOrder.customer) return;
+    if (payAiPolished) {
+      setPayDraft(payTemplate);
+      setPayAiPolished(false);
+      return;
+    }
+    setPayPolishLoading(true);
+    try {
+      const res = await api.post<{ draft: string; source: "ai" }>("/messages/draft", {
+        customerId: data.repairOrder.customer.id,
+        repairOrderId: id,
+        kind: "pay_link",
+        useAi: true,
+      });
+      setPayDraft(res.draft);
+      setPayAiPolished(true);
+    } catch (err) {
+      notifyError(err, { title: "Couldn't polish pay link" });
+    } finally {
+      setPayPolishLoading(false);
+    }
+  }
+
+  const sendPayLink = useMutation({
+    mutationFn: () =>
+      api.post("/payments/create-link", {
+        repairOrderId: id,
+        draftOverride: payDraft,
+        useAi: payAiPolished,
+      }),
+    onSuccess: () => {
+      notifications.show({ color: "green", message: "Pay link sent." });
+      setPayOpen(false);
+      qc.invalidateQueries({ queryKey: ["ro", id] });
     },
     onError: (err) => notifyError(err, { title: "Couldn't text pay link" }),
   });
@@ -318,9 +375,7 @@ export function RoDetailRoute() {
 
   const photoSrc = (photoId: string): string | null => {
     const photo = ro.photos.find((p) => p.id === photoId);
-    if (!photo) return null;
-    const host = (import.meta.env as any).VITE_PHOTOS_CDN ?? "TODO-photos-cdn";
-    return `https://${host}/${photo.s3Key}`;
+    return photo?.url ?? null;
   };
 
   const inspectionItemCount = ro.inspection?.items.length ?? 0;
@@ -426,9 +481,9 @@ export function RoDetailRoute() {
         <Button
           variant="default"
           leftSection={<IconCreditCard size={16} />}
-          onClick={() => createPayLink.mutate()}
-          loading={createPayLink.isPending}
-          disabled={ro.total === 0}
+          onClick={openSendPayLink}
+          loading={payDraftLoading}
+          disabled={ro.total === 0 || !ro.customer}
         >
           Text pay link
         </Button>
@@ -563,32 +618,53 @@ export function RoDetailRoute() {
       </Modal>
 
       {/* Pay link modal */}
-      <Modal opened={payOpen} onClose={() => setPayOpen(false)} title="Pay link">
+      <Modal
+        opened={payOpen}
+        onClose={() => setPayOpen(false)}
+        title="Review pay link"
+        size="lg"
+      >
         <Stack>
-          <Text size="sm" c="dimmed">
-            Send this URL to the customer. They'll be able to pay {formatMoney(ro.total)} via Stripe.
-          </Text>
-          <Card withBorder p="xs">
-            <Text size="sm" style={{ wordBreak: "break-all" }}>
-              {payUrl}
+          <Group justify="space-between" wrap="wrap">
+            <Text size="sm" c="dimmed">
+              Edit before sending. Customer gets this as a text with a link to pay{" "}
+              {formatMoney(ro.total)} via Stripe.
             </Text>
-          </Card>
+            <Group gap="xs">
+              {payAiPolished && (
+                <Badge variant="light" color="grape" size="sm">
+                  AI polished
+                </Badge>
+              )}
+              <Button
+                size="xs"
+                variant={payAiPolished ? "default" : "light"}
+                color="grape"
+                onClick={togglePayPolish}
+                loading={payPolishLoading}
+                leftSection={<IconSparkles size={14} />}
+              >
+                {payAiPolished ? "Use my version" : "Polish with AI"}
+              </Button>
+            </Group>
+          </Group>
+          <Textarea
+            autosize
+            minRows={6}
+            value={payDraft}
+            onChange={(e) => setPayDraft(e.currentTarget.value)}
+          />
           <Group justify="flex-end">
-            {payUrl && (
-              <CopyButton value={payUrl}>
-                {({ copied, copy }) => (
-                  <Button
-                    leftSection={<IconCopy size={16} />}
-                    variant="default"
-                    onClick={copy}
-                    color={copied ? "green" : undefined}
-                  >
-                    {copied ? "Copied" : "Copy"}
-                  </Button>
-                )}
-              </CopyButton>
-            )}
-            <Button onClick={() => setPayOpen(false)}>Done</Button>
+            <Button variant="default" onClick={() => setPayOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => sendPayLink.mutate()}
+              loading={sendPayLink.isPending}
+              disabled={!payDraft.trim()}
+            >
+              Send
+            </Button>
           </Group>
         </Stack>
       </Modal>

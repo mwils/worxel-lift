@@ -8,6 +8,7 @@ import { notifyError } from "../../lib/notify";
 export interface CapturedPhoto {
   id: string;
   s3Key: string;
+  url: string;
   takenAt: string;
   caption: string | null;
 }

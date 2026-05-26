@@ -1,4 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
+import { randomBytes } from "node:crypto";
 import {
   AiInteraction,
   Customer,
@@ -8,16 +9,20 @@ import {
   Vehicle,
   buildEstimatePrompt,
   buildEstimateTemplate,
+  buildPayLinkPrompt,
+  buildPayLinkTemplate,
   buildStatusReplyPrompt,
   buildStatusReplyTemplate,
   type EstimatePromptInput,
+  type PayLinkPromptInput,
   type StatusReplyInput,
   ESTIMATE_PROMPT_VERSION,
+  PAY_LINK_PROMPT_VERSION,
   STATUS_REPLY_PROMPT_VERSION,
 } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
-import { invokeClaude, modelDraft } from "../../lib/bedrock.js";
+import { invokeModel, modelDraft } from "../../lib/bedrock.js";
 
 const FREEFORM_PROMPT_VERSION = "freeform.v1";
 
@@ -53,6 +58,11 @@ function publicEstimateUrl(token: string): string {
   return `${base}/public/estimate/${token}`;
 }
 
+function publicPayUrl(token: string): string {
+  const base = (process.env.WEB_APP_URL ?? "https://app.lift.com").replace(/\/+$/, "");
+  return `${base}/public/pay/${token}`;
+}
+
 /**
  * POST /messages/draft
  *
@@ -81,8 +91,48 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     // ── Build the shared input shape per kind ──────────────────
     let estimateInput: EstimatePromptInput | null = null;
     let statusInput: StatusReplyInput | null = null;
+    let payLinkInput: PayLinkPromptInput | null = null;
 
-    if (dto.kind === "estimate") {
+    if (dto.kind === "pay_link") {
+      if (!dto.repairOrderId) {
+        return badRequest("repairOrderId is required for pay-link drafts");
+      }
+      const ro = await RepairOrder.findOne({
+        _id: dto.repairOrderId,
+        shopId: user.shopId,
+      });
+      if (!ro) return notFound("Repair order not found");
+      if (!ro.total || ro.total <= 0) {
+        return badRequest(
+          "Repair order has no total — add line items before sending a pay link"
+        );
+      }
+
+      // Mint publicToken if absent so the SMS draft contains the real URL
+      // (not a "PENDING" placeholder).
+      if (!ro.publicToken) {
+        ro.publicToken = randomBytes(16).toString("base64url");
+        await ro.save();
+      }
+
+      const vehicle = await Vehicle.findOne({
+        _id: ro.vehicleId,
+        shopId: user.shopId,
+      }).lean();
+
+      payLinkInput = {
+        shopName: shop.name,
+        customerFirstName: customer.firstName,
+        vehicle: {
+          year: vehicle?.year ?? undefined,
+          make: vehicle?.make ?? undefined,
+          model: vehicle?.model ?? undefined,
+        },
+        totalCents: ro.total,
+        payLinkUrl: publicPayUrl(ro.publicToken),
+        aiTone,
+      };
+    } else if (dto.kind === "estimate") {
       if (!dto.repairOrderId) {
         return badRequest("repairOrderId is required for estimate drafts");
       }
@@ -140,6 +190,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (!useAi) {
       let draft = "";
       if (estimateInput) draft = buildEstimateTemplate(estimateInput);
+      else if (payLinkInput) draft = buildPayLinkTemplate(payLinkInput);
       else if (statusInput) draft = buildStatusReplyTemplate(statusInput);
       else return badRequest("Kind not supported without useAi=true");
 
@@ -155,6 +206,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       prompt = buildEstimatePrompt(estimateInput);
       promptVersion = ESTIMATE_PROMPT_VERSION;
       kindLabel = "draft_estimate";
+    } else if (payLinkInput) {
+      prompt = buildPayLinkPrompt(payLinkInput);
+      promptVersion = PAY_LINK_PROMPT_VERSION;
+      kindLabel = "draft_pay_link";
     } else if (statusInput) {
       prompt = buildStatusReplyPrompt(statusInput);
       promptVersion = STATUS_REPLY_PROMPT_VERSION;
@@ -176,7 +231,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     let result;
     let error: string | undefined;
     try {
-      result = await invokeClaude({
+      result = await invokeModel({
         modelId: model,
         prompt,
         maxTokens: 400,

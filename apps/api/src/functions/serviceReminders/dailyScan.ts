@@ -18,7 +18,7 @@ import {
   buildServiceReminderFallback,
   buildServiceReminderPrompt,
 } from "@lift/shared/prompts";
-import { invokeClaude, modelClassify } from "../../lib/bedrock.js";
+import { invokeModel, modelClassify } from "../../lib/bedrock.js";
 import { sendSms } from "../../lib/sms.js";
 
 type ServiceReminderHydrated = HydratedDocument<ServiceReminderDoc>;
@@ -157,11 +157,11 @@ async function processReminder(
   const model = modelClassify(); // Haiku — cheaper than the draft model.
   const start = Date.now();
   let body = "";
-  let invokeResult: Awaited<ReturnType<typeof invokeClaude>> | null = null;
+  let invokeResult: Awaited<ReturnType<typeof invokeModel>> | null = null;
   let invokeError: string | undefined;
 
   try {
-    invokeResult = await invokeClaude({
+    invokeResult = await invokeModel({
       modelId: model,
       prompt: buildServiceReminderPrompt(promptInput),
       maxTokens: 80,

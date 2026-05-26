@@ -103,11 +103,15 @@ export default $config({
       SMS_POOL_ID: SmsPoolId.value,
       S3_PHOTOS_BUCKET: photosBucket.name,
       SMS_INBOUND_SNS_TOPIC_ARN: smsInboundTopic.arn,
-      // Bedrock requires cross-region inference profile IDs (us./eu./apac. prefix)
-      // for the 4.x Claude models — on-demand invocation of the bare model ID
-      // returns "Invocation … with on-demand throughput isn't supported."
-      BEDROCK_MODEL_DRAFT: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      BEDROCK_MODEL_CLASSIFY: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      // Bedrock requires the cross-region inference profile prefix (us./eu./apac.)
+      // for the latest models — on-demand invocation of the bare model ID returns
+      // "Invocation … with on-demand throughput isn't supported."
+      // Llama 4 Scout: Anthropic-style use-case form is not required, cheaper
+      // than Haiku 4.5 on output, and the Converse API in lib/bedrock.ts is
+      // provider-agnostic so swapping these to e.g. us.anthropic.claude-haiku-4-5-20251001-v1:0
+      // later is a pure env-var change.
+      BEDROCK_MODEL_DRAFT: "us.meta.llama4-scout-17b-instruct-v1:0",
+      BEDROCK_MODEL_CLASSIFY: "us.meta.llama4-scout-17b-instruct-v1:0",
       // Mock outbound SMS until the 10DLC campaign is approved and the
       // origination pool has real numbers. CloudWatch logs the would-be SMS.
       MOCK_SMS: "1",
