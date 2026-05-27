@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Container, Paper, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { api } from "../lib/api";
@@ -9,6 +9,17 @@ import { notifyError } from "../lib/notify";
 export function LoginRoute() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    // Captures the cold-email tracking id forwarded from lift.worxel.com.
+    // Survives magic-link → verify → onboard on the same browser; cleared in onboarding.
+    const pid = new URLSearchParams(window.location.search).get("pid");
+    if (pid && /^[a-fA-F0-9]{24}$/.test(pid)) {
+      try {
+        localStorage.setItem("lift_pid", pid);
+      } catch { /* private mode / disabled storage — ignore */ }
+    }
+  }, []);
 
   const form = useForm({
     initialValues: { email: "" },

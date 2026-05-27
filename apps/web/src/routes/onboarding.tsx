@@ -38,10 +38,20 @@ export function OnboardingRoute() {
 
   async function createShop() {
     try {
+      let pid: string | null = null;
+      try {
+        pid = localStorage.getItem("lift_pid");
+      } catch { /* private mode — ignore */ }
       await api.post("/onboard/shop", {
         name: shopName,
         address: { city, state },
+        ...(pid ? { pid } : {}),
       });
+      if (pid) {
+        try {
+          localStorage.removeItem("lift_pid");
+        } catch { /* ignore */ }
+      }
       setStep(1);
     } catch (err) {
       notifyError(err, { title: "Couldn't create shop" });

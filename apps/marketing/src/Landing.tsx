@@ -3,8 +3,16 @@ import type { CSSProperties, ReactNode } from "react";
 
 const APP_URL = import.meta.env.VITE_WEB_APP_URL ?? "https://lift-app.worxel.com";
 const CTA_BASE = `${APP_URL}/login`;
-const ctaHref = (position: string) =>
-  `${CTA_BASE}?utm_source=cold-email&utm_medium=email&utm_campaign=2026-q2-lift-launch&utm_content=${position}`;
+const inboundPid = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const pid = new URLSearchParams(window.location.search).get("pid");
+  return pid && /^[a-fA-F0-9]{24}$/.test(pid) ? pid : null;
+};
+const ctaHref = (position: string) => {
+  const base = `${CTA_BASE}?utm_source=cold-email&utm_medium=email&utm_campaign=2026-q2-lift-launch&utm_content=${position}`;
+  const pid = inboundPid();
+  return pid ? `${base}&pid=${pid}` : base;
+};
 
 const COLORS = {
   paper: "#f4eedf",

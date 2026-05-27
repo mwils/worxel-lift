@@ -12,6 +12,26 @@ import { created, ok } from "../../lib/response.js";
  */
 const MOCK_SHOP_PHONE = "+15555550199";
 
+const SALES_API_URL = process.env.SALES_API_URL ?? "";
+
+// Tells the cold-outreach back office that this prospect just started a trial.
+// Fire-and-forget: never block onboarding on this network call.
+async function reportTrialSignup(pid: string, email: string): Promise<void> {
+  if (!SALES_API_URL || !pid) return;
+  try {
+    const res = await fetch(`${SALES_API_URL.replace(/\/$/, "")}/api/public/trial-signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pid, email, signupAt: new Date().toISOString() }),
+    });
+    if (!res.ok) {
+      console.warn("trial-signup callback non-2xx", { status: res.status });
+    }
+  } catch (err) {
+    console.warn("trial-signup callback failed", err);
+  }
+}
+
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
     const dto = await parseBody(event, OnboardShopDto);
@@ -60,6 +80,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     });
 
     await User.updateOne({ _id: user.userId }, { $set: { shopId: shop._id } });
+
+    if (dto.pid) {
+      // Don't await — the callback is a side-effect that must never block trial creation.
+      void reportTrialSignup(dto.pid, user.email);
+    }
 
     // Refresh the session cookie so subsequent calls have shopId in the JWT.
     // Without this, every authenticated route post-onboarding fails with

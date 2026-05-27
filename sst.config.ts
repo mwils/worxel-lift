@@ -118,6 +118,10 @@ export default $config({
       WEB_APP_URL: urls.web,
       MARKETING_URL: urls.marketing,
       API_URL: urls.api,
+      // Cold-outreach back office: receives a trial-signup callback when a prospect
+      // converts so the cold-email sequence can mark them converted and stop follow-ups.
+      // Empty string disables the callback (e.g., dev stage without the back office).
+      SALES_API_URL: $app.stage === "prod" ? "https://api.yourwebsitebot.com" : "",
       // Cookie domain set to the registrable domain so api → web subdomain
       // requests carry the lift_session cookie.
       COOKIE_DOMAIN: ".worxel.com",

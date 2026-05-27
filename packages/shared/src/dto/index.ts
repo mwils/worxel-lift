@@ -59,6 +59,9 @@ export const OnboardShopDto = z.object({
     })
     .optional(),
   timezone: z.string().default("America/Chicago"),
+  // Cold-email tracking id forwarded from lift.worxel.com via the marketing CTA.
+  // Optional — only present when the user came in through a cold-outreach email.
+  pid: z.string().regex(/^[a-fA-F0-9]{24}$/).optional(),
 });
 
 // ── shop ────────────────────────────────────────────────────────
