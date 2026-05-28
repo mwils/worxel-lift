@@ -9,6 +9,8 @@ import { CreateVehicleDto } from "@lift/shared/dto";
 import type { z } from "zod";
 import { api } from "../../lib/api";
 import { VinScanner, isVinScannerSupported } from "./VinScanner";
+import { VoiceCaptureButton } from "../voice/VoiceCaptureButton";
+import type { VehicleMatch } from "../../lib/useVoiceTranscribe";
 
 // VIN-barcode scanner is hidden while we debug the iPad Chrome UX.
 // Flip to `true` to re-enable — the component + handlers are kept in place
@@ -24,6 +26,8 @@ export interface VehicleFormProps {
   onSubmit: (values: VehicleInput) => Promise<void> | void;
   onCancel?: () => void;
   loading?: boolean;
+  /** Surfaces voice-extracted matches to the parent so it can render a banner. */
+  onMatchesFound?: (matches: VehicleMatch[]) => void;
 }
 
 interface VinDecodeResponse {
@@ -59,6 +63,7 @@ export function VehicleForm({
   onSubmit,
   onCancel,
   loading,
+  onMatchesFound,
 }: VehicleFormProps) {
   const [decoding, setDecoding] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -125,6 +130,28 @@ export function VehicleForm({
       })}
     >
       <Stack>
+        <VoiceCaptureButton
+          kind="vehicle"
+          customerId={customerId}
+          idleLabel="Tap to dictate the vehicle details."
+          onResult={(r) => {
+            if (r.kind !== "vehicle") return;
+            const e = r.extracted;
+            form.setValues((prev) => ({
+              ...prev,
+              vin: e.vin ?? prev.vin,
+              year: e.year ?? prev.year,
+              make: e.make ?? prev.make,
+              model: e.model ?? prev.model,
+              trim: e.trim ?? prev.trim,
+              mileage: e.mileage ?? prev.mileage,
+              plate: e.plate ?? prev.plate,
+              color: e.color ?? prev.color,
+              notes: e.notes ?? prev.notes,
+            }));
+            onMatchesFound?.(r.matches);
+          }}
+        />
         {isSmall ? (
           <Stack gap="xs">
             <TextInput

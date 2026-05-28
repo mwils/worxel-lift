@@ -22,6 +22,10 @@ import { notifyError } from "../../../lib/notify";
 import { formatPhone } from "../../../lib/format";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
+import { CustomerMatchBanner } from "../../../features/customer/CustomerMatchBanner";
+import { VehicleMatchBanner } from "../../../features/vehicle/VehicleMatchBanner";
+import { VoiceCaptureButton } from "../../../features/voice/VoiceCaptureButton";
+import type { CustomerMatch, VehicleMatch } from "../../../lib/useVoiceTranscribe";
 import type { CreateCustomerInput, CreateVehicleDto } from "@lift/shared/dto";
 import type { z } from "zod";
 
@@ -68,6 +72,10 @@ export function NewRoRoute() {
 
   // Concern
   const [concern, setConcern] = useState("");
+
+  // Voice-extracted match suggestions (cleared when banner is dismissed).
+  const [customerMatches, setCustomerMatches] = useState<CustomerMatch[]>([]);
+  const [vehicleMatches, setVehicleMatches] = useState<VehicleMatch[]>([]);
 
   // Customer search
   const { data: customerList, isPending: customersLoading } = useQuery({
@@ -215,13 +223,29 @@ export function NewRoRoute() {
                 </Group>
               </Stack>
             ) : (
-              <CustomerForm
-                submitLabel="Create customer & continue"
-                loading={createCustomer.isPending}
-                onSubmit={async (values) => {
-                  await createCustomer.mutateAsync(values);
-                }}
-              />
+              <Stack>
+                {customerMatches.length > 0 && (
+                  <CustomerMatchBanner
+                    matches={customerMatches}
+                    onUseExisting={(id) => {
+                      setSelectedCustomerId(id);
+                      setSelectedVehicleId(null);
+                      setCustomerMatches([]);
+                      setCustomerMode("existing");
+                      setStep(1);
+                    }}
+                    onDismiss={() => setCustomerMatches([])}
+                  />
+                )}
+                <CustomerForm
+                  submitLabel="Create customer & continue"
+                  loading={createCustomer.isPending}
+                  onSubmit={async (values) => {
+                    await createCustomer.mutateAsync(values);
+                  }}
+                  onMatchesFound={setCustomerMatches}
+                />
+              </Stack>
             )}
           </Stack>
         </Stepper.Step>
@@ -290,14 +314,29 @@ export function NewRoRoute() {
               </Stack>
             ) : (
               selectedCustomerId && (
-                <VehicleForm
-                  customerId={selectedCustomerId}
-                  submitLabel="Add vehicle & continue"
-                  loading={createVehicle.isPending}
-                  onSubmit={async (values) => {
-                    await createVehicle.mutateAsync(values);
-                  }}
-                />
+                <Stack>
+                  {vehicleMatches.length > 0 && (
+                    <VehicleMatchBanner
+                      matches={vehicleMatches}
+                      onUseExisting={(id) => {
+                        setSelectedVehicleId(id);
+                        setVehicleMatches([]);
+                        setVehicleMode("existing");
+                        setStep(2);
+                      }}
+                      onDismiss={() => setVehicleMatches([])}
+                    />
+                  )}
+                  <VehicleForm
+                    customerId={selectedCustomerId}
+                    submitLabel="Add vehicle & continue"
+                    loading={createVehicle.isPending}
+                    onSubmit={async (values) => {
+                      await createVehicle.mutateAsync(values);
+                    }}
+                    onMatchesFound={setVehicleMatches}
+                  />
+                </Stack>
               )
             )}
           </Stack>
@@ -305,6 +344,14 @@ export function NewRoRoute() {
 
         <Stepper.Step label="Concern">
           <Stack mt="md">
+            <VoiceCaptureButton
+              kind="concern"
+              idleLabel="Tap to dictate the customer's concern."
+              onResult={(r) => {
+                if (r.kind !== "concern") return;
+                if (r.text) setConcern(r.text);
+              }}
+            />
             <Textarea
               label="Concern (what the customer reported)"
               placeholder="Clunking from front end on left turns…"

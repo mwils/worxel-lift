@@ -4,3 +4,6 @@ export * from "./voiceToRo.js";
 export * from "./statusReply.js";
 export * from "./serviceReminder.js";
 export * from "./payLink.js";
+export * from "./voiceCustomer.js";
+export * from "./voiceVehicle.js";
+export * from "./voiceConcern.js";

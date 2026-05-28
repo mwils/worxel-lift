@@ -24,12 +24,32 @@ export async function presignUpload(args: {
 }): Promise<{ url: string; s3Key: string }> {
   const extension = (args.contentType.split("/")[1] ?? "jpg").replace(/[^a-z0-9]/gi, "");
   const s3Key = `shops/${args.shopId}/ros/${args.repairOrderId}/${Date.now()}-${randomBytes(8).toString("hex")}.${extension}`;
+  return presignAt(s3Key, args.contentType);
+}
+
+/**
+ * Shop-scoped (no RO) presign for one-shot voice memos used by /voice/presign.
+ * Path is `shops/<shopId>/voice/<timestamp>-<rand>.<ext>` — auditable + tenant-isolated.
+ */
+export async function presignVoiceUpload(args: {
+  shopId: string;
+  contentType: string;
+}): Promise<{ url: string; s3Key: string }> {
+  const extension = (args.contentType.split("/")[1] ?? "webm").replace(/[^a-z0-9]/gi, "");
+  const s3Key = `shops/${args.shopId}/voice/${Date.now()}-${randomBytes(8).toString("hex")}.${extension}`;
+  return presignAt(s3Key, args.contentType);
+}
+
+async function presignAt(
+  s3Key: string,
+  contentType: string
+): Promise<{ url: string; s3Key: string }> {
   const url = await getSignedUrl(
     client(),
     new PutObjectCommand({
       Bucket: bucket(),
       Key: s3Key,
-      ContentType: args.contentType,
+      ContentType: contentType,
     }),
     { expiresIn: 60 * 5 }
   );

@@ -2,6 +2,8 @@ import { Button, Group, Stack, Textarea, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "mantine-form-zod-resolver";
 import { CreateCustomerDto, type CreateCustomerInput } from "@lift/shared/dto";
+import { VoiceCaptureButton } from "../voice/VoiceCaptureButton";
+import type { CustomerMatch } from "../../lib/useVoiceTranscribe";
 
 export interface CustomerFormProps {
   initialValues?: Partial<CreateCustomerInput>;
@@ -9,6 +11,8 @@ export interface CustomerFormProps {
   onSubmit: (values: CreateCustomerInput) => Promise<void> | void;
   onCancel?: () => void;
   loading?: boolean;
+  /** Surfaces voice-extracted matches to the parent so it can render a banner. */
+  onMatchesFound?: (matches: CustomerMatch[]) => void;
 }
 
 const EMPTY: CreateCustomerInput = {
@@ -25,6 +29,7 @@ export function CustomerForm({
   onSubmit,
   onCancel,
   loading,
+  onMatchesFound,
 }: CustomerFormProps) {
   const form = useForm<CreateCustomerInput>({
     initialValues: { ...EMPTY, ...initialValues },
@@ -45,6 +50,23 @@ export function CustomerForm({
       })}
     >
       <Stack>
+        <VoiceCaptureButton
+          kind="customer"
+          idleLabel="Tap to dictate the customer details."
+          onResult={(r) => {
+            if (r.kind !== "customer") return;
+            const e = r.extracted;
+            form.setValues((prev) => ({
+              ...prev,
+              firstName: e.firstName ?? prev.firstName,
+              lastName: e.lastName ?? prev.lastName,
+              phone: e.phone ?? prev.phone,
+              email: e.email ?? prev.email,
+              notes: e.notes ?? prev.notes,
+            }));
+            onMatchesFound?.(r.matches);
+          }}
+        />
         <Group grow>
           <TextInput
             label="First name"

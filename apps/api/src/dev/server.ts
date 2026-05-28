@@ -63,6 +63,9 @@ import { handler as messagesConversation } from "../functions/messages/conversat
 import { handler as messagesDraft } from "../functions/messages/draft.js";
 import { handler as messagesSend } from "../functions/messages/send.js";
 
+import { handler as voicePresign } from "../functions/voice/presign.js";
+import { handler as voiceTranscribe } from "../functions/voice/transcribe.js";
+
 import { handler as paymentsCreateLink } from "../functions/payments/createLink.js";
 import { handler as paymentsSaveCard } from "../functions/payments/saveCard.js";
 import { handler as paymentsCharge } from "../functions/payments/charge.js";
@@ -145,6 +148,10 @@ app.post("/repair-orders/:id/send-estimate", toExpress(roSendEstimate));
 app.get("/messages/conversation/:customerId", toExpress(messagesConversation));
 app.post("/messages/draft", toExpress(messagesDraft));
 app.post("/messages/send", toExpress(messagesSend));
+
+// voice (shop-scoped)
+app.post("/voice/presign", toExpress(voicePresign));
+app.post("/voice/transcribe", toExpress(voiceTranscribe));
 
 // payments
 app.post("/payments/create-link", toExpress(paymentsCreateLink));

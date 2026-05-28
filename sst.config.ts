@@ -292,6 +292,15 @@ export default $config({
       fn("apps/api/src/functions/serviceReminders/disableForVehicle.handler")
     );
 
+    // voice (shop-scoped — used by new-customer / new-vehicle / concern dictation)
+    api.route("POST /voice/presign", fn("apps/api/src/functions/voice/presign.handler"));
+    api.route("POST /voice/transcribe", {
+      ...fn("apps/api/src/functions/voice/transcribe.handler"),
+      // Same rationale as /repair-orders/{id}/voice-to-ro — Transcribe + Bedrock
+      // need the full 30s API Gateway HTTP API integration budget.
+      timeout: "30 seconds" as const,
+    });
+
     // messages
     api.route(
       "GET /messages/conversation/{customerId}",

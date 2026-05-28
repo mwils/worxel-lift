@@ -284,6 +284,23 @@ export const SendMessageDto = z.object({
   mediaKeys: z.array(z.string()).optional(),
 });
 
+// ── voice (shop-scoped, not RO-scoped) ──────────────────────────
+export const VoicePresignDto = z.object({
+  contentType: z.string().regex(/^audio\//, "contentType must be an audio/* MIME type"),
+});
+
+export const VoiceTranscribeDto = z.object({
+  s3Key: z.string().min(1),
+  kind: z.enum(["customer", "vehicle", "concern"]),
+  // Optional: scopes vehicle-match search to this customer when kind === "vehicle".
+  customerId: objectId.optional(),
+  // Optional explicit transcript — bypasses AWS Transcribe when supplied.
+  // Used by tests and as a degraded-mode escape hatch.
+  transcript: z.string().min(1).optional(),
+});
+
+export type VoiceTranscribeInput = z.infer<typeof VoiceTranscribeDto>;
+
 // ── payments ────────────────────────────────────────────────────
 export const CreatePayLinkDto = z.object({
   repairOrderId: objectId,

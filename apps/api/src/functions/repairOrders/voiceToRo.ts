@@ -25,7 +25,6 @@
  *   if present we skip Transcribe entirely.
  */
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import {
   AiInteraction,
@@ -35,15 +34,10 @@ import {
   buildVoiceToRoPrompt,
   VOICE_TO_RO_PROMPT_VERSION,
 } from "@lift/shared";
-import {
-  TranscribeClient,
-  StartTranscriptionJobCommand,
-  GetTranscriptionJobCommand,
-} from "@aws-sdk/client-transcribe";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok, serverError } from "../../lib/response.js";
 import { invokeModel, modelDraft } from "../../lib/bedrock.js";
-import { bucket } from "../../lib/s3.js";
+import { runTranscribe } from "../../lib/transcribe.js";
 
 const VoiceToRoDto = z.object({
   s3Key: z.string().min(1),
@@ -51,80 +45,6 @@ const VoiceToRoDto = z.object({
   // tests and as a degraded-mode escape hatch.
   transcript: z.string().min(1).optional(),
 });
-
-let _transcribeClient: TranscribeClient | null = null;
-function transcribe() {
-  if (!_transcribeClient) {
-    _transcribeClient = new TranscribeClient({
-      region: process.env.AWS_REGION ?? "us-east-1",
-    });
-  }
-  return _transcribeClient;
-}
-
-const MEDIA_FORMAT_BY_EXT: Record<string, string> = {
-  webm: "webm",
-  ogg: "ogg",
-  mp3: "mp3",
-  mp4: "mp4",
-  m4a: "mp4",
-  wav: "wav",
-  flac: "flac",
-  amr: "amr",
-};
-
-function mediaFormatFromKey(s3Key: string): string {
-  const ext = (s3Key.split(".").pop() ?? "").toLowerCase();
-  return MEDIA_FORMAT_BY_EXT[ext] ?? "webm";
-}
-
-async function runTranscribe(s3Key: string): Promise<string> {
-  const jobName = `lift-${Date.now()}-${randomBytes(6).toString("hex")}`;
-  const mediaUri = `s3://${bucket()}/${s3Key}`;
-
-  await transcribe().send(
-    new StartTranscriptionJobCommand({
-      TranscriptionJobName: jobName,
-      LanguageCode: "en-US",
-      MediaFormat: mediaFormatFromKey(s3Key) as any,
-      Media: { MediaFileUri: mediaUri },
-    })
-  );
-
-  // Lambda timeout is 30s (set in sst.config.ts for this route — API Gateway
-  // HTTP API hard-caps integration at 30s). Reserve ~4s for the Bedrock call
-  // after this, so the transcription poll budget is ~26s. Poll every 1s; even
-  // for short voice memos Transcribe rarely finishes faster than ~8s.
-  const start = Date.now();
-  const budgetMs = 26_000;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    if (Date.now() - start > budgetMs) {
-      throw new Error("Transcription timed out");
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-    const got = await transcribe().send(
-      new GetTranscriptionJobCommand({ TranscriptionJobName: jobName })
-    );
-    const status = got.TranscriptionJob?.TranscriptionJobStatus;
-    if (status === "COMPLETED") {
-      const url = got.TranscriptionJob?.Transcript?.TranscriptFileUri;
-      if (!url) throw new Error("Transcription completed without a transcript URL");
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Failed to fetch transcript (${res.status})`);
-      const body = (await res.json()) as {
-        results?: { transcripts?: Array<{ transcript?: string }> };
-      };
-      const text = body.results?.transcripts?.[0]?.transcript ?? "";
-      return text.trim();
-    }
-    if (status === "FAILED") {
-      throw new Error(
-        got.TranscriptionJob?.FailureReason ?? "Transcription job failed"
-      );
-    }
-  }
-}
 
 function safeParseDraft(text: string): {
   concern: string;
