@@ -11,6 +11,8 @@ export interface CustomerFormProps {
   onSubmit: (values: CreateCustomerInput) => Promise<void> | void;
   onCancel?: () => void;
   loading?: boolean;
+  /** "edit" hides voice capture and the opt-in copy — both are create-flow only. */
+  mode?: "create" | "edit";
   /** Surfaces voice-extracted matches to the parent so it can render a banner. */
   onMatchesFound?: (matches: CustomerMatch[]) => void;
 }
@@ -29,6 +31,7 @@ export function CustomerForm({
   onSubmit,
   onCancel,
   loading,
+  mode = "create",
   onMatchesFound,
 }: CustomerFormProps) {
   const form = useForm<CreateCustomerInput>({
@@ -50,23 +53,25 @@ export function CustomerForm({
       })}
     >
       <Stack>
-        <VoiceCaptureButton
-          kind="customer"
-          idleLabel="Tap to dictate the customer details."
-          onResult={(r) => {
-            if (r.kind !== "customer") return;
-            const e = r.extracted;
-            form.setValues((prev) => ({
-              ...prev,
-              firstName: e.firstName ?? prev.firstName,
-              lastName: e.lastName ?? prev.lastName,
-              phone: e.phone ?? prev.phone,
-              email: e.email ?? prev.email,
-              notes: e.notes ?? prev.notes,
-            }));
-            onMatchesFound?.(r.matches);
-          }}
-        />
+        {mode === "create" && (
+          <VoiceCaptureButton
+            kind="customer"
+            idleLabel="Tap to dictate the customer details."
+            onResult={(r) => {
+              if (r.kind !== "customer") return;
+              const e = r.extracted;
+              form.setValues((prev) => ({
+                ...prev,
+                firstName: e.firstName ?? prev.firstName,
+                lastName: e.lastName ?? prev.lastName,
+                phone: e.phone ?? prev.phone,
+                email: e.email ?? prev.email,
+                notes: e.notes ?? prev.notes,
+              }));
+              onMatchesFound?.(r.matches);
+            }}
+          />
+        )}
         <Group grow>
           <TextInput
             label="First name"
@@ -79,7 +84,11 @@ export function CustomerForm({
           label="Phone"
           placeholder="+15551234567"
           required
-          description="Include the area code. Adding a customer opts them in to SMS."
+          description={
+            mode === "edit"
+              ? "Include the area code. Texts from their old number won't match this customer anymore."
+              : "Include the area code. Adding a customer opts them in to SMS."
+          }
           {...form.getInputProps("phone")}
         />
         <TextInput label="Email" type="email" {...form.getInputProps("email")} />

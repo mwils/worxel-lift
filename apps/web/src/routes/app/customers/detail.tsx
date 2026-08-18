@@ -18,6 +18,7 @@ import { notifications } from "@mantine/notifications";
 import {
   IconChevronDown,
   IconChevronRight,
+  IconPencil,
   IconPhone,
   IconPlus,
 } from "@tabler/icons-react";
@@ -26,10 +27,12 @@ import { notifyError } from "../../../lib/notify";
 import { formatMoney, formatPhone, formatRoNumber, relativeTime } from "../../../lib/format";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
 import { VehicleCard } from "../../../features/vehicle/VehicleCard";
+import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { CustomerStatsStrip } from "../../../features/customer/CustomerStatsStrip";
 import { CustomerRemindersPanel } from "../../../features/reminders/CustomerRemindersPanel";
 import type { z } from "zod";
 import type { CreateVehicleDto } from "@lift/shared/dto";
+import type { CreateCustomerInput } from "@lift/shared/dto";
 
 interface CustomerHistory {
   customer: {
@@ -97,6 +100,7 @@ export function CustomerDetailRoute() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [vehicleModal, vehicleModalCtl] = useDisclosure(false);
+  const [editModal, editModalCtl] = useDisclosure(false);
   const [messagesOpen, messagesCtl] = useDisclosure(false);
 
   const { data, isPending } = useQuery({
@@ -113,6 +117,25 @@ export function CustomerDetailRoute() {
       vehicleModalCtl.close();
     },
     onError: (err) => notifyError(err, { title: "Couldn't add vehicle" }),
+  });
+
+  const updateCustomer = useMutation({
+    // CustomerForm strips cleared optionals to undefined, which PATCH would
+    // ignore — null tells the API to actually clear the field.
+    mutationFn: (values: CreateCustomerInput) =>
+      api.patch(`/customers/${id}`, {
+        ...values,
+        lastName: values.lastName ?? null,
+        email: values.email ?? null,
+        notes: values.notes ?? null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer-history", id] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      notifications.show({ color: "green", message: "Customer updated" });
+      editModalCtl.close();
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
   });
 
   if (isPending) return <Text c="dimmed">Loading…</Text>;
@@ -156,7 +179,18 @@ export function CustomerDetailRoute() {
       <Card withBorder padding="md" radius="md">
         <Group justify="space-between" wrap="nowrap" align="flex-start">
           <Stack gap={4} style={{ minWidth: 0 }}>
-            <Title order={2}>{fullName}</Title>
+            <Group gap="xs" wrap="nowrap">
+              <Title order={2}>{fullName}</Title>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="md"
+                aria-label="Edit customer"
+                onClick={editModalCtl.open}
+              >
+                <IconPencil size={16} />
+              </ActionIcon>
+            </Group>
             <Group gap="xs" wrap="nowrap">
               <ActionIcon
                 component="a"
@@ -340,6 +374,31 @@ export function CustomerDetailRoute() {
           </Collapse>
         )}
       </Stack>
+
+      <Modal
+        opened={editModal}
+        onClose={editModalCtl.close}
+        title="Edit customer"
+        size="lg"
+        centered
+      >
+        <CustomerForm
+          mode="edit"
+          submitLabel="Save changes"
+          initialValues={{
+            firstName: customer.firstName,
+            lastName: customer.lastName ?? "",
+            phone: formatPhone(customer.phone),
+            email: customer.email ?? undefined,
+            notes: customer.notes ?? undefined,
+          }}
+          loading={updateCustomer.isPending}
+          onCancel={editModalCtl.close}
+          onSubmit={async (values) => {
+            await updateCustomer.mutateAsync(values);
+          }}
+        />
+      </Modal>
 
       <Modal
         opened={vehicleModal}

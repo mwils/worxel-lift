@@ -10,15 +10,21 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (!id) return badRequest("Missing customer id");
 
     const dto = await parseBody(event, UpdateCustomerDto);
-    // Drop undefined keys so we don't clobber existing fields with $set: undefined.
-    const update: Record<string, unknown> = {};
+    // PATCH semantics: undefined = leave alone, null = clear the field.
+    const set: Record<string, unknown> = {};
+    const unset: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(dto)) {
-      if (v !== undefined) update[k] = v;
+      if (v === undefined) continue;
+      if (v === null) unset[k] = "";
+      else set[k] = v;
     }
 
     const customer = await Customer.findOneAndUpdate(
       { _id: id, shopId: user.shopId },
-      { $set: update },
+      {
+        ...(Object.keys(set).length ? { $set: set } : {}),
+        ...(Object.keys(unset).length ? { $unset: unset } : {}),
+      },
       { new: true }
     ).lean();
     if (!customer) return notFound("Customer not found");

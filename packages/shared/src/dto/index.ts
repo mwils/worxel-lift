@@ -115,7 +115,12 @@ export const CreateCustomerDto = z.object({
   email: z.string().email().optional(),
   notes: z.string().optional(),
 });
-export const UpdateCustomerDto = CreateCustomerDto.partial();
+// PATCH semantics: undefined leaves a field alone, null clears it.
+export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
+  lastName: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
 
 // ── vehicles ────────────────────────────────────────────────────
 export const CreateVehicleDto = z.object({
