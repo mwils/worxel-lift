@@ -139,8 +139,8 @@ export function OnboardingRoute() {
           <Stepper.Step label="Shop number">
             <Stack mt="md">
               <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
-                Your shop gets a dedicated SMS number for customers to text. We set it up right
-                after you finish onboarding.
+                Your customers get texts from your shop's Lift number — estimates, status
+                updates, and pay links. They can text back and it lands in your Messages inbox.
               </Alert>
               <Button onClick={() => setStep(2)}>Next: card</Button>
             </Stack>

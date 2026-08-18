@@ -5,13 +5,6 @@ import { signSessionCookie } from "../../lib/auth.js";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { created, ok } from "../../lib/response.js";
 
-/**
- * Mock SMS number assigned to every new shop until the 10DLC campaign is
- * approved and we can pull real numbers from the AWS End User Messaging pool.
- * Range 555-0100 to 555-0199 is reserved by NANPA for fictional use.
- */
-const MOCK_SHOP_PHONE = "+15555550199";
-
 const SALES_API_URL = process.env.SALES_API_URL ?? "";
 
 // Tells the cold-outreach back office that this prospect just started a trial.
@@ -68,9 +61,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       address: dto.address,
       timezone: dto.timezone,
       ownerUserId: user.userId,
+      // No phoneNumber: shops without one send from the shared Lift number
+      // (SMS_POOL_ID), and inbound routes by the customer's phone (snsInbound).
+      // Setting the shared number here would break that routing — the per-shop
+      // destination lookup would match an arbitrary shop. Assign a phoneNumber
+      // only once shops get dedicated numbers.
       sms: {
-        phoneNumber: MOCK_SHOP_PHONE,
-        awsPhonePoolId: "mock-pool",
         optInScript:
           `By providing your phone number, you agree to receive SMS messages from ${dto.name} about your repair order. ` +
           `Reply STOP to opt out, HELP for help. Msg & data rates may apply.`,
