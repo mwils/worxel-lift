@@ -15,7 +15,7 @@ import {
 } from "@lift/shared";
 
 const TEMPLATE_VERSION = "estimate.template.v1";
-import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
+import { handleKnownErrors, parseBody, withVerifiedAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
 import { invokeModel, modelDraft } from "../../lib/bedrock.js";
 import { sendSms } from "../../lib/sms.js";
@@ -30,7 +30,7 @@ function publicInspectionUrl(token: string): string {
   return `${base}/public/inspection/${token}`;
 }
 
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
     const id = event.pathParameters?.id;

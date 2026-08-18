@@ -5,8 +5,9 @@ import type {
 } from "aws-lambda";
 import { z, ZodError, type ZodTypeAny } from "zod";
 import { connectDb } from "@lift/shared/db";
+import { User } from "@lift/shared";
 import { verifySessionCookie, type SessionClaims } from "./auth.js";
-import { badRequest, serverError, unauthorized } from "./response.js";
+import { badRequest, forbidden, serverError, unauthorized } from "./response.js";
 
 export interface RequestContext {
   event: APIGatewayProxyEventV2;
@@ -40,6 +41,25 @@ export function withAuth(handler: Handlerish): Handler<APIGatewayProxyEventV2> {
     const session = await verifySessionCookie(cookieHeader);
     if (!session) return unauthorized();
     return handler({ event, user: session });
+  });
+}
+
+/**
+ * Require auth + a confirmed email. Instant-signup accounts get a session
+ * before proving they own the address, so anything that reaches a customer
+ * (SMS/email sends, pay links) goes through this instead of withAuth.
+ * Checked against the DB, not the JWT — verification can happen on another
+ * device after this session's cookie was minted.
+ */
+export function withVerifiedAuth(handler: Handlerish): Handler<APIGatewayProxyEventV2> {
+  return withAuth(async (ctx) => {
+    const u = await User.findById(ctx.user.userId).select("emailVerified").lean();
+    if (u?.emailVerified === false) {
+      return forbidden(
+        `Confirm your email first — we sent a link to ${ctx.user.email}. You can resend it from the banner in the app.`
+      );
+    }
+    return handler(ctx);
   });
 }
 

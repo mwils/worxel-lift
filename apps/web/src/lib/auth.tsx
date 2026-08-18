@@ -3,7 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "./api";
 
 export interface Me {
-  user: { id: string; email: string; role: "owner" | "tech"; shopId: string | null };
+  user: {
+    id: string;
+    email: string;
+    role: "owner" | "tech";
+    shopId: string | null;
+    emailVerified: boolean;
+  };
   shop: {
     id: string;
     name: string;

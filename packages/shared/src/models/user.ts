@@ -7,6 +7,11 @@ const UserSchema = new Schema(
     phone: String, // E.164
     role: { type: String, enum: ["owner", "tech"], default: "owner" },
 
+    // false = instant-signup account that hasn't clicked the emailed link yet.
+    // undefined (pre-existing accounts) counts as verified — they could only
+    // have gotten a session through the email round-trip.
+    emailVerified: Boolean,
+
     auth: {
       magicLinkHash: String,
       magicLinkExpiresAt: Date,

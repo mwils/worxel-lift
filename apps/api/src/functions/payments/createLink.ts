@@ -9,7 +9,7 @@ import {
   User,
   PAY_LINK_PROMPT_VERSION,
 } from "@lift/shared";
-import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
+import { handleKnownErrors, parseBody, withVerifiedAuth } from "../../lib/middleware.js";
 import { ok, badRequest, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
 import { modelDraft } from "../../lib/bedrock.js";
@@ -35,7 +35,7 @@ function publicPayUrl(token: string): string {
  *      mocking path when MOCK_SMS=1) and records a Message. Mirrors
  *      `POST /repair-orders/:id/send-estimate`.
  */
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("User has no shop");
     const dto = await parseBody(event, CreatePayLinkDto);

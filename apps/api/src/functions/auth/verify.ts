@@ -21,6 +21,9 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       if (!user) return unauthorized("Invalid or expired link");
       user.set("auth.magicLinkHash", undefined);
       user.set("auth.magicLinkExpiresAt", undefined);
+      // Completing the email round-trip proves ownership — unlocks the
+      // outbound-send routes gated by withVerifiedAuth.
+      user.set("emailVerified", true);
     } else if (dto.phone && dto.code) {
       const hash = hashSmsCode(dto.code);
       user = await User.findOne({

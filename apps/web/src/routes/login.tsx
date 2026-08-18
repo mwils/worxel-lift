@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button, Container, Paper, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { notifyError } from "../lib/notify";
 
@@ -9,6 +11,8 @@ import { notifyError } from "../lib/notify";
 export function LoginRoute() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
   useEffect(() => {
     // Captures the cold-email tracking id forwarded from lift.worxel.com.
@@ -28,7 +32,17 @@ export function LoginRoute() {
   async function onSubmit(values: typeof form.values) {
     setSending(true);
     try {
-      await api.post("/auth/magic-link", { email: values.email });
+      const res = await api.post<{ ok: true; signedIn?: boolean }>("/auth/magic-link", {
+        email: values.email,
+      });
+      if (res.signedIn) {
+        // Brand-new account — the API set the session cookie directly, no
+        // email round-trip. Refetch `me` so the route guards see it, then
+        // straight into onboarding.
+        await qc.invalidateQueries({ queryKey: ["me"] });
+        navigate("/onboarding", { replace: true });
+        return;
+      }
       setSent(true);
     } catch (err) {
       notifyError(err, { title: "Couldn't send", fallback: "Try again in a second." });
@@ -74,12 +88,12 @@ export function LoginRoute() {
                 loading={sending}
                 loaderProps={{ type: "bars" }}
               >
-                {sending ? "Sending your link…" : "Email me a link"}
+                {sending ? "One sec…" : "Continue"}
               </Button>
               <Text c="dimmed" size="xs" ta="center">
                 {sending
-                  ? "Hang tight — the first send takes a couple seconds."
-                  : "New here? We'll create your shop after you confirm."}
+                  ? "Hang tight — this takes a couple seconds."
+                  : "New here? You'll go straight to setup. Already have an account? We'll email you a sign-in link."}
               </Text>
             </Stack>
           </form>

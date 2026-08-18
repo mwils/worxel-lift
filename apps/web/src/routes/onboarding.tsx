@@ -10,12 +10,14 @@ import {
   TextInput,
   Group,
   Alert,
+  Anchor,
 } from "@mantine/core";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { notifyError } from "../lib/notify";
 import { PaymentSheet } from "../features/payments/PaymentSheet";
 
@@ -31,6 +33,19 @@ export function OnboardingRoute() {
   const [state, setState] = useState("");
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { me } = useAuth();
+
+  // Email is the only sign-in credential, and instant signup skips the
+  // round-trip that used to catch typos — so surface it here while a
+  // do-over is still cheap.
+  async function startOver() {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // best-effort — still bounce to login
+    }
+    window.location.href = "/login";
+  }
 
   const [setup, setSetup] = useState<StripeSetupResp | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -83,9 +98,17 @@ export function OnboardingRoute() {
 
   return (
     <Container size={600} py="xl">
-      <Stack mb="lg">
+      <Stack mb="lg" gap="xs">
         <Title order={1}>Let's get your shop on Lift</Title>
         <Text c="dimmed">Three quick screens, then you're sending estimates.</Text>
+        {me && (
+          <Text c="dimmed" size="sm">
+            You're signed up as <b>{me.user.email}</b> — sign-in links go there.{" "}
+            <Anchor size="sm" onClick={startOver}>
+              Wrong email?
+            </Anchor>
+          </Text>
+        )}
       </Stack>
 
       <Paper p="lg" withBorder>

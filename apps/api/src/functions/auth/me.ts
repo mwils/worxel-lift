@@ -33,6 +33,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
         email: u.email,
         role: u.role,
         shopId: u.shopId ? String(u.shopId) : null,
+        // undefined (pre-instant-signup accounts) counts as verified.
+        emailVerified: u.emailVerified !== false,
       },
       shop: shop
         ? {

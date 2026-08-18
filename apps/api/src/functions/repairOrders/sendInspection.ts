@@ -9,7 +9,7 @@ import {
   User,
   Vehicle,
 } from "@lift/shared";
-import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
+import { handleKnownErrors, parseBody, withVerifiedAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
 
@@ -61,7 +61,7 @@ export function buildInspectionTemplate(input: InspectionSmsInput): string {
   return lines.join("\n");
 }
 
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
     const id = event.pathParameters?.id;

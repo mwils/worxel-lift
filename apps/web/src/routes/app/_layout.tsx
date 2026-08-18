@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AppShell, Group, Title, NavLink, Burger, Box, Loader } from "@mantine/core";
+import { Alert, AppShell, Button, Group, Title, NavLink, Burger, Box, Loader } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconLayoutBoard,
@@ -8,10 +8,52 @@ import {
   IconSettings,
   IconLogout,
   IconClipboardList,
+  IconMailExclamation,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation } from "react-router-dom";
+import { notifications } from "@mantine/notifications";
 import { api } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
+import { notifyError } from "../../lib/notify";
 import { GlobalSearchBar, useHasCustomers } from "../../features/history/GlobalSearchBar";
+
+/** Shown until an instant-signup account clicks its confirmation link.
+ *  Outbound sends (texts, estimates, pay links) 403 until then. */
+function ConfirmEmailBanner({ email }: { email: string }) {
+  const [resending, setResending] = useState(false);
+
+  async function resend() {
+    setResending(true);
+    try {
+      await api.post("/auth/magic-link", { email });
+      notifications.show({ color: "green", message: `Confirmation link sent to ${email}.` });
+    } catch (err) {
+      notifyError(err, { title: "Couldn't resend", fallback: "Try again in a minute." });
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <Alert
+      color="yellow"
+      variant="light"
+      icon={<IconMailExclamation size={18} />}
+      title="Confirm your email to text customers"
+      mb="md"
+    >
+      <Group justify="space-between" gap="sm">
+        <Box>
+          We sent a link to <b>{email}</b>. Until you tap it, sending texts, estimates, and pay
+          links is locked.
+        </Box>
+        <Button size="compact-sm" variant="light" color="yellow" onClick={resend} loading={resending}>
+          Resend link
+        </Button>
+      </Group>
+    </Alert>
+  );
+}
 
 const NAV = [
   { to: "/", label: "Board", icon: IconLayoutBoard, end: true },
@@ -26,6 +68,7 @@ export function AppLayout() {
   const location = useLocation();
   const hasCustomers = useHasCustomers();
   const [loggingOut, setLoggingOut] = useState(false);
+  const { me } = useAuth();
 
   async function logout() {
     if (loggingOut) return;
@@ -88,6 +131,7 @@ export function AppLayout() {
       </AppShell.Navbar>
 
       <AppShell.Main>
+        {me && me.user.emailVerified === false && <ConfirmEmailBanner email={me.user.email} />}
         <Outlet />
       </AppShell.Main>
     </AppShell>

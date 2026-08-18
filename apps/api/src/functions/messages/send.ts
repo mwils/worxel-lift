@@ -1,10 +1,10 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Customer, Message, RepairOrder, SendMessageDto, Shop, User } from "@lift/shared";
-import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
+import { handleKnownErrors, parseBody, withVerifiedAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
 
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
     const dto = await parseBody(event, SendMessageDto);
