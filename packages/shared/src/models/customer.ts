@@ -16,6 +16,9 @@ const CustomerSchema = new Schema(
 );
 
 CustomerSchema.index({ shopId: 1, phone: 1 }, { unique: true });
+// Cross-tenant by design: inbound SMS on the shared origination number is
+// routed to a shop by looking up the sender's phone (see snsInbound).
+CustomerSchema.index({ phone: 1 });
 CustomerSchema.index({ shopId: 1, lastName: 1, firstName: 1 });
 
 export type CustomerDoc = InferSchemaType<typeof CustomerSchema> & { _id: mongoose.Types.ObjectId };

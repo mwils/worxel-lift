@@ -50,6 +50,28 @@ export default $config({
     const smsInboundTopic = new sst.aws.SnsTopic("SmsInboundTopic");
     const smsDeliveryTopic = new sst.aws.SnsTopic("SmsDeliveryTopic");
 
+    // AWS End User Messaging publishes inbound SMS to the topic as the
+    // sms-voice service principal — without this resource policy, enabling
+    // two-way messaging on the phone number fails its permission check.
+    // Scoped to this account to avoid confused-deputy publishes.
+    const accountId = aws.getCallerIdentityOutput().accountId;
+    new aws.sns.TopicPolicy("SmsInboundTopicPolicy", {
+      arn: smsInboundTopic.arn,
+      policy: $jsonStringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Sid: "AllowEndUserMessagingPublish",
+            Effect: "Allow",
+            Principal: { Service: "sms-voice.amazonaws.com" },
+            Action: "sns:Publish",
+            Resource: smsInboundTopic.arn,
+            Condition: { StringEquals: { "AWS:SourceAccount": accountId } },
+          },
+        ],
+      }),
+    });
+
     // ── Common Lambda config ────────────────────────────────────
     const commonLink = [
       photosBucket,
@@ -112,9 +134,10 @@ export default $config({
       // later is a pure env-var change.
       BEDROCK_MODEL_DRAFT: "us.meta.llama4-scout-17b-instruct-v1:0",
       BEDROCK_MODEL_CLASSIFY: "us.meta.llama4-scout-17b-instruct-v1:0",
-      // Mock outbound SMS until the 10DLC campaign is approved and the
-      // origination pool has real numbers. CloudWatch logs the would-be SMS.
-      MOCK_SMS: "1",
+      // 10DLC campaign cleared review (shared number +17169858982 active,
+      // SmsPoolId secret = its phone-number id) — real SMS is live.
+      // Flip back to "1" to route outbound through SES email mocks again.
+      MOCK_SMS: "0",
       WEB_APP_URL: urls.web,
       MARKETING_URL: urls.marketing,
       API_URL: urls.api,

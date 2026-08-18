@@ -90,20 +90,43 @@ export const handler: SNSHandler = async (event) => {
         messageId,
       });
 
-      // 1) Resolve shop by destinationNumber. No tenant filter here — this is
-      //    how we *find* the tenant. All subsequent queries are shop-scoped.
-      const shop = await Shop.findOne({ "sms.phoneNumber": destinationNumber }).lean();
+      // 1) Resolve tenant. No tenant filter on these lookups — this is how we
+      //    *find* the tenant. All subsequent queries are shop-scoped.
+      //
+      //    Dedicated-number mode: the destination number belongs to exactly
+      //    one shop. Shared-number mode (early days — every shop sends from
+      //    the same origination number): no shop owns the destination, so
+      //    route by the *sender's* phone instead. The unique {shopId, phone}
+      //    index means multiple matches = the same person is a customer at
+      //    two shops — ambiguous, so log and skip rather than guess.
+      let shop = await Shop.findOne({ "sms.phoneNumber": destinationNumber }).lean();
+      let customer = shop
+        ? await Customer.findOne({ shopId: shop._id, phone: originationNumber }).lean()
+        : null;
+
       if (!shop) {
-        console.log("[snsInbound] no shop matches destinationNumber", destinationNumber);
+        const candidates = await Customer.find({ phone: originationNumber }).limit(2).lean();
+        const only = candidates.length === 1 ? candidates[0] : undefined;
+        if (only) {
+          customer = only;
+          shop = await Shop.findById(only.shopId).lean();
+        } else if (candidates.length > 1) {
+          console.error("[snsInbound] phone matches customers at multiple shops — skipping", {
+            phone: originationNumber,
+          });
+          continue;
+        }
+      }
+
+      if (!shop) {
+        console.log("[snsInbound] no shop for inbound message", {
+          to: destinationNumber,
+          from: originationNumber,
+        });
         continue;
       }
 
-      // 2) Resolve customer by (shopId, phone). We do NOT auto-create
-      //    customers from random inbound texts.
-      const customer = await Customer.findOne({
-        shopId: shop._id,
-        phone: originationNumber,
-      }).lean();
+      // 2) We do NOT auto-create customers from random inbound texts.
       if (!customer) {
         console.log("[snsInbound] no customer matches phone for shop", {
           shopId: String(shop._id),
