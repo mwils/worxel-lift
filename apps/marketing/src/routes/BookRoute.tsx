@@ -122,10 +122,14 @@ interface BookFormProps {
 function BookForm({ slug, shop }: BookFormProps) {
   const tz = shop.shop.timezone;
   const today = new Date();
-  const maxDate = useMemo(
-    () => new Date(Date.now() + shop.booking.horizonDays * 24 * 60 * 60 * 1000),
-    [shop.booking.horizonDays]
-  );
+  const maxDate = useMemo(() => {
+    // horizonDays counts today as day 1 — the API validates the INCLUSIVE
+    // from..to span, so today + horizonDays would be one day too many.
+    // Calendar-day arithmetic, not ms math, so DST boundaries don't drift it.
+    const d = new Date();
+    d.setDate(d.getDate() + shop.booking.horizonDays - 1);
+    return d;
+  }, [shop.booking.horizonDays]);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -313,6 +317,8 @@ function BookForm({ slug, shop }: BookFormProps) {
                 <Center py="md">
                   <Loader size="sm" />
                 </Center>
+              ) : slotsError ? (
+                <Text c="dimmed">Couldn't load times — refresh the page to try again.</Text>
               ) : slotsForSelectedDay.length === 0 ? (
                 <Text c="dimmed">No times open that day. Try another.</Text>
               ) : (
