@@ -82,7 +82,12 @@ its consent disclosure text.
 
 1. > John — here's the estimate for your 1988 Ford Bronco: Brake pad
    > replacement — $120.00, Tire balance and rotation — $45.00. Total: $250.00.
-   > Review and approve: https://lift-app.worxel.com/public/estimate/abc123
+   > Review and approve:
+   > https://lift-app.worxel.com/public/estimate/3M4AaNeRgT1XlU3CmoZ0M6zp8QZ9RZNJ
+   >
+   > (Live example URL — resolves to a real rendered estimate page, verified
+   > 2026-08-19. Use this wherever the form asks for an embedded-link example
+   > that must point to a public page.)
 2. > Update on your F-150 from Mike's Auto: parts arrived, repair is underway.
    > We'll text you when it's ready.
 3. > Your Civic is ready for pickup at Mike's Auto. Total is $412.50 — pay
