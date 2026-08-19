@@ -3,6 +3,7 @@ import { Center, Container, Stack, Text, Title, Button } from "@mantine/core";
 import { Landing } from "./Landing";
 import { BookRoute } from "./routes/BookRoute";
 import { ManageBookingRoute } from "./routes/ManageBookingRoute";
+import { LegalRoute } from "./routes/LegalRoute";
 
 export function App() {
   return (
@@ -11,6 +12,8 @@ export function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/book/:slug" element={<BookRoute />} />
         <Route path="/booking/:token" element={<ManageBookingRoute />} />
+        <Route path="/privacy" element={<LegalRoute />} />
+        <Route path="/terms" element={<LegalRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

@@ -87,7 +87,7 @@ export function CustomerForm({
           description={
             mode === "edit"
               ? "Include the area code. Texts from their old number won't match this customer anymore."
-              : "Include the area code. Adding a customer opts them in to SMS."
+              : "Include the area code. By adding this number you confirm the customer agreed to receive service texts about their vehicle. Msg frequency varies, msg & data rates may apply. They can reply STOP to opt out, HELP for help."
           }
           {...form.getInputProps("phone")}
         />
