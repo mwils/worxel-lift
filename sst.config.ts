@@ -430,6 +430,14 @@ export default $config({
       environment: { VITE_API_URL: urls.api, VITE_WEB_APP_URL: urls.web },
     });
 
+    // Parent-company page at the apex. Exists mostly for 10DLC brand vetting:
+    // the registered brand (AICHEETAH IO LLC dba Worxel) needs a website that
+    // ties both products' campaigns to one end brand. Plain static HTML, no build.
+    const company = new sst.aws.StaticSite("Company", {
+      path: "apps/company",
+      domain: { name: "worxel.com", redirects: ["www.worxel.com"] },
+    });
+
     return {
       api: api.url,
       web: web.url,

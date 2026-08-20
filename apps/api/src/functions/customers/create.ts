@@ -43,9 +43,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     // creation over a carrier hiccup — the record and consent stand either way.
     try {
       const shop = await Shop.findById(user.shopId).lean();
+      // "Worxel" (registered 10DLC DBA) must appear in the opt-in confirmation
+      // — carrier vetting rejects opt-in/opt-out texts without the brand name.
       const confirmBody =
-        `${shop?.name ?? "Your repair shop"} via Lift: You're set to get text updates about ` +
-        `your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
+        `${shop?.name ?? "Your repair shop"} via Worxel Lift: You're set to get text updates ` +
+        `about your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
         `Reply HELP for help, STOP to cancel.`;
       const sendResult = await sendSms({
         to: customer.phone,

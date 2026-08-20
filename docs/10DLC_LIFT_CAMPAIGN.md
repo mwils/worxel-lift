@@ -15,10 +15,31 @@ pointing at `SmsInboundTopic` (same as the current number).
 
 ## Campaign info
 
+## Rejection round 1 (2026-08-20) — fixes
+
+AWS/TCR returned "Requires update" with three findings. Resubmission changes:
+
+1. **Opt-in message mismatch** — vetting requires the registered brand or DBA
+   ("Worxel") literally in the opt-in confirmation. Fixed text below (and in
+   the product: `customers/create.ts` sends the same string).
+2. **Opt-out message mismatch** — same for the STOP response. Fixed below.
+3. **Invalid brand business connection** (brand looks like an ISV; website
+   mismatch — brand site was aerotraks.com, campaign is lift.worxel.com):
+   - Parent-company page now live at **https://worxel.com** (apps/company)
+     naming AICHEETAH IO LLC dba Worxel and both products.
+   - **Update the BRAND registration's website field to https://worxel.com**
+     (Registrations → the brand → edit contact info). This makes the brand
+     site cover both the Aerotraks and Lift campaigns.
+   - Campaign description below now opens with the brand connection, and
+     sample messages carry "via Worxel Lift" so the sender identity is the
+     registered brand, not the individual shop.
+
 **Campaign name / description**
 
-> Lift is shop-management software for small independent auto repair shops
-> (lift.worxel.com), a product of AICHEETAH IO LLC dba Worxel. Shops use Lift to
+> Worxel Lift is shop-management software built, operated, and sold by
+> AICHEETAH IO LLC dba Worxel (worxel.com) — Worxel is the end brand sending
+> these messages, not a reseller or ISV for other brands. Lift
+> (lift.worxel.com) is used by small independent auto repair shops to
 > send transactional SMS to their own customers about vehicles currently in for
 > service: repair estimates with an approval link, repair status updates,
 > vehicle-ready notifications, payment links, and replies to customer-initiated
@@ -62,36 +83,38 @@ its consent disclosure text.
 
 ## Program messages
 
-**Opt-in confirmation message**
+**Opt-in confirmation message** (carrier vetting requires the registered brand
+name or DBA — "Worxel" — to appear literally in the opt-in and opt-out texts)
 
-> [Shop name] via Lift: You're set to get text updates about your vehicle. Msg
-> frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to
-> cancel.
+> [Shop name] via Worxel Lift: You're set to get text updates about your
+> vehicle. Msg frequency varies. Msg & data rates may apply. Reply HELP for
+> help, STOP to cancel.
 
 **HELP response**
 
-> Lift service updates on behalf of your repair shop. Msg & data rates may
-> apply. Email lift@worxel.com for help. Reply STOP to cancel.
+> Worxel Lift service updates on behalf of your repair shop. Msg & data rates
+> may apply. Email lift@worxel.com for help. Reply STOP to cancel.
 
 **STOP response**
 
-> You have been unsubscribed from repair updates via Lift and will receive no
-> further messages. Reply START to resubscribe.
+> Worxel Lift: You have been unsubscribed from repair updates and will receive
+> no further messages. Reply START to resubscribe.
 
 ## Sample messages
 
-1. > John — here's the estimate for your 1988 Ford Bronco: Brake pad
-   > replacement — $120.00, Tire balance and rotation — $45.00. Total: $250.00.
-   > Review and approve:
+1. > Mike's Auto via Worxel Lift: John — here's the estimate for your 1988
+   > Ford Bronco: Brake pad replacement — $120.00, Tire balance and rotation —
+   > $45.00. Total: $250.00. Review and approve:
    > https://lift-app.worxel.com/public/estimate/3M4AaNeRgT1XlU3CmoZ0M6zp8QZ9RZNJ
    >
    > (Live example URL — resolves to a real rendered estimate page, verified
    > 2026-08-19. Use this wherever the form asks for an embedded-link example
    > that must point to a public page.)
-2. > Update on your F-150 from Mike's Auto: parts arrived, repair is underway.
-   > We'll text you when it's ready.
-3. > Your Civic is ready for pickup at Mike's Auto. Total is $412.50 — pay
-   > ahead here if you like: https://lift-app.worxel.com/public/pay/xyz789
+2. > Mike's Auto via Worxel Lift: parts for your F-150 arrived, repair is
+   > underway. We'll text you when it's ready.
+3. > Mike's Auto via Worxel Lift: your Civic is ready for pickup. Total is
+   > $412.50 — pay ahead here if you like:
+   > https://lift-app.worxel.com/public/pay/xyz789
 
 ## Links
 
