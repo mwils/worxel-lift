@@ -1,7 +1,8 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { CreateCustomerDto, Customer } from "@lift/shared";
+import { CreateCustomerDto, Customer, Message, Shop } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, ok } from "../../lib/response.js";
+import { sendSms } from "../../lib/sms.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
@@ -36,6 +37,34 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       // included in the shop onboarding script / first outbound).
       smsOptInAt: new Date(),
     });
+
+    // Opt-in confirmation text, required by our 10DLC registration ("verbal
+    // opt-in gets a written confirmation"). Best-effort: never fail customer
+    // creation over a carrier hiccup — the record and consent stand either way.
+    try {
+      const shop = await Shop.findById(user.shopId).lean();
+      const confirmBody =
+        `${shop?.name ?? "Your repair shop"} via Lift: You're set to get text updates about ` +
+        `your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
+        `Reply HELP for help, STOP to cancel.`;
+      const sendResult = await sendSms({
+        to: customer.phone,
+        from: shop?.sms?.phoneNumber ?? undefined,
+        body: confirmBody,
+        mockEmailRecipient: customer.email ?? undefined,
+      });
+      await Message.create({
+        shopId: user.shopId,
+        customerId: customer._id,
+        direction: "out",
+        body: confirmBody,
+        sentAt: new Date(),
+        awsMessageId: sendResult.messageId,
+        autoReplied: true,
+      });
+    } catch (err) {
+      console.error("[customers/create] opt-in confirmation SMS failed", err);
+    }
 
     return created({
       customer: {

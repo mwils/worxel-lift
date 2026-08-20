@@ -67,9 +67,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       // destination lookup would match an arbitrary shop. Assign a phoneNumber
       // only once shops get dedicated numbers.
       sms: {
+        // Mirrors the verbal disclosure registered with our 10DLC campaign —
+        // keep the frequency, rates, STOP/HELP, and privacy-URL clauses intact.
         optInScript:
-          `By providing your phone number, you agree to receive SMS messages from ${dto.name} about your repair order. ` +
-          `Reply STOP to opt out, HELP for help. Msg & data rates may apply.`,
+          `By providing your phone number, you agree to receive text messages from ${dto.name} via Lift about your repair order. ` +
+          `Message frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help. ` +
+          `Terms & privacy: lift.worxel.com/privacy`,
       },
       billing: { plan: "lift_79", trialEndsAt },
       settings: { aiTone: "plain", autoReplyEnabled: true },
