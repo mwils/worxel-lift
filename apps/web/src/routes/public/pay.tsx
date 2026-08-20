@@ -13,14 +13,16 @@ import {
   Title,
 } from "@mantine/core";
 import { IconCircleCheck } from "@tabler/icons-react";
-import { api } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
 import { formatMoney, formatRoNumber } from "../../lib/format";
 import { PaymentSheet } from "../../features/payments/PaymentSheet";
 
 interface PublicPay {
   clientSecret: string | null;
+  stripeAccountId: string | null;
   publishableKey: string;
   paid: boolean;
+  payable: boolean;
   ro: { number: number; total: number; status: string };
   customer: { firstName: string; lastName: string | null } | null;
   shop: { name: string } | null;
@@ -31,7 +33,7 @@ export function PublicPayRoute() {
   const qc = useQueryClient();
   const [confirmed, setConfirmed] = useState(false);
 
-  const { data, isPending, refetch } = useQuery({
+  const { data, isPending, error, refetch } = useQuery({
     queryKey: ["public-pay", token],
     queryFn: () => api.get<PublicPay>(`/public/pay/${token}`),
     enabled: !!token,
@@ -60,14 +62,35 @@ export function PublicPayRoute() {
   }
 
   if (!data) {
+    // A 404 means the link genuinely doesn't resolve; anything else is a
+    // server/Stripe hiccup — don't tell the customer their link is dead.
+    const gone = error instanceof ApiError && error.status === 404;
     return (
       <Container py="xl" size={520}>
-        <Text>This pay link has expired or already been paid. Reply to the shop's text if you have questions.</Text>
+        <Text>
+          {gone
+            ? "This pay link has expired or already been paid. Reply to the shop's text if you have questions."
+            : "Something went wrong loading this payment. Try again in a minute, or call the shop to pay."}
+        </Text>
       </Container>
     );
   }
 
   const paid = data.paid || confirmed;
+
+  if (!paid && !data.payable) {
+    return (
+      <Container py="xl" size={520}>
+        <Stack gap="xs">
+          <Title order={3}>{data.shop?.name ?? "This shop"}</Title>
+          <Text>
+            {data.shop?.name ?? "This shop"} doesn't take online payments yet — give them a
+            call or pay at the counter. Reply to their text if you have questions.
+          </Text>
+        </Stack>
+      </Container>
+    );
+  }
 
   return (
     <Container size={520} py="lg">
@@ -108,6 +131,7 @@ export function PublicPayRoute() {
             }}
             clientSecret={data.clientSecret}
             publishableKey={data.publishableKey}
+            stripeAccount={data.stripeAccountId}
             mode="payment"
             onSuccess={async () => {
               setConfirmed(true);

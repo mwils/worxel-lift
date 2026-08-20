@@ -26,6 +26,7 @@ import {
 } from "@tabler/icons-react";
 import { RO_STATUSES, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import { formatMoney, formatPhone, formatRoNumber } from "../../../lib/format";
 import { notifyError } from "../../../lib/notify";
 import {
@@ -86,6 +87,7 @@ const STATUS_OPTIONS = RO_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g
 export function RoDetailRoute() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { me } = useAuth();
 
   const roQ = useQuery({
     queryKey: ["ro", id],
@@ -228,9 +230,24 @@ export function RoDetailRoute() {
   const [payAiPolished, setPayAiPolished] = useState(false);
   const [payDraftLoading, setPayDraftLoading] = useState(false);
   const [payPolishLoading, setPayPolishLoading] = useState(false);
+  // Payments are set up lazily — until the shop's Stripe Connect account can
+  // take charges, the pay-link button opens a setup prompt instead.
+  const [paySetupOpen, setPaySetupOpen] = useState(false);
+  const paymentsReady = me?.shop?.payments.chargesEnabled === true;
+  const startPaymentSetup = useMutation({
+    mutationFn: () => api.post<{ url: string }>("/payments/connect/start"),
+    onSuccess: (res) => {
+      window.location.href = res.url;
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't start payment setup" }),
+  });
 
   async function openSendPayLink() {
     if (!data?.repairOrder.customer) return;
+    if (!paymentsReady) {
+      setPaySetupOpen(true);
+      return;
+    }
     setPayDraftLoading(true);
     try {
       const res = await api.post<{ draft: string; source: "template" | "ai" }>(
@@ -612,6 +629,32 @@ export function RoDetailRoute() {
               disabled={!estimateDraft.trim()}
             >
               Send
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Payments-not-set-up prompt (lazy Stripe Connect onboarding) */}
+      <Modal
+        opened={paySetupOpen}
+        onClose={() => setPaySetupOpen(false)}
+        title="Set up payments"
+        centered
+      >
+        <Stack>
+          <Alert color="blue" variant="light">
+            Texting pay links needs a free Stripe account so the money lands in your bank.
+            One-time setup, about 5 minutes — this RO will be right here when you're back.
+          </Alert>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setPaySetupOpen(false)}>
+              Not now
+            </Button>
+            <Button
+              onClick={() => startPaymentSetup.mutate()}
+              loading={startPaymentSetup.isPending}
+            >
+              Set up payments
             </Button>
           </Group>
         </Stack>

@@ -44,6 +44,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
             settings: shop.settings,
             billing: shop.billing,
             sms: { phoneNumber: shop.sms?.phoneNumber },
+            payments: {
+              hasAccount: !!shop.stripe?.connectAccountId,
+              chargesEnabled: shop.stripe?.connectChargesEnabled === true,
+              detailsSubmitted: shop.stripe?.connectDetailsSubmitted === true,
+            },
           }
         : null,
     },

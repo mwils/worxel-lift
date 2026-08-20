@@ -87,6 +87,30 @@ export function SettingsRoute() {
     onError: (err) => notifyError(err, { title: "Couldn't open billing" }),
   });
 
+  // ── Getting paid (Stripe Connect, lazy setup) ──────────────────
+  const payments = me?.shop?.payments;
+  const startPaymentSetup = useMutation({
+    mutationFn: () => api.post<{ url: string }>("/payments/connect/start"),
+    onSuccess: (res) => {
+      window.location.href = res.url;
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't start payment setup" }),
+  });
+
+  // Returning from Stripe-hosted onboarding (?connect=return|refresh): sync
+  // the account state, refresh `me`, and clean the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("connect")) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    api
+      .post("/payments/connect/refresh")
+      .then(() => qc.invalidateQueries({ queryKey: ["me"] }))
+      .catch(() => {
+        /* next Settings visit re-syncs */
+      });
+  }, [qc]);
+
   function exportData() {
     window.location.href = `${API_URL}/data/export`;
   }
@@ -379,6 +403,30 @@ export function SettingsRoute() {
           Save rate
         </Button>
       </Group>
+
+      <Divider label="Getting paid" />
+      {payments?.chargesEnabled ? (
+        <Alert color="green" variant="light">
+          Payments active — customers' card payments go straight to your bank through Stripe.
+          Manage payouts and refunds at dashboard.stripe.com.
+        </Alert>
+      ) : (
+        <Stack gap="xs">
+          <Text size="sm" c="dimmed">
+            {payments?.hasAccount
+              ? "Payment setup was started but isn't finished — pick up where you left off."
+              : "Connect a free Stripe account so customers can pay their bill from a text. Takes about 5 minutes; card money goes straight to your bank."}
+          </Text>
+          <Group>
+            <Button
+              onClick={() => startPaymentSetup.mutate()}
+              loading={startPaymentSetup.isPending}
+            >
+              {payments?.hasAccount ? "Finish payment setup" : "Set up payments"}
+            </Button>
+          </Group>
+        </Stack>
+      )}
 
       <Divider label="Billing" />
       <Group>

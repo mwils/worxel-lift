@@ -21,28 +21,35 @@ export interface PaymentSheetProps {
    *             Used on the public pay page.
    */
   mode: "setup" | "payment";
+  /**
+   * Stripe Connect account the intent lives on (public pay page — direct
+   * charges on the shop's account). Omit for platform-account intents
+   * (onboarding subscription card).
+   */
+  stripeAccount?: string | null;
 }
 
-// Cache loadStripe promises per publishable key — Stripe explicitly recommends
-// calling loadStripe outside React render. We can't do that here cleanly
-// because the key arrives via props, so memoize by key.
+// Cache loadStripe promises per (publishable key, connected account) — Stripe
+// explicitly recommends calling loadStripe outside React render. We can't do
+// that here cleanly because the key arrives via props, so memoize by key.
 const stripeCache = new Map<string, Promise<Stripe | null>>();
-function getStripe(publishableKey: string): Promise<Stripe | null> {
-  let p = stripeCache.get(publishableKey);
+function getStripe(publishableKey: string, stripeAccount?: string | null): Promise<Stripe | null> {
+  const cacheKey = `${publishableKey}:${stripeAccount ?? ""}`;
+  let p = stripeCache.get(cacheKey);
   if (!p) {
-    p = loadStripe(publishableKey);
-    stripeCache.set(publishableKey, p);
+    p = loadStripe(publishableKey, stripeAccount ? { stripeAccount } : undefined);
+    stripeCache.set(cacheKey, p);
   }
   return p;
 }
 
 export function PaymentSheet(props: PaymentSheetProps) {
-  const { opened, onClose, clientSecret, publishableKey, onSuccess, mode } = props;
+  const { opened, onClose, clientSecret, publishableKey, onSuccess, mode, stripeAccount } = props;
 
   const stripePromise = useMemo(() => {
     if (!publishableKey || publishableKey === "MISSING") return null;
-    return getStripe(publishableKey);
-  }, [publishableKey]);
+    return getStripe(publishableKey, stripeAccount);
+  }, [publishableKey, stripeAccount]);
 
   if (!stripePromise || !clientSecret) {
     return (

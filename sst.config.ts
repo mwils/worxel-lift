@@ -339,6 +339,15 @@ export default $config({
     );
     api.route("POST /payments/save-card", fn("apps/api/src/functions/payments/saveCard.handler"));
     api.route("POST /payments/charge", fn("apps/api/src/functions/payments/charge.handler"));
+    // Lazy per-shop payment setup (Stripe Connect Standard)
+    api.route(
+      "POST /payments/connect/start",
+      fn("apps/api/src/functions/payments/connectStart.handler")
+    );
+    api.route(
+      "POST /payments/connect/refresh",
+      fn("apps/api/src/functions/payments/connectStatus.handler")
+    );
 
     // webhooks
     api.route("POST /webhooks/stripe", fn("apps/api/src/functions/webhooks/stripe.handler"));

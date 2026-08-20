@@ -10,7 +10,7 @@ import {
   PAY_LINK_PROMPT_VERSION,
 } from "@lift/shared";
 import { handleKnownErrors, parseBody, withVerifiedAuth } from "../../lib/middleware.js";
-import { ok, badRequest, notFound } from "../../lib/response.js";
+import { ok, badRequest, forbidden, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
 import { modelDraft } from "../../lib/bedrock.js";
 
@@ -39,6 +39,15 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
   try {
     if (!user.shopId) return badRequest("User has no shop");
     const dto = await parseBody(event, CreatePayLinkDto);
+
+    // Payments are set up lazily (Stripe Connect Standard) — refuse to mint a
+    // link the customer couldn't pay, and say how to fix it.
+    const gateShop = await Shop.findById(user.shopId).lean();
+    if (gateShop?.stripe?.connectChargesEnabled !== true) {
+      return forbidden(
+        "Payments aren't set up yet — go to Settings → Getting paid. Takes about 5 minutes, then you can text pay links."
+      );
+    }
 
     const ro = await RepairOrder.findOne({ _id: dto.repairOrderId, shopId: user.shopId });
     if (!ro) return notFound("Repair order not found");

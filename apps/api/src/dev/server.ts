@@ -69,6 +69,8 @@ import { handler as voiceTranscribe } from "../functions/voice/transcribe.js";
 import { handler as paymentsCreateLink } from "../functions/payments/createLink.js";
 import { handler as paymentsSaveCard } from "../functions/payments/saveCard.js";
 import { handler as paymentsCharge } from "../functions/payments/charge.js";
+import { handler as paymentsConnectStart } from "../functions/payments/connectStart.js";
+import { handler as paymentsConnectStatus } from "../functions/payments/connectStatus.js";
 
 import { handler as webhookStripe } from "../functions/webhooks/stripe.js";
 import { handler as snsInboundHandler } from "../functions/webhooks/snsInbound.js";
@@ -157,6 +159,8 @@ app.post("/voice/transcribe", toExpress(voiceTranscribe));
 app.post("/payments/create-link", toExpress(paymentsCreateLink));
 app.post("/payments/save-card", toExpress(paymentsSaveCard));
 app.post("/payments/charge", toExpress(paymentsCharge));
+app.post("/payments/connect/start", toExpress(paymentsConnectStart));
+app.post("/payments/connect/refresh", toExpress(paymentsConnectStatus));
 
 // webhooks
 app.post("/webhooks/stripe", toExpress(webhookStripe));

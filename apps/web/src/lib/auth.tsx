@@ -24,6 +24,7 @@ export interface Me {
     };
     billing: { plan: string; trialEndsAt?: string };
     sms: { phoneNumber?: string };
+    payments: { hasAccount: boolean; chargesEnabled: boolean; detailsSubmitted: boolean };
   } | null;
 }
 

@@ -31,6 +31,13 @@ const ShopSchema = new Schema(
       subscriptionId: String,
       status: { type: String, enum: ["trialing", "active", "past_due", "canceled", "incomplete"] },
       currentPeriodEnd: Date,
+      // Stripe Connect (Standard) — the shop's own account for RECEIVING
+      // customer payments. Distinct from customerId/subscriptionId above,
+      // which are the shop PAYING Lift's $79/mo. Charges are created directly
+      // on this account; Lift takes no fee.
+      connectAccountId: String,
+      connectChargesEnabled: Boolean,
+      connectDetailsSubmitted: Boolean,
     },
 
     billing: {

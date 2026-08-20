@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { z } from "zod";
-import { Payment, RepairOrder } from "@lift/shared";
+import { Payment, RepairOrder, Shop } from "@lift/shared";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { ok, notFound, badRequest } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
@@ -28,7 +28,14 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
   const ro = await RepairOrder.findOne({ publicToken: token });
   if (!ro) return notFound();
 
-  const intent = await stripe().paymentIntents.retrieve(parsed.data.paymentIntentId);
+  // Direct charge on the shop's connected account — retrieve it there.
+  const shop = await Shop.findById(ro.shopId).lean();
+  const accountId = shop?.stripe?.connectAccountId;
+  if (!accountId) return badRequest("Shop has no payment account");
+
+  const intent = await stripe().paymentIntents.retrieve(parsed.data.paymentIntentId, {
+    stripeAccount: accountId,
+  });
   if (intent.metadata?.roId && intent.metadata.roId !== String(ro._id)) {
     return badRequest("Payment intent does not belong to this RO");
   }

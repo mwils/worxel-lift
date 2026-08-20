@@ -21,7 +21,7 @@ import {
   STATUS_REPLY_PROMPT_VERSION,
 } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
-import { badRequest, notFound, ok } from "../../lib/response.js";
+import { badRequest, forbidden, notFound, ok } from "../../lib/response.js";
 import { invokeModel, modelDraft } from "../../lib/bedrock.js";
 
 const FREEFORM_PROMPT_VERSION = "freeform.v1";
@@ -96,6 +96,13 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (dto.kind === "pay_link") {
       if (!dto.repairOrderId) {
         return badRequest("repairOrderId is required for pay-link drafts");
+      }
+      // Same lazy-setup gate as POST /payments/create-link, but at draft time
+      // so the owner finds out before composing a message.
+      if (shop.stripe?.connectChargesEnabled !== true) {
+        return forbidden(
+          "Payments aren't set up yet — go to Settings → Getting paid. Takes about 5 minutes, then you can text pay links."
+        );
       }
       const ro = await RepairOrder.findOne({
         _id: dto.repairOrderId,
