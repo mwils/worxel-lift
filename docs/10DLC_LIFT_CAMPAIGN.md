@@ -112,10 +112,11 @@ name or DBA — "Worxel" — to appear literally in the opt-in and opt-out texts
 > vehicle. Msg frequency varies. Msg & data rates may apply. Reply HELP for
 > help, STOP to cancel.
 
-**HELP response**
+**HELP response** (avoid "on behalf of your repair shop" — that phrasing echoes
+the reseller/ISV framing that got round 1 rejected)
 
-> Worxel Lift service updates on behalf of your repair shop. Msg & data rates
-> may apply. Email lift@worxel.com for help. Reply STOP to cancel.
+> Worxel Lift: service updates about your vehicle repair. Msg & data rates may
+> apply. Email lift@worxel.com for help. Reply STOP to cancel.
 
 **STOP response**
 
@@ -127,7 +128,7 @@ name or DBA — "Worxel" — to appear literally in the opt-in and opt-out texts
 1. > Mike's Auto via Worxel Lift: John — here's the estimate for your 1988
    > Ford Bronco: Brake pad replacement — $120.00, Tire balance and rotation —
    > $45.00. Total: $250.00. Review and approve:
-   > https://lift-app.worxel.com/public/estimate/3M4AaNeRgT1XlU3CmoZ0M6zp8QZ9RZNJ
+   > https://lift-app.worxel.com/public/estimate/ivYKmzw_G-bx1IuU9XNtOJo_za0D3lsA
    >
    > (Live example URL — resolves to a real rendered estimate page, verified
    > 2026-08-19. Use this wherever the form asks for an embedded-link example
