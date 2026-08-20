@@ -23,28 +23,45 @@ AWS/TCR returned "Requires update" with three findings. Resubmission changes:
    ("Worxel") literally in the opt-in confirmation. Fixed text below (and in
    the product: `customers/create.ts` sends the same string).
 2. **Opt-out message mismatch** — same for the STOP response. Fixed below.
-3. **Invalid brand business connection** (brand looks like an ISV; website
-   mismatch — brand site was aerotraks.com, campaign is lift.worxel.com):
+3. **Invalid brand business connection** — the real trigger was almost
+   certainly the old description's phrasing, *"Shops use Lift to send
+   transactional SMS to **their own customers**"*: that is textbook
+   ISV/reseller language (a platform messaging on behalf of other brands).
+   Do NOT touch the brand registration to fix this (see below). Instead:
+   - Description rewritten so **Worxel is the sender and end brand** — shops
+     are the service context, not the sender. One Worxel-owned number, one
+     brand, no third party sending.
+   - Every message and sample identifies "Worxel Lift" as sender.
    - Parent-company page now live at **https://worxel.com** (apps/company)
-     naming AICHEETAH IO LLC dba Worxel and both products.
-   - **Update the BRAND registration's website field to https://worxel.com**
-     (Registrations → the brand → edit contact info). This makes the brand
-     site cover both the Aerotraks and Lift campaigns.
-   - Campaign description below now opens with the brand connection, and
-     sample messages carry "via Worxel Lift" so the sender identity is the
-     registered brand, not the individual shop.
+     naming AICHEETAH IO LLC dba Worxel and both products, so the campaign
+     domain and the brand are visibly the same company.
+
+### Do not re-open the brand registration
+
+The brand (`registration-305058f0b4004933bfac734601f6a5f7`) is COMPLETE,
+approved at version 7, with `contactInfo.website = aerotraks.com`. The console
+offers no edit, and while the API would technically accept a new version
+(`create-registration-version`), submitting it sends the brand back through TCR
+vetting — risking a re-vetting fee, a denial, and disruption to the already
+approved Aerotraks campaign that depends on this brand. The website field is
+not what the campaign vetter matches against; fix the connection at the
+campaign level (above). Optional low-risk reinforcement: add an "A Worxel
+company" footer link on aerotraks.com pointing to worxel.com, so the registered
+brand website itself shows the product family.
 
 **Campaign name / description**
 
-> Worxel Lift is shop-management software built, operated, and sold by
-> AICHEETAH IO LLC dba Worxel (worxel.com) — Worxel is the end brand sending
-> these messages, not a reseller or ISV for other brands. Lift
-> (lift.worxel.com) is used by small independent auto repair shops to
-> send transactional SMS to their own customers about vehicles currently in for
-> service: repair estimates with an approval link, repair status updates,
-> vehicle-ready notifications, payment links, and replies to customer-initiated
-> questions. No marketing or promotional content. Customers opt in in person at
-> the shop's service counter when their vehicle is written up.
+> AICHEETAH IO LLC dba Worxel (worxel.com) is the end brand and the only sender
+> on this campaign — we are not a reseller, ISV, or messaging provider for other
+> brands, and no third party sends on this number. Worxel operates Lift
+> (lift.worxel.com), our own auto-repair service platform. Worxel sends
+> transactional messages from a single Worxel-owned number to vehicle owners who
+> opted in, about work in progress on their vehicle at a partner repair shop:
+> an estimate ready for their approval, repair status updates, vehicle ready for
+> pickup, a payment request, and replies to questions the recipient starts.
+> Every message identifies Worxel Lift as the sender. Transactional only — no
+> marketing or promotional content. Consent is collected in person when the
+> vehicle is dropped off for service.
 
 **Vertical:** Technology
 **Message type:** Transactional
@@ -62,20 +79,25 @@ AWS/TCR returned "Requires update" with three findings. Resubmission changes:
 
 ## Opt-in workflow description
 
-> Consent is collected in person, at the point of service. When a customer
-> brings their vehicle to a participating repair shop, the shop writes up the
-> repair order at the service counter and asks the customer for their mobile
-> number to receive text updates about their vehicle. The shop's staff reads or
-> shows the disclosure: "By providing your phone number, you agree to receive
-> SMS messages from [shop name] about your repair order. Reply STOP to opt out,
-> HELP for help. Msg & data rates may apply." The Lift software displays a
-> confirmation requirement when the number is entered: "By adding this number
-> you confirm the customer agreed to receive service texts about their vehicle.
-> Msg frequency varies, msg & data rates may apply. They can reply STOP to opt
-> out, HELP for help." Consent timestamp is stored on the customer record
-> (smsOptInAt). STOP is honored automatically: the sender suppresses all future
-> messages to opted-out numbers in addition to carrier-level blocking. Mobile
-> information is never shared with third parties or affiliates for marketing.
+> Consent is collected in person at the point of service, not by phone or web
+> form. When a vehicle owner drops their vehicle off at a partner repair shop,
+> counter staff asks for their mobile number to send text updates and reads the
+> disclosure verbatim: "By providing your phone number, you agree to receive
+> text messages from Worxel Lift about your repair order at [Shop Name].
+> Message frequency varies. Message and data rates may apply. Reply STOP to opt
+> out, HELP for help. Terms and privacy: lift.worxel.com/privacy." The recipient
+> gives an explicit verbal yes before the number is entered. The Lift software
+> then requires staff to confirm consent when saving the number ("By adding this
+> number you confirm the customer agreed to receive service texts about their
+> vehicle. Msg frequency varies, msg & data rates may apply. They can reply STOP
+> to opt out, HELP for help.") and records the consent timestamp on the customer
+> record (smsOptInAt). Worxel immediately sends a written confirmation text
+> identifying itself as the sender: "[Shop Name] via Worxel Lift: You're set to
+> get text updates about your vehicle. Msg frequency varies. Msg & data rates
+> may apply. Reply HELP for help, STOP to cancel." STOP is honored automatically
+> — Worxel suppresses all future messages to opted-out numbers in addition to
+> carrier-level blocking; HELP returns support contact. Mobile information is
+> never shared with third parties or affiliates for marketing purposes.
 
 **Opt-in screenshot attachment:** screenshot of the Lift "New customer" form
 (lift-app.worxel.com → Customers → Add customer) showing the phone field with

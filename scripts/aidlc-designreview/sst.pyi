@@ -10,6 +10,9 @@ class Resource:
     class App:
         name: str
         stage: str
+    class Company:
+        type: str
+        url: str
     class JwtSecret:
         type: str
         value: str

@@ -69,8 +69,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       sms: {
         // Mirrors the verbal disclosure registered with our 10DLC campaign —
         // keep the frequency, rates, STOP/HELP, and privacy-URL clauses intact.
+        // Sender identity is Worxel Lift (the registered 10DLC brand); the shop
+        // is the service context. Keep it that way — "texts from [shop]" reads
+        // as reseller/ISV messaging to carrier vetting.
         optInScript:
-          `By providing your phone number, you agree to receive text messages from ${dto.name} via Lift about your repair order. ` +
+          `By providing your phone number, you agree to receive text messages from Worxel Lift about your repair order at ${dto.name}. ` +
           `Message frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help. ` +
           `Terms & privacy: lift.worxel.com/privacy`,
       },
