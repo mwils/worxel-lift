@@ -23,11 +23,12 @@ import {
   IconSparkles,
   IconClipboardList,
   IconChecklist,
+  IconCalendarEvent,
 } from "@tabler/icons-react";
 import { RO_STATUSES, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import { formatMoney, formatPhone, formatRoNumber } from "../../../lib/format";
+import { formatMoney, formatPhone, formatRoNumber, formatVisit, shopTimezone } from "../../../lib/format";
 import { notifyError } from "../../../lib/notify";
 import {
   LineItemEditor,
@@ -57,6 +58,7 @@ interface RoDetail {
     total: number;
     photos: GalleryPhoto[];
     publicToken: string | null;
+    scheduledFor: string | null;
     estimate: { sentAt?: string; approvedAt?: string; declinedAt?: string } | null;
     inspection: InspectionState;
     customer: {
@@ -410,6 +412,14 @@ export function RoDetailRoute() {
             {vehicleSummary}
             {ro.vehicle?.vin ? ` · VIN ${ro.vehicle.vin}` : ""}
           </Text>
+          {ro.scheduledFor && (
+            <Group gap={4} wrap="nowrap">
+              <IconCalendarEvent size={14} />
+              <Text size="sm" fw={500}>
+                {formatVisit(ro.scheduledFor, shopTimezone(me?.shop?.timezone))}
+              </Text>
+            </Group>
+          )}
         </Stack>
         <Stack gap={4} align="flex-end">
           <Select

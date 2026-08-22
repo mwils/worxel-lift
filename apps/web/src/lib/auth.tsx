@@ -14,6 +14,7 @@ export interface Me {
     id: string;
     name: string;
     slug?: string | null;
+    timezone?: string | null;
     settings: {
       aiTone: "plain" | "friendly";
       autoReplyEnabled: boolean;

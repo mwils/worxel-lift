@@ -64,6 +64,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         vehicleSummary: vehicleSummary(v),
         total: r.total,
         updatedAt: r.updatedAt,
+        // Board cards show the visit date for scheduled ROs.
+        scheduledFor: r.scheduledFor ?? null,
       };
     });
 
