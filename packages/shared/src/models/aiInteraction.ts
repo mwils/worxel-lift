@@ -2,7 +2,8 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
 const AiInteractionSchema = new Schema(
   {
-    shopId: { type: Schema.Types.ObjectId, ref: "Shop", required: true, index: true },
+    // Optional: company-level interactions (e.g. kind "blog_draft") have no shop.
+    shopId: { type: Schema.Types.ObjectId, ref: "Shop", index: true },
     kind: { type: String, required: true }, // 'draft_estimate', 'classify_inbound', 'voice_to_ro', ...
     model: { type: String, required: true },
     promptVersion: String,

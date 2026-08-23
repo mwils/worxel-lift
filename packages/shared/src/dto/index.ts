@@ -356,6 +356,31 @@ export type CreateBookingInput = z.infer<typeof CreateBookingDto>;
 export type RescheduleBookingInput = z.infer<typeof RescheduleBookingDto>;
 export type BookSlotsQueryInput = z.infer<typeof BookSlotsQueryDto>;
 
+// ── marketing blog (company-admin only) ─────────────────────────
+export const BLOG_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
+
+export const BlogPostPatchDto = z
+  .object({
+    title: z.string().min(3).max(160).optional(),
+    metaDescription: z.string().min(10).max(155).optional(),
+    slug: z.string().regex(BLOG_SLUG_REGEX, "lowercase letters, numbers, hyphens").optional(),
+    bodyMarkdown: z.string().min(50).max(50_000).optional(),
+    scheduledFor: z.string().datetime().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
+
+export const BlogPostRejectDto = z.object({
+  reason: z.string().max(500).optional(),
+});
+
+export const BlogAdminListQueryDto = z.object({
+  status: z.enum(["queue", "published", "rejected"]).default("queue"),
+});
+
+export type BlogPostPatchInput = z.infer<typeof BlogPostPatchDto>;
+export type BlogPostRejectInput = z.infer<typeof BlogPostRejectDto>;
+export type BlogAdminListQueryInput = z.infer<typeof BlogAdminListQueryDto>;
+
 // ── re-exports for type inference at call sites ─────────────────
 export type CreateRepairOrderInput = z.infer<typeof CreateRepairOrderDto>;
 export type UpdateRepairOrderInput = z.infer<typeof UpdateRepairOrderDto>;

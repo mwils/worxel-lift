@@ -9,6 +9,8 @@ export interface Me {
     role: "owner" | "tech";
     shopId: string | null;
     emailVerified: boolean;
+    /** Lift-the-company back office (blog admin) — email allowlist, not a tenant role. */
+    isCompanyAdmin?: boolean;
   };
   shop: {
     id: string;

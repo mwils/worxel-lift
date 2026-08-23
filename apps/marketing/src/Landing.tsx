@@ -977,6 +977,8 @@ function Colophon() {
             </Text>
           </Box>
           <Group gap={32}>
+            {/* Plain href on purpose — /blog is server-rendered outside the SPA. */}
+            <FooterLink href="/blog">Shop notes</FooterLink>
             <FooterLink href="/terms">Terms</FooterLink>
             <FooterLink href="/privacy">Privacy</FooterLink>
             <FooterLink href="mailto:lift@worxel.com">lift@worxel.com</FooterLink>

@@ -128,3 +128,19 @@ export const BOOKING_DEFAULTS = {
 
 /** Slug must be lowercase alphanumeric+hyphens, can't start/end with a hyphen, 2-42 chars. */
 export const SHOP_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,40}[a-z0-9])?$/;
+
+// ── Marketing blog ──────────────────────────────────────────────
+// `scheduled` posts become publicly visible the moment scheduledFor passes —
+// the renderer treats visibility as (published OR scheduled-and-due), so the
+// scheduled→published flip is bookkeeping, not a publish gate. `rejected`
+// covers both pre-publish rejection and post-publish retraction.
+export const BLOG_POST_STATUSES = ["scheduled", "published", "rejected"] as const;
+export type BlogPostStatus = (typeof BLOG_POST_STATUSES)[number];
+
+/** Target size of the forward queue the generation cron maintains. */
+export const BLOG_QUEUE_TARGET = 7;
+/** Publish cadence: a new post every N days. */
+export const BLOG_CADENCE_DAYS = 2;
+/** Local wall-clock publish hour in the blog's home timezone. */
+export const BLOG_PUBLISH_HOUR_LOCAL = 7;
+export const BLOG_TIMEZONE = "America/Chicago";

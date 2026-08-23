@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { User, Shop } from "@lift/shared";
-import { signSessionCookie } from "../../lib/auth.js";
+import { isCompanyAdmin, signSessionCookie } from "../../lib/auth.js";
 import { withAuth } from "../../lib/middleware.js";
 import { notFound, ok } from "../../lib/response.js";
 
@@ -35,6 +35,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
         shopId: u.shopId ? String(u.shopId) : null,
         // undefined (pre-instant-signup accounts) counts as verified.
         emailVerified: u.emailVerified !== false,
+        // Lift-the-company back office (blog admin, etc.) — email allowlist,
+        // not a tenant role.
+        isCompanyAdmin: isCompanyAdmin(u.email),
       },
       shop: shop
         ? {

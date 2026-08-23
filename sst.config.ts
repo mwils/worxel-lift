@@ -148,6 +148,17 @@ export default $config({
       // Cookie domain set to the registrable domain so api → web subdomain
       // requests carry the lift_session cookie.
       COOKIE_DOMAIN: ".worxel.com",
+      // ── Marketing blog ──
+      // Long-form drafting model. Scout works but needs heavy editing for
+      // 1000-word persona-voice posts — once the Anthropic marketplace form is
+      // filed, point this at e.g. us.anthropic.claude-sonnet-4-6 (env-only swap).
+      BEDROCK_MODEL_BLOG: "us.meta.llama4-scout-17b-instruct-v1:0",
+      // Comma-separated Lift-the-company admin emails (blog queue back office).
+      // Must match the email you LOG INTO lift-app with, or /admin/blog 403s.
+      COMPANY_ADMIN_EMAILS: "mwilson@digitalpharmacist.com",
+      // Gate for the nightly blog-draft cron. Admin's manual "generate" button
+      // bypasses this. Flip to "1" once the queue/review flow is verified.
+      BLOG_GENERATION_ENABLED: "0",
     } as const;
 
     const fn = (handler: string) => ({
@@ -349,6 +360,20 @@ export default $config({
       fn("apps/api/src/functions/payments/connectStatus.handler")
     );
 
+    // marketing blog back office (company-admin allowlist, not shop-tenant)
+    api.route("GET /admin/blog/posts", fn("apps/api/src/functions/blog/adminList.handler"));
+    api.route("PATCH /admin/blog/posts/{id}", fn("apps/api/src/functions/blog/adminPatch.handler"));
+    api.route(
+      "POST /admin/blog/posts/{id}/reject",
+      fn("apps/api/src/functions/blog/adminReject.handler")
+    );
+    api.route("POST /admin/blog/generate", {
+      ...fn("apps/api/src/functions/blog/adminGenerate.handler"),
+      // One long-form Bedrock draft per call can run 20s+; sit just under the
+      // 30s API Gateway integration cap (same rationale as voice-to-ro).
+      timeout: "30 seconds" as const,
+    });
+
     // webhooks
     api.route("POST /webhooks/stripe", fn("apps/api/src/functions/webhooks/stripe.handler"));
 
@@ -415,6 +440,20 @@ export default $config({
       },
     });
 
+    // Blog queue top-up: flips overdue posts to published (bookkeeping) and
+    // generates drafts up to a 7-post forward queue. 09:00 UTC = 3-4am
+    // Central, hours before the 7am publish instant. Generation no-ops until
+    // BLOG_GENERATION_ENABLED=1.
+    new sst.aws.Cron("BlogGenerateScan", {
+      schedule: "cron(0 9 * * ? *)",
+      function: {
+        ...fn("apps/api/src/functions/blog/generateScan.handler"),
+        // Up to 3 serial long-form Bedrock drafts per run.
+        timeout: "5 minutes" as const,
+        memory: "1024 MB" as const,
+      },
+    });
+
     // ── Static sites ────────────────────────────────────────────
     const web = new sst.aws.StaticSite("Web", {
       path: "apps/web",
@@ -423,11 +462,32 @@ export default $config({
       environment: { VITE_API_URL: urls.api, VITE_MARKETING_URL: urls.marketing },
     });
 
+    // ── Marketing site + blog router ────────────────────────────
+    // The Router owns lift.worxel.com: the SPA StaticSite attaches to it, and
+    // the server-rendered blog Lambda mounts at /blog (crawlable HTML straight
+    // from Mongo, CloudFront-cached per its Cache-Control — no S3 writes, no
+    // invalidations; "publishing" is just scheduledFor passing).
+    //
+    // ⚠ MIGRATION: converting Marketing from `domain:` to `router:` must be
+    // TWO deploys (removal is "retain", so one-shot hits CNAMEAlreadyExists):
+    //   deploy 1 — Marketing with `domain` REMOVED and no router yet
+    //   deploy 2 — this final state (Router holds the domain)
+    // Expect a ~1-2 min lift.worxel.com DNS gap between them. Verify the SPA
+    // root and deep links (/book/x, /privacy) still resolve afterwards.
+    const marketingRouter = new sst.aws.Router("MarketingRouter", {
+      domain: domains.marketing,
+    });
+
     const marketing = new sst.aws.StaticSite("Marketing", {
       path: "apps/marketing",
-      domain: domains.marketing,
+      router: { instance: marketingRouter },
       build: { command: "pnpm build", output: "dist" },
       environment: { VITE_API_URL: urls.api, VITE_WEB_APP_URL: urls.web },
+    });
+
+    new sst.aws.Function("BlogRenderer", {
+      ...fn("apps/api/src/functions/blog/render.handler"),
+      url: { router: { instance: marketingRouter, path: "/blog" } },
     });
 
     // Parent-company page at the apex. Exists mostly for 10DLC brand vetting:

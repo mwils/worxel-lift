@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lift.worxel.com/blog/sitemap.xml

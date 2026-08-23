@@ -32,6 +32,9 @@ const ConversationRoute = lazy(() =>
 const SettingsRoute = lazy(() =>
   import("./routes/app/settings").then((m) => ({ default: m.SettingsRoute }))
 );
+const AdminBlogRoute = lazy(() =>
+  import("./routes/app/admin/blog").then((m) => ({ default: m.AdminBlogRoute }))
+);
 const TemplatesRoute = lazy(() =>
   import("./routes/app/templates").then((m) => ({ default: m.TemplatesRoute }))
 );
@@ -116,6 +119,8 @@ export function App() {
           <Route path="messages/:customerId" element={<ConversationRoute />} />
           <Route path="templates" element={<TemplatesRoute />} />
           <Route path="settings" element={<SettingsRoute />} />
+          {/* Company back office — the route itself re-checks isCompanyAdmin. */}
+          <Route path="admin/blog" element={<AdminBlogRoute />} />
         </Route>
       </Routes>
     </Suspense>

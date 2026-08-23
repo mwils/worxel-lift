@@ -72,6 +72,20 @@ export async function verifySessionCookie(cookieHeader: string): Promise<Session
   }
 }
 
+/**
+ * Company-level admin check (Lift-the-company, not a shop tenant). There is
+ * no admin role in the user model — admins are a comma-separated email
+ * allowlist in COMPANY_ADMIN_EMAILS. Used by withCompanyAuth and /auth/me.
+ */
+export function isCompanyAdmin(email: string | undefined | null): boolean {
+  if (!email) return false;
+  const admins = (process.env.COMPANY_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return admins.includes(email.toLowerCase());
+}
+
 // ── magic link / sms code helpers ───────────────────────────────
 export function generateMagicToken(): { token: string; hash: string } {
   const token = randomBytes(32).toString("base64url");

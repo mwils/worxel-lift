@@ -9,6 +9,7 @@ import {
   IconLogout,
   IconClipboardList,
   IconMailExclamation,
+  IconNews,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
@@ -121,6 +122,16 @@ export function AppLayout() {
               onClick={close}
             />
           ))}
+          {me?.user.isCompanyAdmin && (
+            <NavLink
+              component={RouterLink as any}
+              to="/admin/blog"
+              label="Blog admin"
+              leftSection={<IconNews size={18} />}
+              active={location.pathname.startsWith("/admin/blog")}
+              onClick={close}
+            />
+          )}
         </Box>
         <NavLink
           label={loggingOut ? "Signing out…" : "Sign out"}

@@ -9,3 +9,4 @@ export * from "./aiInteraction.js";
 export * from "./subscriptionEvent.js";
 export * from "./jobTemplate.js";
 export * from "./serviceReminder.js";
+export * from "./blogPost.js";

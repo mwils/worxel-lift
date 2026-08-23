@@ -6,7 +6,7 @@ import type {
 import { z, ZodError, type ZodTypeAny } from "zod";
 import { connectDb } from "@lift/shared/db";
 import { User } from "@lift/shared";
-import { verifySessionCookie, type SessionClaims } from "./auth.js";
+import { isCompanyAdmin, verifySessionCookie, type SessionClaims } from "./auth.js";
 import { badRequest, forbidden, serverError, unauthorized } from "./response.js";
 
 export interface RequestContext {
@@ -59,6 +59,18 @@ export function withVerifiedAuth(handler: Handlerish): Handler<APIGatewayProxyEv
         `Confirm your email first — we sent a link to ${ctx.user.email}. You can resend it from the banner in the app.`
       );
     }
+    return handler(ctx);
+  });
+}
+
+/**
+ * Require a Lift-the-company admin (email allowlist in COMPANY_ADMIN_EMAILS).
+ * For internal back-office endpoints (blog queue, etc.) — orthogonal to the
+ * shop-tenant roles, which withAuth never inspects.
+ */
+export function withCompanyAuth(handler: Handlerish): Handler<APIGatewayProxyEventV2> {
+  return withAuth(async (ctx) => {
+    if (!isCompanyAdmin(ctx.user.email)) return forbidden("Not authorized");
     return handler(ctx);
   });
 }

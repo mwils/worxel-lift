@@ -69,3 +69,9 @@ export function modelDraft() {
 export function modelClassify() {
   return process.env.BEDROCK_MODEL_CLASSIFY ?? DEFAULT_MODEL;
 }
+
+export function modelBlog() {
+  // Long-form persona-voice drafting wants a stronger model than the SMS
+  // one-liners — point BEDROCK_MODEL_BLOG at a Claude profile when available.
+  return process.env.BEDROCK_MODEL_BLOG ?? modelDraft();
+}
