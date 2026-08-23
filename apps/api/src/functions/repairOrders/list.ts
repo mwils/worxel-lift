@@ -5,7 +5,13 @@ import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js
 import { badRequest, ok } from "../../lib/response.js";
 
 const ListQuery = z.object({
-  status: RoStatusEnum.optional(),
+  // Single status or comma-separated list ("picked_up,voided") — the board's
+  // closed section wants all three closed statuses in one call.
+  status: z
+    .string()
+    .transform((v) => v.split(",").filter(Boolean))
+    .pipe(z.array(RoStatusEnum).min(1))
+    .optional(),
   q: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
@@ -33,7 +39,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const { status, q, limit } = parseQuery(event, ListQuery);
 
     const filter: Record<string, unknown> = { shopId: user.shopId };
-    if (status) filter.status = status;
+    if (status) filter.status = status.length === 1 ? status[0] : { $in: status };
 
     // If q is numeric, match RO number. Otherwise filter post-hoc by customer
     // name / vehicle summary (cheaper than aggregation at this scale).

@@ -1,5 +1,6 @@
-import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center } from "@mantine/core";
-import { IconPlus, IconCalendarEvent } from "@tabler/icons-react";
+import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader } from "@mantine/core";
+import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -19,6 +20,14 @@ interface BoardRO {
   scheduledFor: string | null;
 }
 
+// Closed = off the board but not out of the books. Muted colors on purpose —
+// this strip is a record, not a to-do list.
+const CLOSED_STATUSES: Array<{ status: RoStatus; label: string; color: string }> = [
+  { status: "picked_up", label: "Picked up", color: "teal" },
+  { status: "voided", label: "Voided", color: "gray" },
+  { status: "cancelled_by_customer", label: "Cancelled", color: "red" },
+];
+
 const STATUS_BUCKETS: Array<{ status: RoStatus; label: string; color: string }> = [
   { status: "scheduled", label: "Scheduled", color: "gray" },
   { status: "in", label: "In", color: "blue" },
@@ -32,10 +41,26 @@ export function BoardRoute() {
   const { me } = useAuth();
   const tz = shopTimezone(me?.shop?.timezone);
 
+  // Open statuses only — closed ROs pile up forever and would crowd the
+  // 100-row payload out from under the live columns.
+  const openStatuses = STATUS_BUCKETS.map((b) => b.status).join(",");
   const { data, isPending } = useQuery({
     queryKey: ["ros", "board"],
-    queryFn: () => api.get<{ ros: BoardRO[] }>("/repair-orders"),
+    queryFn: () => api.get<{ ros: BoardRO[] }>(`/repair-orders?status=${openStatuses}`),
   });
+
+  // Closed jobs, fetched only when the strip is opened. Collapsed by default:
+  // the board is for today's work, history stays one tap away.
+  const [showClosed, setShowClosed] = useState(false);
+  const closedQ = useQuery({
+    queryKey: ["ros", "closed"],
+    queryFn: () =>
+      api.get<{ ros: BoardRO[] }>(
+        `/repair-orders?status=${CLOSED_STATUSES.map((c) => c.status).join(",")}&limit=30`
+      ),
+    enabled: showClosed,
+  });
+  const closed = closedQ.data?.ros ?? [];
 
   const grouped = new Map<RoStatus, BoardRO[]>();
   for (const bucket of STATUS_BUCKETS) grouped.set(bucket.status, []);
@@ -110,6 +135,61 @@ export function BoardRoute() {
             );
           })}
         </SimpleGrid>
+      )}
+
+      {!isPending && (
+        <>
+          <Divider mt="sm" />
+          <Group justify="center">
+            <Button
+              variant="subtle"
+              color="gray"
+              size="sm"
+              onClick={() => setShowClosed((v) => !v)}
+              rightSection={showClosed ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+            >
+              Recently closed{showClosed && closedQ.data ? ` · ${closed.length}` : ""}
+            </Button>
+          </Group>
+          {showClosed &&
+            (closedQ.isPending ? (
+              <Center py="sm">
+                <Loader size="sm" />
+              </Center>
+            ) : closed.length === 0 ? (
+              <Text size="sm" c="dimmed" ta="center">
+                Nothing closed yet.
+              </Text>
+            ) : (
+              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+                {closed.map((ro) => {
+                  const meta = CLOSED_STATUSES.find((c) => c.status === ro.status);
+                  return (
+                    <Card
+                      key={ro.id}
+                      component={Link as any}
+                      to={`/ro/${ro.id}`}
+                      style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}
+                    >
+                      <Group justify="space-between">
+                        <Text fw={600}>{formatRoNumber(ro.number)}</Text>
+                        <Text size="sm">{formatMoney(ro.total)}</Text>
+                      </Group>
+                      <Text size="sm">{ro.customerName}</Text>
+                      <Group justify="space-between" mt={2}>
+                        <Text size="xs" c="dimmed">
+                          {ro.vehicleSummary} · {relativeTime(ro.updatedAt)}
+                        </Text>
+                        <Badge size="sm" variant="light" color={meta?.color ?? "gray"}>
+                          {meta?.label ?? ro.status}
+                        </Badge>
+                      </Group>
+                    </Card>
+                  );
+                })}
+              </SimpleGrid>
+            ))}
+        </>
       )}
     </Stack>
   );
