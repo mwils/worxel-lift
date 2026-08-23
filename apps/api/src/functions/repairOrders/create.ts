@@ -37,7 +37,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       customerId: customer._id,
       vehicleId: vehicle._id,
       number,
-      status: "in",
+      // A creation-time date means the car isn't here yet — start it in the
+      // Scheduled column, same as a customer self-booking (public/book.ts).
+      status: dto.scheduledFor ? "scheduled" : "in",
       concern: dto.concern,
       scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
       lineItems: [],

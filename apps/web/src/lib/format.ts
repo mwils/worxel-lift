@@ -79,3 +79,68 @@ export function shopTimezone(tz: string | null | undefined): string {
     return "America/Chicago";
   }
 }
+
+// Minutes east of UTC that `tz` observes at `instant`. Derived via Intl —
+// the only zone database the browser ships.
+function tzOffsetMinutes(instant: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(instant);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24, // Intl renders midnight as "24" in some engines
+    get("minute"),
+    get("second")
+  );
+  return Math.round((asUtc - instant.getTime()) / 60_000);
+}
+
+/**
+ * The instant at which the shop's wall clock reads the picker's value.
+ *
+ * Date pickers hand back a browser-local Date, but "8:00 AM" typed by the
+ * owner means 8:00 AM *at the shop*. Reinterpret the picker's wall-clock
+ * fields in the shop's zone. Second offset pass handles picks that land on a
+ * DST transition.
+ */
+export function pickerDateToInstant(picked: Date, tz: string): Date {
+  const naive = Date.UTC(
+    picked.getFullYear(),
+    picked.getMonth(),
+    picked.getDate(),
+    picked.getHours(),
+    picked.getMinutes()
+  );
+  let ts = naive - tzOffsetMinutes(new Date(naive), tz) * 60_000;
+  ts = naive - tzOffsetMinutes(new Date(ts), tz) * 60_000;
+  return new Date(ts);
+}
+
+/**
+ * Inverse of pickerDateToInstant: a browser-local Date whose wall-clock fields
+ * equal the shop-zone rendering of `iso`, for prefilling a picker.
+ */
+export function instantToPickerDate(iso: string, tz: string): Date {
+  const d = new Date(iso);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"));
+}

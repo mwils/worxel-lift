@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   Divider,
+  Checkbox,
   Group,
   Loader,
   Modal,
@@ -17,6 +18,7 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { DateTimePicker } from "@mantine/dates";
 import {
   IconCreditCard,
   IconSend,
@@ -28,7 +30,15 @@ import {
 import { RO_STATUSES, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import { formatMoney, formatPhone, formatRoNumber, formatVisit, shopTimezone } from "../../../lib/format";
+import {
+  formatMoney,
+  formatPhone,
+  formatRoNumber,
+  formatVisit,
+  instantToPickerDate,
+  pickerDateToInstant,
+  shopTimezone,
+} from "../../../lib/format";
 import { notifyError } from "../../../lib/notify";
 import {
   LineItemEditor,
@@ -90,6 +100,14 @@ export function RoDetailRoute() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const { me } = useAuth();
+  const tz = shopTimezone(me?.shop?.timezone);
+
+  // ── Scheduled visit ──────────────────────────────────────────────────────
+  // The picker edits shop-zone wall time; conversion to/from the stored
+  // instant happens at the modal boundary (pickerDateToInstant and back).
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDraft, setScheduleDraft] = useState<Date | null>(null);
+  const [moveToScheduled, setMoveToScheduled] = useState(false);
 
   const roQ = useQuery({
     queryKey: ["ro", id],
@@ -99,7 +117,7 @@ export function RoDetailRoute() {
   const { data, isPending } = roQ;
 
   const patchRo = useMutation({
-    mutationFn: (patch: Partial<{ status: RoStatus }>) =>
+    mutationFn: (patch: Partial<{ status: RoStatus; scheduledFor: string | null }>) =>
       api.patch(`/repair-orders/${id}`, patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ro", id] });
@@ -399,6 +417,30 @@ export function RoDetailRoute() {
 
   const inspectionItemCount = ro.inspection?.items.length ?? 0;
 
+  const openSchedule = () => {
+    setScheduleDraft(ro.scheduledFor ? instantToPickerDate(ro.scheduledFor, tz) : null);
+    // A fresh manual RO ("in") being given a date is almost always a future
+    // drop-off — offer the column move. Any other status (diagnosing,
+    // in_repair…) means the car is physically here; leave the status alone.
+    setMoveToScheduled(ro.status === "in");
+    setScheduleOpen(true);
+  };
+
+  const saveSchedule = () => {
+    if (!scheduleDraft) return;
+    patchRo.mutate(
+      {
+        scheduledFor: pickerDateToInstant(scheduleDraft, tz).toISOString(),
+        ...(moveToScheduled && ro.status !== "scheduled" ? { status: "scheduled" as RoStatus } : {}),
+      },
+      { onSuccess: () => setScheduleOpen(false) }
+    );
+  };
+
+  const clearSchedule = () => {
+    patchRo.mutate({ scheduledFor: null }, { onSuccess: () => setScheduleOpen(false) });
+  };
+
   return (
     <Stack>
       <Group justify="space-between" align="flex-start" wrap="wrap">
@@ -412,13 +454,29 @@ export function RoDetailRoute() {
             {vehicleSummary}
             {ro.vehicle?.vin ? ` · VIN ${ro.vehicle.vin}` : ""}
           </Text>
-          {ro.scheduledFor && (
+          {ro.scheduledFor ? (
             <Group gap={4} wrap="nowrap">
               <IconCalendarEvent size={14} />
               <Text size="sm" fw={500}>
-                {formatVisit(ro.scheduledFor, shopTimezone(me?.shop?.timezone))}
+                {formatVisit(ro.scheduledFor, tz)}
               </Text>
+              <Button variant="subtle" size="compact-xs" onClick={openSchedule}>
+                Change
+              </Button>
             </Group>
+          ) : (
+            // A closed RO doesn't need a schedule prompt cluttering its header.
+            !["picked_up", "voided", "cancelled_by_customer"].includes(ro.status) && (
+              <Button
+                variant="subtle"
+                size="compact-xs"
+                leftSection={<IconCalendarEvent size={14} />}
+                onClick={openSchedule}
+                style={{ alignSelf: "flex-start" }}
+              >
+                Schedule visit
+              </Button>
+            )
           )}
         </Stack>
         <Stack gap={4} align="flex-end">
@@ -666,6 +724,51 @@ export function RoDetailRoute() {
             >
               Set up payments
             </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        title={ro.scheduledFor ? "Change scheduled visit" : "Schedule visit"}
+        centered
+      >
+        <Stack>
+          <DateTimePicker
+            label="Drop-off date & time"
+            description={`Shop time (${tz.replace(/_/g, " ")})`}
+            placeholder="Pick date and time"
+            value={scheduleDraft}
+            onChange={setScheduleDraft}
+            valueFormat="ddd MMM D, h:mm A"
+            minDate={new Date()}
+            popoverProps={{ withinPortal: true }}
+            clearable={false}
+          />
+          {ro.status !== "scheduled" && (
+            <Checkbox
+              label="Move to the Scheduled column"
+              checked={moveToScheduled}
+              onChange={(e) => setMoveToScheduled(e.currentTarget.checked)}
+            />
+          )}
+          <Group justify="space-between">
+            {ro.scheduledFor ? (
+              <Button variant="subtle" color="red" onClick={clearSchedule} loading={patchRo.isPending}>
+                Clear date
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Group>
+              <Button variant="default" onClick={() => setScheduleOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveSchedule} loading={patchRo.isPending} disabled={!scheduleDraft}>
+                Save
+              </Button>
+            </Group>
           </Group>
         </Stack>
       </Modal>

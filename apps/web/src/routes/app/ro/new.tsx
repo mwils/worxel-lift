@@ -16,10 +16,12 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { DateTimePicker } from "@mantine/dates";
 import { IconSearch } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
 import { notifyError } from "../../../lib/notify";
-import { formatPhone } from "../../../lib/format";
+import { formatPhone, pickerDateToInstant, shopTimezone } from "../../../lib/format";
+import { useAuth } from "../../../lib/auth";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
 import { CustomerMatchBanner } from "../../../features/customer/CustomerMatchBanner";
@@ -55,6 +57,8 @@ interface CustomerWithVehicles {
 
 export function NewRoRoute() {
   const navigate = useNavigate();
+  const { me } = useAuth();
+  const tz = shopTimezone(me?.shop?.timezone);
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const initialCustomerId = searchParams.get("customerId");
@@ -72,6 +76,9 @@ export function NewRoRoute() {
 
   // Concern
   const [concern, setConcern] = useState("");
+  // Optional drop-off time, interpreted in the shop's timezone. When set,
+  // the RO is created in "scheduled" status instead of "in".
+  const [scheduledDraft, setScheduledDraft] = useState<Date | null>(null);
 
   // Voice-extracted match suggestions (cleared when banner is dismissed).
   const [customerMatches, setCustomerMatches] = useState<CustomerMatch[]>([]);
@@ -134,6 +141,9 @@ export function NewRoRoute() {
         customerId: selectedCustomerId,
         vehicleId: selectedVehicleId,
         concern: concern || undefined,
+        scheduledFor: scheduledDraft
+          ? pickerDateToInstant(scheduledDraft, tz).toISOString()
+          : undefined,
       }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["ros"] });
@@ -358,6 +368,17 @@ export function NewRoRoute() {
               minRows={4}
               value={concern}
               onChange={(e) => setConcern(e.currentTarget.value)}
+            />
+            <DateTimePicker
+              label="Scheduled drop-off (optional)"
+              description="Leave empty if the car is already here"
+              placeholder="Pick date and time"
+              value={scheduledDraft}
+              onChange={setScheduledDraft}
+              valueFormat="ddd MMM D, h:mm A"
+              minDate={new Date()}
+              popoverProps={{ withinPortal: true }}
+              clearable
             />
             <Group justify="space-between">
               <Button variant="subtle" onClick={() => setStep(1)}>
