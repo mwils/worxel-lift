@@ -6,11 +6,18 @@ Everything an agent (or human marketer) needs to plan, write, and ship email cam
 
 ## 1. Product in one line
 
-Lift is a **mobile-first PWA** for **1–3 bay independent auto repair shops** that uses **AI to handle customer SMS** so the owner can stay in the bay instead of fielding "is my car ready?" calls. Flat **$79/mo**, **14-day free trial**, no card required to start.
+Lift is a **mobile-first PWA** for **1–3 bay independent auto repair shops**: dead-simple repair orders, invoices, and customer status checks — **you run the whole shop from your phone. You talk, it service-writes.** Flat **$79/mo**, **14-day free trial**, no card required to start.
 
-## 2. The wedge (what makes Lift different)
+## 2. The main value proposition (lead with this)
 
-Every competitor (Shopmonkey, AutoLeap, Tekmetric, Mitchell 1) is built for multi-bay shops with a dedicated service advisor. Lift is built for the owner-operator who is the tech, the SA, *and* the bookkeeper. The AI-handled customer texting is the single thing that drops the most friction from his day. **Lead with the wedge. Don't lead with feature parity.**
+Every competitor (Shopmonkey, AutoLeap, Tekmetric, Mitchell 1) is built for multi-bay shops with a service advisor and a front desk — big, desk-bound, typing-heavy. Lift is built for the owner-operator who is the tech, the SA, *and* the bookkeeper: **the whole shop runs from the phone in his pocket. He talks, it service-writes.**
+
+- Say the job out loud — it becomes line items at your labor rate.
+- Scan or say the VIN — the vehicle fills itself in.
+- "Is it ready?" texts answer themselves off the real RO status.
+- Estimate → invoice → paid, all by text link.
+
+**Lead with simplicity and phone-first, prove it with the mechanisms above. Don't lead with feature parity.** The AI-answered status texts are the sharpest single demo of the you-talk-it-types promise — keep using the line:
 
 > "While you were under a hood, Lift answered 4 texts."
 
@@ -63,10 +70,10 @@ Saying no to these in the copy is a positioning *feature*, not a hole — it bui
 
 ## 5. Core value props (rank order)
 
-1. **AI handles customer texts** so you stay in the bay. Auto-replies to "is it ready?" status checks. Drafts every other message for one-tap send.
-2. **10-minute setup.** Three screens: shop info → test SMS → trial start.
-3. **$79/mo flat.** Unlimited techs, ROs, SMS. No add-ons, no overages.
-4. **Phone-first.** Snap RO photos with the camera. Narrate jobs by voice — AI turns it into line items.
+1. **Run the whole shop from your phone. You talk, it service-writes.** Dead-simple ROs and invoices: say the job out loud and AI turns it into line items at your rate; scan the VIN and the vehicle fills itself in; snap photos straight onto the RO.
+2. **Customer status checks handle themselves.** Auto-replies to "is it ready?" texts off the real RO status in under 10 seconds. Every other message is AI-drafted for one-tap send — you approve every word.
+3. **10-minute setup.** Three screens: shop info → test SMS → trial start.
+4. **$79/mo flat.** Unlimited techs, ROs, SMS. No add-ons, no overages.
 5. **Get paid faster.** Pay links in SMS. Card-on-file with pre-auth. Cars get picked up, payment is already done.
 6. **You own your data.** One-click CSV export of customers, vehicles, ROs, messages, payments — anytime.
 
@@ -95,7 +102,7 @@ Frame these as **focus**, not gaps: *"You don't need 90% of what Shopmonkey ship
 | "Will customers hate AI texts?" | You approve every word before send. Auto-replies are *only* status checks — and you can switch them off. |
 | "Will my data be locked in?" | One-click CSV export, always. Customers, vehicles, ROs, messages, payments. |
 | "What about QuickBooks?" | CSV export in QB-import format today. Native sync 2026. |
-| "Why not Shopmonkey?" | Built for bigger shops. You don't need 90% of what they ship. Lift does one thing — kill customer-text overhead — and does it well. |
+| "Why not Shopmonkey?" | Built for bigger shops. You don't need 90% of what they ship. Lift is the simple version — the whole shop from your phone, you talk, it service-writes — at $79 flat. |
 | "Is AI going to make my shop look unprofessional?" | The AI rewrites mechanic-speak into plain English. Customers get clearer estimates. Mike still hits send. |
 
 ---

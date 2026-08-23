@@ -1,0 +1,10 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Front", "x": 0, "y": 0, "w": 816, "h": 1056, "print": "fixed" },
+    { "file": "Back.dc.html", "title": "Back", "x": 896, "y": 0, "w": 816, "h": 1056, "print": "fixed" }
+  ],
+  "annotations": [
+    { "id": "print-spec", "x": 0, "y": -150, "w": 360, "text": "Two-sided 8.5×11 handout — front and back. Print on uncoated cream or white stock, duplex, no bleed needed (design keeps a 0.45″ margin). Test-scan the QR on a physical proof before the full run." }
+  ],
+  "launch": { "view": "canvas" }
+}

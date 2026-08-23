@@ -34,10 +34,10 @@ Voice: plain, blunt, mechanic-shop direct (see `docs/EMAIL_CAMPAIGN_BRIEF.md` §
 
 **VISUAL:** Hard cut to cream background. LIFT wordmark stamps in. Then a phone in a greasy hand, app open to the board.
 
-**ON-SCREEN TEXT:** `§ 01 / THE SHOP APP FOR 1–3 BAY INDEPENDENTS`
+**ON-SCREEN TEXT:** `§ 01 / RUN THE WHOLE SHOP FROM YOUR PHONE`
 
 **VO:**
-> This is Lift. It's a shop app built for 1–3 bay independents — the owner who's also the tech, the front counter, and the bookkeeper. It does one thing better than anything else: it handles your customer texts so you can keep wrenching.
+> This is Lift. It's a shop app built for 1–3 bay independents — the owner who's also the tech, the front counter, and the bookkeeper. The whole shop runs from the phone in your pocket: dead-simple ROs, invoices, and customer texts. You talk, it service-writes.
 
 ---
 
@@ -48,7 +48,7 @@ Voice: plain, blunt, mechanic-shop direct (see `docs/EMAIL_CAMPAIGN_BRIEF.md` §
 **ON-SCREEN TEXT:** `ANSWERED IN UNDER 10 SECONDS. YOU NEVER STOPPED WORKING.`
 
 **VO:**
-> Here's the whole point. A customer texts your shop number. Lift reads it, checks the RO, and answers with the real status — in under ten seconds. You never touched your phone.
+> Start with the part that steals the most wrench time. A customer texts your shop number. Lift reads it, checks the RO, and answers with the real status — in under ten seconds. You never touched your phone.
 >
 > It only auto-replies to status checks. A real question, a complaint, anything that needs you — that comes straight to you, untouched. And every auto-reply is tagged, so you can read exactly what it said. There's a kill switch in settings if you ever want it off.
 
@@ -56,15 +56,15 @@ Voice: plain, blunt, mechanic-shop direct (see `docs/EMAIL_CAMPAIGN_BRIEF.md` §
 
 ### SCENE 4 — Write up a car from your phone (0:48–1:12)
 
-**VISUAL:** New RO flow. Type a VIN → year/make/model fill themselves. Tap the mic, talk. Line items appear with prices. Snap two photos of a seized caliper from inside the RO.
+**VISUAL:** New RO flow. Scan the VIN with the camera → year/make/model fill themselves. Tap the mic, talk. Line items appear with prices. Snap two photos of a seized caliper from inside the RO.
 
 **DEMO AUDIO (owner speaking into phone):**
 > "Front pads and rotors, left caliper's seized, call it two and a half hours."
 
-**ON-SCREEN TEXT:** `TALK. IT WRITES THE RO.`
+**ON-SCREEN TEXT:** `YOU TALK, IT SERVICE-WRITES.`
 
 **VO:**
-> Writing up a car takes about a minute. Punch in the VIN — Lift decodes it and fills in the vehicle. Then just say what you found. Lift turns it into line items at your labor rate. Snap photos right on the RO — the seized caliper, the rotted line — so the evidence lives with the job, not buried in your camera roll.
+> Writing up a car takes about a minute. Scan the VIN — Lift decodes it and fills in the vehicle. Then just say what you found. Lift turns it into line items at your labor rate. Snap photos right on the RO — the seized caliper, the rotted line — so the evidence lives with the job, not buried in your camera roll.
 
 ---
 

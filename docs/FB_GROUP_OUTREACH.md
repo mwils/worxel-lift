@@ -63,6 +63,39 @@ For when someone else's thread is already about the pain (someone venting about 
 
 **Why the anti-persona line stays in:** telling people who it's NOT for is the single strongest credibility move in these groups.
 
+### Variant E — the direct "check my app out" ask
+
+Lower-friction alternative to A/B when you'd rather just ask plainly. Converts fewer commenters than the research post, but responders are warmer (self-selected as willing to try software).
+
+**E1 — straight ask:**
+
+> Hoping this is allowed here — mods, delete if not.
+>
+> I'm a software developer and I've spent the last few months building an app for small independent shops. 1–3 bays, no service advisor, the kind of shop where the owner is also the guy answering every text. It answers the "is my car ready?" texts for you off the RO status, and drafts your estimate texts so you just approve and send from your phone.
+>
+> Honest truth: I don't have a single real shop using it yet. Before I go any further I'd love a few owners to check it out and tell me what's wrong with it. Free — I'm after opinions, not money. It'll cost something eventually, but not for the folks who help me get it right.
+>
+> Comment or DM if you're willing to take a look. Rip it apart.
+
+**E2 — shorter, self-deprecating:**
+
+> Long shot, but — any owner-operators here willing to look at an app I built and tell me if it's useful or garbage?
+>
+> It's for 1–3 bay shops. Answers the "is it ready?" texts automatically and sends your estimates by text so you can stay under the hood. I'm a developer, not a mechanic, so there's a real chance I got stuff wrong — that's exactly what I want to hear about.
+>
+> Free to try, no catch. Comment or DM me and I'll send you the link.
+
+**E3 — two-liner (strict groups / busy feeds):**
+
+> Built an app that answers your customers' "is my car ready?" texts for you so you can keep wrenching. Looking for a few 1–3 bay shop owners to try it free and tell me everything that's wrong with it — DM me if you're game.
+
+**Craft notes for this style:**
+- The "mods, delete if not" opener signals you know the norms — often earns goodwill instead of a ban.
+- "I don't have a single shop using it yet" is the most disarming line — admitting zero is what separates this from stealth sales.
+- Always say it'll cost money eventually. "Free" now + $79 later with no warning is a bait-and-switch story that travels fast in these groups.
+- "Rip it apart" outperforms "check it out" — asking for criticism gets more engagement than asking for approval.
+- Link goes in DM, not the post. First DM reply is personal: their name, one question about their shop, then the link.
+
 ---
 
 ## Handling predictable responses

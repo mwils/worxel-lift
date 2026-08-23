@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Spectral:ital,wght@0,400;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #555; display: flex; flex-direction: column; gap: 40px; padding: 40px; }
+  .display { font-family: "Archivo Black", "Arial Black", "Helvetica Neue", sans-serif; letter-spacing: -0.02em; text-transform: uppercase; }
+  .mono { font-family: "Space Mono", "Courier New", monospace; text-transform: uppercase; }
+  .serif { font-family: Spectral, Georgia, "Times New Roman", serif; }
+  .red { color: #c8261d; }
+
+  /* ── Profile picture: 1024×1024, circle-crop safe ── */
+  #profile {
+    width: 1024px; height: 1024px; background: #c8261d;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  }
+  #profile .word { color: #f4eedf; font-size: 300px; line-height: 1; }
+  #profile .tag { color: #f4eedf; font-size: 30px; letter-spacing: 0.3em; }
+
+  /* ── Cover photo: 1640×624 (2× of 820×312), mobile-safe center ── */
+  #cover {
+    width: 1640px; height: 624px; background: #f4eedf; color: #1a1714;
+    display: flex; align-items: center; position: relative; overflow: hidden;
+  }
+  #cover .inner { padding: 0 200px; display: flex; flex-direction: column; gap: 26px; max-width: 1240px; }
+  #cover .rule { height: 4px; background: #1a1714; width: 120px; }
+
+  /* ── Feed posts: 1080×1080 ── */
+  .post { width: 1080px; height: 1080px; background: #f4eedf; color: #1a1714; padding: 84px; display: flex; flex-direction: column; overflow: hidden; }
+  .post .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .post .label { font-size: 20px; letter-spacing: 0.18em; color: #605849; }
+  .post .word { font-size: 44px; line-height: 1; }
+  .post .hr { height: 4px; background: #1a1714; margin: 30px 0 0; }
+  .post .footer { margin-top: auto; display: flex; justify-content: space-between; align-items: baseline; }
+  .post .url { font-size: 34px; }
+  .post .foot-note { font-size: 19px; letter-spacing: 0.14em; color: #c8261d; font-weight: 700; }
+
+  /* ── Link preview: 1200×630 ── */
+  #linkcard { width: 1200px; height: 630px; background: #f4eedf; color: #1a1714; padding: 70px 80px; display: flex; flex-direction: column; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<div id="profile">
+  <div class="display word">LIFT</div>
+  <div class="mono tag">SHOP APP</div>
+</div>
+
+<div id="cover">
+  <div class="inner">
+    <div class="mono" style="font-size: 24px; letter-spacing: 0.2em; color: #605849">§ Shop tool — for 1–3 bay independents</div>
+    <div class="display" style="font-size: 66px; line-height: 1.08">Run the whole shop from your phone.<br /><span class="red">You talk, it service-writes.</span></div>
+    <div class="mono red" style="font-size: 24px; font-weight: 700; letter-spacing: 0.16em">$79/mo flat &middot; 14-day free trial &middot; no card</div>
+  </div>
+</div>
+
+<div class="post" id="post-value-prop">
+  <div class="head">
+    <div class="mono label">§ 01 / The pitch</div>
+    <div class="display word">LIFT</div>
+  </div>
+  <div class="hr"></div>
+  <div class="display" style="font-size: 92px; line-height: 1.05; margin-top: 56px">Run the whole shop from your phone. <span class="red">You talk, it service-writes.</span></div>
+  <div style="display: flex; flex-direction: column; gap: 26px; margin-top: 62px">
+    <div style="display: flex; gap: 22px; align-items: baseline"><span class="mono red" style="font-size: 26px; font-weight: 700">01</span><span class="serif" style="font-size: 36px; line-height: 1.35">Say the job out loud — it becomes line items at your rate.</span></div>
+    <div style="display: flex; gap: 22px; align-items: baseline"><span class="mono red" style="font-size: 26px; font-weight: 700">02</span><span class="serif" style="font-size: 36px; line-height: 1.35">Scan the VIN — the vehicle fills itself in.</span></div>
+    <div style="display: flex; gap: 22px; align-items: baseline"><span class="mono red" style="font-size: 26px; font-weight: 700">03</span><span class="serif" style="font-size: 36px; line-height: 1.35">&ldquo;Is it ready?&rdquo; texts answer themselves.</span></div>
+  </div>
+  <div class="footer">
+    <div class="display url">LIFT.WORXEL.COM</div>
+    <div class="mono foot-note">$79/mo flat</div>
+  </div>
+</div>
+
+<div class="post" id="post-sms-demo" style="padding: 64px 84px">
+  <div class="head">
+    <div class="mono label">§ 02 / The proof</div>
+    <div class="display word">LIFT</div>
+  </div>
+  <div class="hr"></div>
+  <div class="display" style="font-size: 58px; line-height: 1.08; margin-top: 38px">While you were under a hood, <span class="red">Lift answered 4 texts.</span></div>
+  <div style="display: flex; justify-content: center; margin-top: 34px">
+    <img id="smsimg" src="/Users/mwilson/Desktop/projects/mwilson/lift/docs/brochure/assets/sms-thread-customer-phone.png" style="width: 368px; border: 2px solid #8c8270; box-shadow: 10px 10px 0 #1a1714" alt="Text thread: Lift auto-answers a customer's status check" />
+  </div>
+  <div class="footer" style="margin-top: 30px">
+    <div class="display url">LIFT.WORXEL.COM</div>
+    <div class="mono foot-note">You approve every word</div>
+  </div>
+</div>
+
+<div class="post" id="post-price">
+  <div class="head">
+    <div class="mono label">§ 03 / The price</div>
+    <div class="display word">LIFT</div>
+  </div>
+  <div class="hr"></div>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 46px">
+    <div class="display" style="font-size: 168px; line-height: 0.98">$79/mo.<br /><span class="red">That&rsquo;s it.</span></div>
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <div class="mono" style="font-size: 27px; letter-spacing: 0.12em">Unlimited techs &middot; ROs &middot; texts</div>
+      <div class="mono" style="font-size: 27px; letter-spacing: 0.12em">No per-tech fees &middot; no add-ons &middot; no contract</div>
+      <div class="mono" style="font-size: 27px; letter-spacing: 0.12em">14-day free trial &mdash; no card</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="display url">LIFT.WORXEL.COM</div>
+    <div class="mono foot-note">No per-seat games</div>
+  </div>
+</div>
+
+<div id="linkcard">
+  <div style="display: flex; justify-content: space-between; align-items: baseline">
+    <div class="mono" style="font-size: 20px; letter-spacing: 0.18em; color: #605849">§ Shop tool — for 1–3 bay independents</div>
+    <div class="display" style="font-size: 40px; line-height: 1">LIFT</div>
+  </div>
+  <div style="height: 4px; background: #1a1714; margin-top: 24px"></div>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 30px">
+    <div class="display" style="font-size: 74px; line-height: 1.05">Run the whole shop from your phone. <span class="red">You talk, it service-writes.</span></div>
+    <div class="serif" style="font-size: 30px; line-height: 1.45; color: #3f3a32">Dead-simple repair orders, invoices, and customer status checks for 1&ndash;3 bay shops.</div>
+  </div>
+  <div style="display: flex; justify-content: space-between; align-items: baseline">
+    <div class="mono red" style="font-size: 24px; font-weight: 700; letter-spacing: 0.14em">$79/mo flat &middot; 14-day free trial</div>
+    <div class="display" style="font-size: 28px">LIFT.WORXEL.COM</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -93,7 +93,7 @@ If a prospect identifies as one of these, **route them away kindly**. It builds 
 | "Will customers hate AI texts?" | You approve every word before send. Auto-replies are only status checks — and one tap turns them off. |
 | "Will my data be locked in?" | One-click CSV export of everything, anytime — even after cancel. |
 | "What about QuickBooks?" | CSV export in QB Import format today. Native sync 2026. |
-| "Why not Shopmonkey?" | Built for 10-bay shops. You don't need 90% of what they ship. Lift does one thing — kill text overhead — and does it well. |
+| "Why not Shopmonkey?" | Built for 10-bay shops. You don't need 90% of what they ship. Lift is the simple version — the whole shop from your phone, you talk, it service-writes — at $79 flat. |
 | "Is AI going to make my shop look unprofessional?" | The AI rewrites mechanic-speak into plain English. Customers get clearer estimates, not weirder ones. |
 | "Do I need a new phone or a new number?" | No. PWA installs to your existing phone. Lift gives your shop a dedicated SMS number that routes into the app — not your personal inbox. |
 | "What's the catch with $79?" | No catch. No per-tech, per-message, or per-RO fees. The card processing on customer payments is the only thing you pay extra for, and that's standard Stripe rates passed through at cost. |
