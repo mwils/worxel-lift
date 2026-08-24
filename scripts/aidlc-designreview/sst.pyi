@@ -10,6 +10,10 @@ class Resource:
     class App:
         name: str
         stage: str
+    class BlogRenderer:
+        name: str
+        type: str
+        url: str
     class Company:
         type: str
         url: str
@@ -17,6 +21,9 @@ class Resource:
         type: str
         value: str
     class Marketing:
+        type: str
+        url: str
+    class MarketingRouter:
         type: str
         url: str
     class MongodbUri:
