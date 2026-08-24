@@ -247,13 +247,45 @@ async function generateDraft(topic: BlogTopic, recentTitles: string[]): Promise<
   }
 }
 
+/**
+ * Escape raw control characters that appear INSIDE string literals. Models
+ * routinely emit the 1000-word bodyMarkdown with literal newlines instead of
+ * \n escapes, which is invalid JSON ("Bad control character in string
+ * literal"). Newlines between tokens are legal whitespace, so this walks the
+ * text tracking in-string state and touches nothing outside strings.
+ */
+function escapeControlCharsInStrings(json: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (const ch of json) {
+    if (inString && !escaped && ch.charCodeAt(0) < 0x20) {
+      if (ch === "\n" || ch === "\r") out += "\\n";
+      else if (ch === "\t") out += "\\t";
+      // other control chars: drop
+      continue;
+    }
+    out += ch;
+    if (escaped) escaped = false;
+    else if (ch === "\\") escaped = true;
+    else if (ch === '"') inString = !inString;
+  }
+  return out;
+}
+
 /** Defensive parse of the JSON envelope — strip fences, take first {...} block. */
 function parseDraftEnvelope(text: string): Pick<Draft, "title" | "metaDescription" | "bodyMarkdown"> {
   const cleaned = text.replace(/```(?:json)?/gi, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("model returned no JSON object");
-  const obj = JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
+  const raw = cleaned.slice(start, end + 1);
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    obj = JSON.parse(escapeControlCharsInStrings(raw)) as Record<string, unknown>;
+  }
   const title = typeof obj.title === "string" ? obj.title.trim() : "";
   const metaDescription =
     typeof obj.metaDescription === "string" ? obj.metaDescription.trim().slice(0, 155) : "";
