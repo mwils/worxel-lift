@@ -15,9 +15,15 @@
       content="The shop app for 1–3 bay owner-operators. AI auto-replies to 'is my car ready' texts and drafts your estimates. $79/mo flat. 14-day free trial."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://lift.worxel.com/" />
+    <meta property="og:image" content="https://lift.worxel.com/social/landing-og-1200x630.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://lift.worxel.com/social/landing-og-1200x630.png" />
     <meta name="robots" content="index,follow" />
     <link rel="canonical" href="https://lift.worxel.com/" />
+    <link rel="alternate" type="application/rss+xml" title="The Shop Notes" href="https://lift.worxel.com/blog/rss.xml" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,6 +41,12 @@
 
       gtag('config', 'G-NSV9WZWQHN');
     </script>
+
+    <!-- Structured data. The FAQPage block mirrors SectionFAQ in src/Landing.tsx —
+         Google requires JSON-LD FAQ content to match the visible page, so update
+         both together. -->
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Lift", "url": "https://lift.worxel.com/", "applicationCategory": "BusinessApplication", "operatingSystem": "Web", "description": "Shop management app for 1–3 bay independent auto repair shops: repair orders, estimates, AI-handled customer texting, and payments — run from your phone.", "offers": {"@type": "Offer", "price": "79.00", "priceCurrency": "USD", "description": "$79/month flat. 14-day free trial, no card required."}, "publisher": {"@type": "Organization", "name": "Worxel", "legalName": "AICHEETAH IO LLC", "url": "https://worxel.com"}}</script>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Will I waste my weekend setting it up?", "acceptedAnswer": {"@type": "Answer", "text": "No. Onboarding is three screens: shop info, test the SMS number, start the trial. About 10 minutes. You'll send your first AI-drafted estimate the same afternoon."}}, {"@type": "Question", "name": "Will my customers hate AI texts?", "acceptedAnswer": {"@type": "Answer", "text": "You approve every word before it sends. The only auto-replies are short status-check acknowledgements (\"we're finishing brakes, ready by 4pm\") — and you can switch them off in one tap. The AI rewrites mechanic-speak into plain English, so customers usually get clearer texts, not weirder ones."}}, {"@type": "Question", "name": "Can I get my data out if I leave?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. One-click CSV export of customers, vehicles, ROs, messages, and payments — anytime, including after you cancel. No lock-in, no exit fees, no friction."}}, {"@type": "Question", "name": "Does it sync with QuickBooks?", "acceptedAnswer": {"@type": "Answer", "text": "Not natively yet. Today: CSV export in QuickBooks Import format. Native sync is on the roadmap for 2026."}}, {"@type": "Question", "name": "Do I need a new phone or a new number?", "acceptedAnswer": {"@type": "Answer", "text": "No. Lift is a web app that installs to your home screen — works on the phone you already have. We give your shop a dedicated two-way SMS number so customer texts route into Lift, not your personal inbox."}}, {"@type": "Question", "name": "How is this different from Shopmonkey or AutoLeap?", "acceptedAnswer": {"@type": "Answer", "text": "Those are built for 10-bay shops with a dedicated service advisor. You don't need 90% of what they ship — and you're paying $300–$400/mo for the parts you do use. Lift does one thing: keep you in the bay while customers get answers."}}]}</script>
   </head>
   <body>
     <div id="root"></div>

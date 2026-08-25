@@ -880,6 +880,8 @@ function SectionPricing() {
 /* ------------------------------------------------------------------ */
 
 function SectionFAQ() {
+  // Mirrored as FAQPage JSON-LD in index.html — Google requires the markup to
+  // match the visible copy, so update both together.
   const faq: { q: string; a: string }[] = [
     {
       q: "Will I waste my weekend setting it up?",
@@ -984,7 +986,11 @@ function Colophon() {
             <FooterLink href="mailto:lift@worxel.com">lift@worxel.com</FooterLink>
           </Group>
           <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: COLORS.paperShade }}>
-            © {new Date().getFullYear()} · Printed on the internet
+            © {new Date().getFullYear()} ·{" "}
+            <Anchor href="https://worxel.com" style={{ fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", textDecoration: "underline" }}>
+              A Worxel company
+            </Anchor>{" "}
+            · Printed on the internet
           </Text>
         </Group>
       </Container>

@@ -1,26 +1,37 @@
 import { BrowserRouter, Route, Routes, Link } from "react-router-dom";
+import { useNoindex } from "./seo";
 import { Center, Container, Stack, Text, Title, Button } from "@mantine/core";
 import { Landing } from "./Landing";
 import { BookRoute } from "./routes/BookRoute";
 import { ManageBookingRoute } from "./routes/ManageBookingRoute";
 import { LegalRoute } from "./routes/LegalRoute";
 
-export function App() {
+/** Routes without a router — the SSR pre-render wraps these in MemoryRouter. */
+export function AppRoutes() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/book/:slug" element={<BookRoute />} />
         <Route path="/booking/:token" element={<ManageBookingRoute />} />
         <Route path="/privacy" element={<LegalRoute />} />
         <Route path="/terms" element={<LegalRoute />} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
+    </Routes>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   );
 }
 
 function NotFound() {
+  // Soft-404 mitigation: the static host returns 200 for unknown paths, so
+  // tell crawlers explicitly not to index them.
+  useNoindex();
   return (
     <Center h="100vh">
       <Container size="sm">

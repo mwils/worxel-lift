@@ -46,6 +46,22 @@ export function htmlShell(a: ShellArgs): string {
 <meta property="og:url" content="${escapeHtml(a.canonicalUrl)}">
 <meta property="og:image" content="${escapeHtml(a.ogImageUrl)}">
 ${a.publishedAtIso ? `<meta property="article:published_time" content="${escapeHtml(a.publishedAtIso)}">` : ""}
+${
+  a.publishedAtIso
+    ? `<script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        headline: a.title,
+        description: a.metaDescription,
+        datePublished: a.publishedAtIso,
+        url: a.canonicalUrl,
+        image: a.ogImageUrl,
+        author: { "@type": "Organization", name: "Lift" },
+        publisher: { "@type": "Organization", name: "Worxel", url: "https://worxel.com" },
+      })}</script>`
+    : ""
+}
+<link rel="alternate" type="application/rss+xml" title="The Shop Notes" href="${escapeHtml(a.siteUrl)}/blog/rss.xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Spectral:ital,wght@0,400;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -99,7 +115,7 @@ ${a.publishedAtIso ? `<meta property="article:published_time" content="${escapeH
     invoices, and customer status checks — $79/mo flat, 14-day free trial, no card.</div>
     <a class="btn" href="${escapeHtml(a.siteUrl)}?utm_source=blog&amp;utm_medium=organic&amp;utm_campaign=blog-cta">See how Lift works</a>
   </div>
-  <footer class="mono">© Worxel · <a href="${escapeHtml(a.siteUrl)}/privacy">Privacy</a> · <a href="${escapeHtml(a.siteUrl)}/terms">Terms</a></footer>
+  <footer class="mono">© <a href="https://worxel.com" style="color:inherit">Worxel</a> · <a href="${escapeHtml(a.siteUrl)}/privacy">Privacy</a> · <a href="${escapeHtml(a.siteUrl)}/terms">Terms</a> · <a href="${escapeHtml(a.siteUrl)}/blog/rss.xml">RSS</a></footer>
 </div>
 </body>
 </html>`;

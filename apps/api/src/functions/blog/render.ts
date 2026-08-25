@@ -40,6 +40,7 @@ export const handler = async (
 
     if (sub === "/") return index(siteUrl);
     if (sub === "/sitemap.xml") return sitemap(siteUrl);
+    if (sub === "/rss.xml") return rss(siteUrl);
     const slug = sub.slice(1);
     if (/^[a-z0-9-]{1,80}$/.test(slug)) return post(siteUrl, slug);
     return notFoundPage(siteUrl);
@@ -90,7 +91,8 @@ async function index(siteUrl: string): Promise<APIGatewayProxyStructuredResultV2
     statusCode: 200,
     headers: HTML_HEADERS,
     body: htmlShell({
-      title: "The shop notes",
+      // Title carries query intent; the on-page H1 stays the pure name.
+      title: "The Shop Notes — advice for independent auto repair shops",
       metaDescription:
         "Practical notes for 1–3 bay independent auto repair shops: quotes, customer texts, getting paid, and the business side of running a small shop.",
       canonicalUrl: `${siteUrl}/blog`,
@@ -139,8 +141,16 @@ async function sitemap(siteUrl: string): Promise<APIGatewayProxyStructuredResult
     .limit(1000)
     .lean();
 
+  const newest = posts[0]
+    ? new Date((posts[0] as { updatedAt?: Date }).updatedAt ?? postDate(posts[0])).toISOString()
+    : undefined;
   const urls = [
-    `<url><loc>${siteUrl}/blog</loc></url>`,
+    // Core marketing pages — this is the only sitemap robots.txt points at,
+    // so it covers the whole site, not just the blog.
+    `<url><loc>${siteUrl}/</loc></url>`,
+    `<url><loc>${siteUrl}/privacy</loc></url>`,
+    `<url><loc>${siteUrl}/terms</loc></url>`,
+    `<url><loc>${siteUrl}/blog</loc>${newest ? `<lastmod>${newest}</lastmod>` : ""}</url>`,
     ...posts.map(
       (p) =>
         `<url><loc>${siteUrl}/blog/${escapeHtml(p.slug)}</loc><lastmod>${new Date(
@@ -156,6 +166,41 @@ async function sitemap(siteUrl: string): Promise<APIGatewayProxyStructuredResult
       "Cache-Control": "public, max-age=300, s-maxage=900",
     },
     body: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`,
+  };
+}
+
+async function rss(siteUrl: string): Promise<APIGatewayProxyStructuredResultV2> {
+  const posts = await BlogPost.find(visibleQuery(new Date()))
+    .select("slug title metaDescription scheduledFor publishedAt")
+    .sort({ scheduledFor: -1 })
+    .limit(50)
+    .lean();
+
+  const items = posts
+    .map(
+      (p) => `  <item>
+    <title>${escapeHtml(p.title)}</title>
+    <link>${siteUrl}/blog/${escapeHtml(p.slug)}</link>
+    <guid isPermaLink="true">${siteUrl}/blog/${escapeHtml(p.slug)}</guid>
+    <description>${escapeHtml(p.metaDescription)}</description>
+    <pubDate>${postDate(p).toUTCString()}</pubDate>
+  </item>`
+    )
+    .join("\n");
+
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=300, s-maxage=900",
+    },
+    body: `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>The Shop Notes — Lift</title>
+  <link>${siteUrl}/blog</link>
+  <description>Practical notes for 1–3 bay independent auto repair shops.</description>
+${items}
+</channel></rss>`,
   };
 }
 

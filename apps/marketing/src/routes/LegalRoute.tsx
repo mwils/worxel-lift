@@ -1,6 +1,7 @@
 import { Anchor, Box, Container, Divider, List, Stack, Text, Title } from "@mantine/core";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import { useCanonical } from "../seo";
 
 /**
  * Combined Privacy Policy & Terms of Service, served at both /privacy and
@@ -21,6 +22,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function LegalRoute() {
+  // Same component serves /privacy and /terms — canonicalize each path to
+  // itself (the SPA shell's static canonical points at "/").
+  const { pathname } = useLocation();
+  const path = pathname.startsWith("/terms") ? "/terms" : "/privacy";
+  useCanonical(path, "Privacy Policy & Terms — Lift");
   return (
     <Box py="xl" style={{ background: "#f4eedf", minHeight: "100vh" }}>
       <Container size="sm" px="md">

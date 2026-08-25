@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNoindex } from "../seo";
 import { useParams } from "react-router-dom";
 import {
   Alert,
@@ -65,6 +66,9 @@ function formatLongInTz(iso: string, tz: string) {
 }
 
 export function BookRoute() {
+  // Per-shop booking pages are functional widgets, not content — keep them
+  // out of the index until they carry real per-shop copy.
+  useNoindex();
   const { slug } = useParams<{ slug: string }>();
   const [shop, setShop] = useState<BookingShop | null>(null);
   const [shopErr, setShopErr] = useState<string | null>(null);
