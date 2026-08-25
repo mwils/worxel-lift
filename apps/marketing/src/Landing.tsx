@@ -213,6 +213,8 @@ function NavBar() {
           <a href="#features" className="lift-link">Features</a>
           <a href="#pricing" className="lift-link">Pricing</a>
           <a href="#faq" className="lift-link">FAQ</a>
+          {/* Plain href — /blog is server-rendered outside the SPA. */}
+          <a href="/blog" className="lift-link">Shop notes</a>
           <a href={CTA_BASE} className="lift-link">Sign in</a>
         </Group>
         <a href={ctaHref("nav")} className="lift-cta lift-cta-small">Start trial →</a>
