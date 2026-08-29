@@ -29,8 +29,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
   try {
     const dto = await parseBody(event, OnboardShopDto);
 
-    // Idempotent: if the user already owns a shop, return it instead of creating a second.
-    const existing = await Shop.findOne({ ownerUserId: user.userId });
+    // Idempotent: if the user already owns a shop — or was invited to one as
+    // a tech — return that shop instead of creating a second.
+    const me = await User.findById(user.userId).select("shopId").lean();
+    const existing = me?.shopId
+      ? await Shop.findById(me.shopId)
+      : await Shop.findOne({ ownerUserId: user.userId });
     if (existing) {
       await User.updateOne({ _id: user.userId }, { $set: { shopId: existing._id } });
       // Refresh the session cookie so the JWT's shopId claim is current. The

@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Shop } from "@lift/shared";
-import { withAuth } from "../../lib/middleware.js";
+import { withOwnerAuth } from "../../lib/middleware.js";
 import { ok, badRequest, notFound } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
 
@@ -10,7 +10,7 @@ import { stripe } from "../../lib/stripe.js";
  * Creates a Stripe Billing Portal session for the owner's shop and returns
  * the hosted URL. The frontend redirects the browser to it.
  */
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) => {
   if (!user.shopId) return badRequest("User has no shop yet");
 
   const shop = await Shop.findById(user.shopId);

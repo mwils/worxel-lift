@@ -29,6 +29,9 @@ import { handler as authLogout } from "../functions/auth/logout.js";
 import { handler as authMe } from "../functions/auth/me.js";
 
 import { handler as onboardShop } from "../functions/onboard/shop.js";
+import { handler as teamList } from "../functions/team/list.js";
+import { handler as teamInvite } from "../functions/team/invite.js";
+import { handler as teamRemove } from "../functions/team/remove.js";
 import { handler as onboardSmsVerify } from "../functions/onboard/smsVerify.js";
 import { handler as onboardStripeSetup } from "../functions/onboard/stripeSetup.js";
 
@@ -114,6 +117,9 @@ app.get("/auth/me", toExpress(authMe));
 
 // onboarding
 app.post("/onboard/shop", toExpress(onboardShop));
+app.get("/team", toExpress(teamList));
+app.post("/team/invites", toExpress(teamInvite));
+app.delete("/team/:userId", toExpress(teamRemove));
 app.post("/onboard/sms-verify", toExpress(onboardSmsVerify));
 app.post("/onboard/stripe-setup-intent", toExpress(onboardStripeSetup));
 

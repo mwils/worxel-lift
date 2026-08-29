@@ -6,7 +6,7 @@ const requireCjs = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const archiver = requireCjs("archiver") as typeof import("archiver");
 import { Customer, Message, Payment, RepairOrder, Vehicle } from "@lift/shared";
-import { withAuth } from "../../lib/middleware.js";
+import { withOwnerAuth } from "../../lib/middleware.js";
 import { badRequest } from "../../lib/response.js";
 
 /**
@@ -42,7 +42,7 @@ function buildCsv(headers: string[], rows: unknown[][]): string {
   return out;
 }
 
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) => {
   if (!user.shopId) return badRequest("User has no shop yet");
   const shopId = user.shopId;
 

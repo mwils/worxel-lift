@@ -15,9 +15,11 @@ import {
   Anchor,
   Table,
   Alert,
+  Badge,
+  ActionIcon,
 } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import {
   SERVICE_CATEGORIES,
@@ -32,6 +34,24 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL ?? "https://lift.worxel.com";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+interface TeamMember {
+  id: string;
+  email: string;
+  phone: string | null;
+  role: "owner" | "tech";
+  pending: boolean;
+  lastLoginAt: string | null;
+  isYou: boolean;
+}
+
+/** "(512) 555-0134" → "+15125550134"; returns null if it isn't a 10/11-digit US number. */
+function normalizePhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return null;
+}
 
 function defaultHoursFrom(business: BookingHour[] | undefined): BookingHour[] {
   // Copy business hours when first turning booking on. If business hours
@@ -110,6 +130,48 @@ export function SettingsRoute() {
         /* next Settings visit re-syncs */
       });
   }, [qc]);
+
+  // ── Team (techs sharing this shop's login) ─────────────────────
+  const isOwner = me?.user.role === "owner";
+  const team = useQuery({
+    queryKey: ["team"],
+    queryFn: () => api.get<{ members: TeamMember[] }>("/team"),
+    enabled: !!me?.shop,
+  });
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const invite = useMutation({
+    mutationFn: (body: { email: string; phone?: string }) =>
+      api.post<{ ok: true; resent: boolean }>("/team/invites", body),
+    onSuccess: (res) => {
+      setInviteEmail("");
+      setInvitePhone("");
+      qc.invalidateQueries({ queryKey: ["team"] });
+      notifications.show({
+        color: "green",
+        message: res.resent ? "Sign-in link re-sent." : "Invite sent — they'll get a sign-in link by email.",
+      });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't add tech" }),
+  });
+  const removeMember = useMutation({
+    mutationFn: (id: string) => api.del<void>(`/team/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team"] });
+      notifications.show({ color: "green", message: "Removed from the shop." });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't remove" }),
+  });
+  function submitInvite() {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    const phone = normalizePhone(invitePhone);
+    if (invitePhone.trim() && !phone) {
+      notifications.show({ color: "red", message: "Phone should be a 10-digit US number." });
+      return;
+    }
+    invite.mutate(phone ? { email, phone } : { email });
+  }
 
   function exportData() {
     window.location.href = `${API_URL}/data/export`;
@@ -404,6 +466,93 @@ export function SettingsRoute() {
         </Button>
       </Group>
 
+      <Divider label="Team" />
+      <Text size="sm" c="dimmed">
+        Techs sign in with their own email and see the same board, ROs, customers, and texts.
+        {isOwner ? " Only you can manage payments, billing, and the team." : ""}
+      </Text>
+      {team.data && team.data.members.length > 0 && (
+        <Table verticalSpacing="xs" withRowBorders={false}>
+          <Table.Tbody>
+            {team.data.members.map((m) => (
+              <Table.Tr key={m.id}>
+                <Table.Td>
+                  <Text size="sm" fw={m.isYou ? 600 : 400} style={{ wordBreak: "break-all" }}>
+                    {m.email}
+                    {m.isYou ? " (you)" : ""}
+                  </Text>
+                  {m.phone && (
+                    <Text size="xs" c="dimmed">
+                      {m.phone}
+                    </Text>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  <Group gap="xs" justify="flex-end" wrap="nowrap">
+                    {m.role === "owner" ? (
+                      <Badge variant="light">Owner</Badge>
+                    ) : m.pending ? (
+                      <Badge variant="light" color="yellow">
+                        Invited
+                      </Badge>
+                    ) : (
+                      <Badge variant="light" color="gray">
+                        Tech
+                      </Badge>
+                    )}
+                    {isOwner && m.role === "tech" && (
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        aria-label={`Remove ${m.email}`}
+                        loading={removeMember.isPending && removeMember.variables === m.id}
+                        onClick={() => {
+                          if (window.confirm(`Remove ${m.email} from the shop? They'll lose access right away.`)) {
+                            removeMember.mutate(m.id);
+                          }
+                        }}
+                      >
+                        ×
+                      </ActionIcon>
+                    )}
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
+      {isOwner && (
+        <Stack gap="xs">
+          <Group align="flex-end" wrap="wrap">
+            <TextInput
+              label="Add a tech"
+              placeholder="tech@example.com"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitInvite()}
+              style={{ flex: 1, minWidth: 220 }}
+            />
+            <TextInput
+              label="Cell (optional)"
+              description="Lets them sign in with a text code too"
+              placeholder="(512) 555-0134"
+              type="tel"
+              value={invitePhone}
+              onChange={(e) => setInvitePhone(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitInvite()}
+              style={{ flex: 1, minWidth: 180 }}
+            />
+            <Button onClick={submitInvite} loading={invite.isPending} disabled={!inviteEmail.trim()}>
+              Send invite
+            </Button>
+          </Group>
+        </Stack>
+      )}
+
+      {isOwner && (
+        <>
       <Divider label="Getting paid" />
       {payments?.chargesEnabled ? (
         <Alert color="green" variant="light">
@@ -445,6 +594,8 @@ export function SettingsRoute() {
           Export everything as CSV
         </Button>
       </Group>
+        </>
+      )}
     </Stack>
   );
 }

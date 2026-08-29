@@ -198,6 +198,11 @@ export default $config({
     );
 
     // shop
+    // team (techs sharing the shop login)
+    api.route("GET /team", fn("apps/api/src/functions/team/list.handler"));
+    api.route("POST /team/invites", fn("apps/api/src/functions/team/invite.handler"));
+    api.route("DELETE /team/{userId}", fn("apps/api/src/functions/team/remove.handler"));
+
     api.route("GET /shop", fn("apps/api/src/functions/shop/get.handler"));
     api.route("PATCH /shop", fn("apps/api/src/functions/shop/patch.handler"));
 

@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Shop, User } from "@lift/shared";
-import { withAuth } from "../../lib/middleware.js";
+import { withOwnerAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
 
@@ -13,7 +13,7 @@ import { stripe } from "../../lib/stripe.js";
  * setup"). Charges are made directly on the connected account, so the shop
  * pays Stripe's standard fees and owns disputes/payouts; Lift takes no cut.
  */
-export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
+export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) => {
   if (!user.shopId) return badRequest("No shop on session");
 
   const shop = await Shop.findById(user.shopId);

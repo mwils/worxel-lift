@@ -46,6 +46,12 @@ export const VerifyAuthDto = z.object({
   code: z.string().length(6).optional(),
 });
 
+// ── team ────────────────────────────────────────────────────────
+export const InviteMemberDto = z.object({
+  email: z.string().email(),
+  phone: e164.optional(),
+});
+
 // ── onboarding ──────────────────────────────────────────────────
 export const OnboardShopDto = z.object({
   name: z.string().min(2),

@@ -64,6 +64,21 @@ export function withVerifiedAuth(handler: Handlerish): Handler<APIGatewayProxyEv
 }
 
 /**
+ * Require auth + the shop-owner role. Techs share the whole shop (ROs,
+ * customers, messages) but not money/team controls. Checked against the DB
+ * rather than the JWT so a removed tech's stale cookie can't reach these.
+ */
+export function withOwnerAuth(handler: Handlerish): Handler<APIGatewayProxyEventV2> {
+  return withAuth(async (ctx) => {
+    const u = await User.findById(ctx.user.userId).select("role shopId").lean();
+    if (!u || u.role !== "owner" || (ctx.user.shopId && String(u.shopId) !== ctx.user.shopId)) {
+      return forbidden("Only the shop owner can do this");
+    }
+    return handler(ctx);
+  });
+}
+
+/**
  * Require a Lift-the-company admin (email allowlist in COMPANY_ADMIN_EMAILS).
  * For internal back-office endpoints (blog queue, etc.) — orthogonal to the
  * shop-tenant roles, which withAuth never inspects.
