@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { z } from "zod";
-import { Customer, Vehicle } from "@lift/shared";
+import { Customer, Vehicle, normalizePlate } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok } from "../../lib/response.js";
 
@@ -12,10 +12,6 @@ const ListQuery = z.object({
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function normalizePlate(s: string): string {
-  return s.replace(/[^a-z0-9]/gi, "").toUpperCase();
 }
 
 const PLATE_VIN_SCAN_CAP = 200;
@@ -48,8 +44,15 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           : Promise.resolve([]),
         plateNorm.length > 0
           ? Vehicle.find(
-              { shopId: user.shopId, plate: { $exists: true, $ne: null } },
-              { customerId: 1, plate: 1 }
+              {
+                shopId: user.shopId,
+                $or: [
+                  { plateNormalized: new RegExp(escapeRegex(plateNorm)) },
+                  // Pre-backfill rows without plateNormalized: normalize in JS below.
+                  { plateNormalized: { $exists: false }, plate: { $exists: true, $ne: null } },
+                ],
+              },
+              { customerId: 1, plate: 1, plateNormalized: 1 }
             )
               .limit(PLATE_VIN_SCAN_CAP)
               .lean()
@@ -57,7 +60,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       ]);
 
       const plateCustomerIds = plateCandidates
-        .filter((v) => normalizePlate(v.plate ?? "").includes(plateNorm))
+        .filter((v) => (v.plateNormalized ?? normalizePlate(v.plate)).includes(plateNorm))
         .map((v) => v.customerId);
       const matchedCustomerIds = [
         ...vinMatches.map((v) => v.customerId),

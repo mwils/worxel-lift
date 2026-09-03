@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNoindex } from "../seo";
 import { useParams } from "react-router-dom";
 import {
@@ -24,46 +24,18 @@ import {
 } from "@mantine/core";
 import { DatePicker } from "@mantine/dates";
 import { useForm } from "@mantine/form";
+import { useDocumentTitle } from "@mantine/hooks";
 import { IconBolt, IconCalendarCheck, IconCheck } from "@tabler/icons-react";
 import { api, ApiError } from "../api";
-import type { BookingShop, CreateBookingResponse, Slot, SlotResponse } from "../api";
-
-const PHONE_DIGITS_RE = /\D+/g;
-function normalizeUSPhone(raw: string): string | null {
-  // Accept the four most common formats Mike's customers will type:
-  //   555-555-5555, (555) 555-5555, +1 555 555 5555, 5555555555
-  // Normalize to E.164. Anything else falls through to a validation error.
-  const digits = raw.replace(PHONE_DIGITS_RE, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return null;
-}
-
-function formatYmd(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatTimeInTz(iso: string, tz: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    timeZone: tz,
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatLongInTz(iso: string, tz: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    timeZone: tz,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import type { BookingShop, CreateBookingResponse } from "../api";
+import {
+  formatLongInTz,
+  formatTimeInTz,
+  formatUSPhoneDisplay,
+  formatYmd,
+  normalizeUSPhone,
+  useSlotWindow,
+} from "./bookingSlots";
 
 export function BookRoute() {
   // Per-shop booking pages are functional widgets, not content — keep them
@@ -73,6 +45,9 @@ export function BookRoute() {
   const [shop, setShop] = useState<BookingShop | null>(null);
   const [shopErr, setShopErr] = useState<string | null>(null);
   const [shopLoading, setShopLoading] = useState(true);
+  // The SPA shell ships the marketing <title>; this route isn't pre-rendered,
+  // so set it client-side once the shop loads.
+  useDocumentTitle(shop ? `Book · ${shop.shop.name}` : "Book an appointment");
 
   useEffect(() => {
     if (!slug) return;
@@ -125,28 +100,22 @@ interface BookFormProps {
 
 function BookForm({ slug, shop }: BookFormProps) {
   const tz = shop.shop.timezone;
-  const today = new Date();
-  const maxDate = useMemo(() => {
-    // horizonDays counts today as day 1 — the API validates the INCLUSIVE
-    // from..to span, so today + horizonDays would be one day too many.
-    // Calendar-day arithmetic, not ms math, so DST boundaries don't drift it.
-    const d = new Date();
-    d.setDate(d.getDate() + shop.booking.horizonDays - 1);
-    return d;
-  }, [shop.booking.horizonDays]);
+  // Fetch the shop's whole bookable window (horizonDays, inclusive of today)
+  // on mount so the calendar can grey closed days without a round-trip per click.
+  const {
+    today,
+    maxDate,
+    dayHasSlots,
+    loading: slotsLoading,
+    error: slotsError,
+    slotsForDay,
+  } = useSlotWindow({ slug, horizonDays: shop.booking.horizonDays });
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [slotData, setSlotData] = useState<SlotResponse | null>(null);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<CreateBookingResponse | null>(null);
-
-  // Day-level availability map for greying out closed days on the calendar.
-  // Populated alongside slot fetches.
-  const [dayHasSlots, setDayHasSlots] = useState<Record<string, boolean>>({});
 
   const form = useForm({
     initialValues: {
@@ -158,43 +127,31 @@ function BookForm({ slug, shop }: BookFormProps) {
       concern: "",
     },
     validate: {
-      name: (v) => (v.trim().length >= 1 ? null : "Your name"),
-      phone: (v) => (normalizeUSPhone(v) ? null : "10-digit US phone, please"),
+      name: (v) => (v.trim().length >= 1 ? null : "Required"),
+      phone: (v) =>
+        v.trim().length === 0
+          ? "Required"
+          : normalizeUSPhone(v)
+            ? null
+            : "Enter a 10-digit US phone number",
       year: (v) =>
-        typeof v === "number" && v >= 1900 && v <= 2100 ? null : "Vehicle year",
-      make: (v) => (v.trim().length >= 1 ? null : "Make"),
-      model: (v) => (v.trim().length >= 1 ? null : "Model"),
-      concern: (v) => (v.trim().length >= 3 ? null : "Tell us what's going on"),
+        v === "" || v === null || v === undefined
+          ? "Required"
+          : typeof v === "number" && v >= 1900 && v <= 2100
+            ? null
+            : "Enter a 4-digit year",
+      make: (v) => (v.trim().length >= 1 ? null : "Required"),
+      model: (v) => (v.trim().length >= 1 ? null : "Required"),
+      concern: (v) =>
+        v.trim().length === 0
+          ? "Required"
+          : v.trim().length >= 3
+            ? null
+            : "Tell us a little more",
     },
   });
 
-  // Fetch a 14-day window around today on mount so the calendar can grey
-  // closed days without an extra round-trip per click.
-  useEffect(() => {
-    const from = formatYmd(today);
-    const to = formatYmd(maxDate);
-    setSlotsLoading(true);
-    setSlotsError(null);
-    api
-      .get<SlotResponse>(`/public/book/${slug}/slots?from=${from}&to=${to}`)
-      .then((res) => {
-        setSlotData(res);
-        const map: Record<string, boolean> = {};
-        for (const d of res.days) {
-          map[d.date] = d.slots.some((s) => s.available);
-        }
-        setDayHasSlots(map);
-      })
-      .catch((err: ApiError) => setSlotsError(err.message))
-      .finally(() => setSlotsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
-
-  const slotsForSelectedDay: Slot[] = useMemo(() => {
-    if (!selectedDate || !slotData) return [];
-    const key = formatYmd(selectedDate);
-    return slotData.days.find((d) => d.date === key)?.slots ?? [];
-  }, [selectedDate, slotData]);
+  const slotsForSelectedDay = slotsForDay(selectedDate);
 
   async function submit(values: typeof form.values) {
     if (!selectedSlot) {
@@ -361,8 +318,12 @@ function BookForm({ slug, shop }: BookFormProps) {
                   placeholder="(555) 555-5555"
                   {...form.getInputProps("phone")}
                   onBlur={(e) => {
-                    const e164 = normalizeUSPhone(e.currentTarget.value);
-                    if (e164) form.setFieldValue("phone", e164);
+                    // Show the friendly (555) 555-5555 shape; submit() still
+                    // normalizes to E.164 for the API.
+                    const raw = e.currentTarget.value;
+                    if (normalizeUSPhone(raw)) {
+                      form.setFieldValue("phone", formatUSPhoneDisplay(raw));
+                    }
                   }}
                 />
                 <Group grow>

@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { readSnapshot, writeSnapshot } from "../../lib/snapshot";
 import { formatMoney, formatRoNumber, formatVisit, relativeTime, shopTimezone } from "../../lib/format";
-import type { RoStatus } from "@lift/shared/constants";
+import { RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
 import { useAuth } from "../../lib/auth";
 import { StarterLibraryPrompt } from "../../features/jobTemplates/StarterLibraryPrompt";
 
@@ -24,18 +24,18 @@ interface BoardRO {
 // Closed = off the board but not out of the books. Muted colors on purpose —
 // this strip is a record, not a to-do list.
 const CLOSED_STATUSES: Array<{ status: RoStatus; label: string; color: string }> = [
-  { status: "picked_up", label: "Picked up", color: "teal" },
-  { status: "voided", label: "Voided", color: "gray" },
-  { status: "cancelled_by_customer", label: "Cancelled", color: "red" },
+  { status: "picked_up", label: RO_STATUS_LABELS.picked_up, color: "teal" },
+  { status: "voided", label: RO_STATUS_LABELS.voided, color: "gray" },
+  { status: "cancelled_by_customer", label: RO_STATUS_LABELS.cancelled_by_customer, color: "red" },
 ];
 
 const STATUS_BUCKETS: Array<{ status: RoStatus; label: string; color: string }> = [
-  { status: "scheduled", label: "Scheduled", color: "gray" },
-  { status: "in", label: "In", color: "blue" },
-  { status: "diagnosing", label: "Diagnosing", color: "yellow" },
-  { status: "awaiting_parts", label: "Awaiting parts", color: "orange" },
-  { status: "in_repair", label: "In repair", color: "cyan" },
-  { status: "ready", label: "Ready", color: "green" },
+  { status: "scheduled", label: RO_STATUS_LABELS.scheduled, color: "gray" },
+  { status: "in", label: RO_STATUS_LABELS.in, color: "blue" },
+  { status: "diagnosing", label: RO_STATUS_LABELS.diagnosing, color: "yellow" },
+  { status: "awaiting_parts", label: RO_STATUS_LABELS.awaiting_parts, color: "orange" },
+  { status: "in_repair", label: RO_STATUS_LABELS.in_repair, color: "cyan" },
+  { status: "ready", label: RO_STATUS_LABELS.ready, color: "green" },
 ];
 
 export function BoardRoute() {
@@ -200,7 +200,7 @@ export function BoardRoute() {
                           {ro.vehicleSummary} · {relativeTime(ro.updatedAt)}
                         </Text>
                         <Badge size="sm" variant="light" color={meta?.color ?? "gray"}>
-                          {meta?.label ?? ro.status}
+                          {meta?.label ?? RO_STATUS_LABELS[ro.status] ?? ro.status}
                         </Badge>
                       </Group>
                     </Card>

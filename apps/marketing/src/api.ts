@@ -86,5 +86,7 @@ export type ManageBooking = {
     concern: string | null;
     cancellable: boolean;
     rescheduleable: boolean;
+    /** Shop's booking window in days (inclusive of today); null on older API responses. */
+    horizonDays: number | null;
   };
 };

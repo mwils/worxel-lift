@@ -11,7 +11,8 @@ export interface StatusReplyInput {
   aiTone: "plain" | "friendly";
 }
 
-const STATUS_TO_PHRASE: Record<string, string> = {
+/** Customer-facing phrase per RO status. Shared with the freeform draft prompt. */
+export const RO_STATUS_PHRASES: Record<string, string> = {
   scheduled: "scheduled to come in",
   in: "in the shop and getting looked at",
   diagnosing: "being diagnosed right now",
@@ -22,7 +23,7 @@ const STATUS_TO_PHRASE: Record<string, string> = {
 };
 
 export function buildStatusReplyPrompt(input: StatusReplyInput): string {
-  const phrase = STATUS_TO_PHRASE[input.roStatus] ?? "in progress";
+  const phrase = RO_STATUS_PHRASES[input.roStatus] ?? "in progress";
   const tone =
     input.aiTone === "friendly"
       ? "Warm, neighborly. At most one emoji."
@@ -49,7 +50,7 @@ Rules:
  * Deterministic SMS template for a status update — no AI call required.
  */
 export function buildStatusReplyTemplate(input: StatusReplyInput): string {
-  const phrase = STATUS_TO_PHRASE[input.roStatus] ?? "in progress";
+  const phrase = RO_STATUS_PHRASES[input.roStatus] ?? "in progress";
   const eta = input.etaText
     ? ` ETA ${input.etaText}.`
     : " We'll follow up with an ETA shortly.";

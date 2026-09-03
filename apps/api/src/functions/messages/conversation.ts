@@ -53,6 +53,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         customerId: String(m.customerId),
         repairOrderId: m.repairOrderId ? String(m.repairOrderId) : null,
         direction: m.direction,
+        kind: m.kind ?? "sms",
         body: m.body,
         mediaUrls: m.mediaUrls ?? [],
         sentAt: m.sentAt,

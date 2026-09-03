@@ -1,5 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { UpdateVehicleDto, Vehicle } from "@lift/shared";
+import { UpdateVehicleDto, Vehicle, normalizePlate } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
 
@@ -15,6 +15,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       // customerId reassignment isn't expected via this endpoint; allow it but
       // still scope by shopId so we can't yank a vehicle into another tenant.
       if (v !== undefined) update[k] = v;
+    }
+    if (typeof dto.plate === "string") {
+      update.plateNormalized = normalizePlate(dto.plate) || undefined;
     }
 
     const vehicle = await Vehicle.findOneAndUpdate(

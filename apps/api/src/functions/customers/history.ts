@@ -186,6 +186,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     recentMessages: messages.map((m) => ({
       id: String(m._id),
       direction: m.direction,
+      kind: m.kind ?? "sms",
       body: m.body,
       sentAt: m.sentAt,
       aiDrafted: m.aiDrafted,

@@ -1,6 +1,12 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { z } from "zod";
-import { Customer, Vehicle, type CustomerDoc, type VehicleDoc } from "@lift/shared";
+import {
+  Customer,
+  Vehicle,
+  normalizePlate,
+  type CustomerDoc,
+  type VehicleDoc,
+} from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../lib/middleware.js";
 import { badRequest, ok } from "../lib/response.js";
 
@@ -11,10 +17,6 @@ const LookupQuery = z.object({
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function normalizePlate(s: string): string {
-  return s.replace(/[^a-z0-9]/gi, "").toUpperCase();
 }
 
 function isPhoneLike(s: string): boolean {
@@ -51,7 +53,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const nameRx = new RegExp(`^${escaped}`, "i");
     const phoneDigits = raw.replace(/[^\d+]/g, "");
     const plateNorm = normalizePlate(raw);
-    const plateRx = plateNorm ? new RegExp(`^${escapeRegex(plateNorm)}`, "i") : null;
+    // Substring match on the normalized plate so "KLM-4471" / "klm4471" find
+    // a car stored as "SC KLM-4471".
+    const plateRx = plateNorm ? new RegExp(escapeRegex(plateNorm)) : null;
     const vinSuffix = isVinSuffixLike(raw) ? raw.toUpperCase() : null;
 
     const noCustomers: CustomerDoc[] = [];
@@ -74,7 +78,15 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         .limit(limit)
         .lean<CustomerDoc[]>(),
       plateRx
-        ? Vehicle.find({ shopId: user.shopId, plate: { $exists: true, $ne: null } })
+        ? Vehicle.find({
+            shopId: user.shopId,
+            $or: [
+              { plateNormalized: plateRx },
+              // Vehicles written before plateNormalized existed (pre-backfill):
+              // pull the raw plates and normalize in JS below.
+              { plateNormalized: { $exists: false }, plate: { $exists: true, $ne: null } },
+            ],
+          })
             .limit(limit * 5)
             .lean<VehicleDoc[]>()
         : Promise.resolve(noVehicles),
@@ -88,12 +100,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         : Promise.resolve(noVehicles),
     ])) as [CustomerDoc[], CustomerDoc[], VehicleDoc[], VehicleDoc[]];
 
-    // Plate normalization happens at query time, not at write time — so we
-    // can't run a single Mongo regex against raw plates and trust it. Pull
-    // candidates by prefix-of-first-char (covers most), normalize in JS,
-    // and filter exactly. At 1–3 bay scale this is fine.
+    // Legacy rows (no plateNormalized yet) are normalized here; rows that hit
+    // the indexed plateNormalized regex pass straight through.
     const plateMatches = plateRx
-      ? byPlate.filter((v) => normalizePlate(v.plate ?? "").startsWith(plateNorm))
+      ? byPlate.filter((v) => (v.plateNormalized ?? normalizePlate(v.plate)).includes(plateNorm))
       : [];
 
     const customerResults: CustomerResult[] = [];
