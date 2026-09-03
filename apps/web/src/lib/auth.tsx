@@ -16,6 +16,9 @@ export interface Me {
     id: string;
     name: string;
     slug?: string | null;
+    address?: ShopAddress | null;
+    /** Front-desk number (E.164), distinct from the Lift texting number in `sms`. */
+    phone?: string | null;
     timezone?: string | null;
     settings: {
       aiTone: "plain" | "friendly";
@@ -29,6 +32,14 @@ export interface Me {
     sms: { phoneNumber?: string };
     payments: { hasAccount: boolean; chargesEnabled: boolean; detailsSubmitted: boolean };
   } | null;
+}
+
+export interface ShopAddress {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 }
 
 export interface BookingHour {

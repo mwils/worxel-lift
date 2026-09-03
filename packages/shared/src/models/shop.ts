@@ -17,6 +17,9 @@ const ShopSchema = new Schema(
       state: String,
       zip: String,
     },
+    // Front-desk number shown to customers. Distinct from sms.phoneNumber,
+    // which is the Lift texting number.
+    phone: String, // E.164
     timezone: { type: String, default: "America/Chicago" },
     ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
 

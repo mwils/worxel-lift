@@ -13,6 +13,7 @@ import {
 import { IconCheck, IconPencil, IconTrash, IconX } from "@tabler/icons-react";
 import { LINE_ITEM_KINDS, type LineItemKind } from "@lift/shared/constants";
 import { formatMoney } from "../../lib/format";
+import { useAuth } from "../../lib/auth";
 
 export interface LineItemRow {
   id: string;
@@ -192,12 +193,17 @@ export function RowEditor({ state, setState }: RowEditorProps) {
 export function LineItemEditor({ items, onCreate, onUpdate, onDelete, busy }: LineItemEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [state, setState] = useState<EditState>(blankEdit());
+  // New labor rows open at the shop's default rate (Settings → Saved jobs),
+  // seeded at onboarding — not a blank field.
+  const { me } = useAuth();
+  const shopRate = me?.shop?.settings.defaultLaborRate;
+  const defaultRateDollars = shopRate != null && shopRate > 0 ? shopRate / 100 : undefined;
+  const [state, setState] = useState<EditState>(blankEdit(defaultRateDollars));
 
   function startAdd() {
     setEditingId(null);
     setAdding(true);
-    setState(blankEdit());
+    setState(blankEdit(defaultRateDollars));
   }
   function startEdit(row: LineItemRow) {
     setAdding(false);

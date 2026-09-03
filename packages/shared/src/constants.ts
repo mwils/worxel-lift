@@ -144,3 +144,160 @@ export const BLOG_CADENCE_DAYS = 2;
 /** Local wall-clock publish hour in the blog's home timezone. */
 export const BLOG_PUBLISH_HOUR_LOCAL = 7;
 export const BLOG_TIMEZONE = "America/Chicago";
+
+// ── Shop profile: US states, timezones, slugs, opt-in copy ──────
+/** Two-letter USPS codes — the 50 states plus DC. Stored uppercase. */
+export const US_STATE_CODES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN",
+  "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH",
+  "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT",
+  "VT", "VA", "WA", "WV", "WI", "WY",
+] as const;
+export type UsStateCode = (typeof US_STATE_CODES)[number];
+
+export const US_STATE_NAMES: Record<UsStateCode, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado",
+  CT: "Connecticut", DE: "Delaware", DC: "District of Columbia", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas",
+  KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland", MA: "Massachusetts",
+  MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana",
+  NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
+  NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma",
+  OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
+  WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+};
+
+/** Curated IANA zones offered in the Settings timezone picker. */
+export const US_TIMEZONES = [
+  { value: "America/New_York", label: "Eastern (New York)" },
+  { value: "America/Chicago", label: "Central (Chicago)" },
+  { value: "America/Denver", label: "Mountain (Denver)" },
+  { value: "America/Phoenix", label: "Arizona (Phoenix, no DST)" },
+  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { value: "America/Anchorage", label: "Alaska (Anchorage)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (Honolulu)" },
+] as const;
+
+export const DEFAULT_SHOP_TIMEZONE = "America/Chicago";
+
+/**
+ * IANA zones observed in each state, dominant zone first. Split states list
+ * every zone so a browser-reported zone that matches can win over the default.
+ */
+export const US_STATE_TIMEZONES: Record<UsStateCode, readonly string[]> = {
+  AL: ["America/Chicago"],
+  AK: ["America/Anchorage"],
+  AZ: ["America/Phoenix", "America/Denver"],
+  AR: ["America/Chicago"],
+  CA: ["America/Los_Angeles"],
+  CO: ["America/Denver"],
+  CT: ["America/New_York"],
+  DE: ["America/New_York"],
+  DC: ["America/New_York"],
+  FL: ["America/New_York", "America/Chicago"],
+  GA: ["America/New_York"],
+  HI: ["Pacific/Honolulu"],
+  ID: ["America/Denver", "America/Los_Angeles"],
+  IL: ["America/Chicago"],
+  IN: ["America/New_York", "America/Chicago"],
+  IA: ["America/Chicago"],
+  KS: ["America/Chicago", "America/Denver"],
+  KY: ["America/New_York", "America/Chicago"],
+  LA: ["America/Chicago"],
+  ME: ["America/New_York"],
+  MD: ["America/New_York"],
+  MA: ["America/New_York"],
+  MI: ["America/New_York", "America/Chicago"],
+  MN: ["America/Chicago"],
+  MS: ["America/Chicago"],
+  MO: ["America/Chicago"],
+  MT: ["America/Denver"],
+  NE: ["America/Chicago", "America/Denver"],
+  NV: ["America/Los_Angeles", "America/Denver"],
+  NH: ["America/New_York"],
+  NJ: ["America/New_York"],
+  NM: ["America/Denver"],
+  NY: ["America/New_York"],
+  NC: ["America/New_York"],
+  ND: ["America/Chicago", "America/Denver"],
+  OH: ["America/New_York"],
+  OK: ["America/Chicago"],
+  OR: ["America/Los_Angeles", "America/Denver"],
+  PA: ["America/New_York"],
+  RI: ["America/New_York"],
+  SC: ["America/New_York"],
+  SD: ["America/Chicago", "America/Denver"],
+  TN: ["America/Chicago", "America/New_York"],
+  TX: ["America/Chicago", "America/Denver"],
+  UT: ["America/Denver"],
+  VT: ["America/New_York"],
+  VA: ["America/New_York"],
+  WA: ["America/Los_Angeles"],
+  WV: ["America/New_York"],
+  WI: ["America/Chicago"],
+  WY: ["America/Denver"],
+};
+
+/** True when `tz` is an IANA zone the runtime's Intl database knows. */
+export function isValidTimezone(tz: unknown): tz is string {
+  if (typeof tz !== "string" || !tz) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pick a shop timezone from its state, with the browser's zone as a tiebreaker
+ * for split states (a Knoxville shop in TN is Eastern, not the Central default)
+ * and as the fallback when no state is known. Last resort: Central.
+ */
+export function resolveShopTimezone(
+  state: string | null | undefined,
+  browserTz: string | null | undefined
+): string {
+  const code = (state ?? "").trim().toUpperCase() as UsStateCode;
+  const zones = US_STATE_TIMEZONES[code];
+  const hint = isValidTimezone(browserTz) ? browserTz : null;
+  if (zones && zones.length > 0) {
+    return hint && zones.includes(hint) ? hint : zones[0]!;
+  }
+  return hint ?? DEFAULT_SHOP_TIMEZONE;
+}
+
+/**
+ * "Mike's Auto & Tire" → "mikes-auto-tire". Lowercases, drops apostrophes,
+ * turns any other run of non-alphanumerics into a single hyphen, and trims
+ * leading/trailing hyphens. Does NOT enforce length — validate the result
+ * against SHOP_SLUG_REGEX afterwards.
+ */
+export function slugifyShopName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Trim and collapse internal runs of whitespace: "  Mike's   Auto " → "Mike's Auto". */
+export function collapseWhitespace(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The verbal opt-in disclosure stored on each shop. Mirrors the script
+ * registered with our 10DLC campaign — keep the frequency, rates, STOP/HELP,
+ * and privacy-URL clauses intact. Sender identity is Worxel Lift (the
+ * registered 10DLC brand); the shop is the service context. Keep it that way —
+ * "texts from [shop]" reads as reseller/ISV messaging to carrier vetting.
+ */
+export function buildOptInScript(shopName: string): string {
+  return (
+    `By providing your phone number, you agree to receive text messages from Worxel Lift about your repair order at ${shopName}. ` +
+    `Message frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help. ` +
+    `Terms & privacy: lift.worxel.com/privacy`
+  );
+}

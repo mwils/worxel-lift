@@ -1,5 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Shop, UpdateShopDto } from "@lift/shared";
+import { buildOptInScript } from "@lift/shared/constants";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, conflict, notFound, ok } from "../../lib/response.js";
 
@@ -11,8 +12,18 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const dto = await parseBody(event, UpdateShopDto);
 
     const update: Record<string, unknown> = {};
-    if (dto.name !== undefined) update.name = dto.name;
+    const unset: Record<string, 1> = {};
+    if (dto.name !== undefined) {
+      update.name = dto.name;
+      // The stored opt-in disclosure names the shop — keep it in step so a
+      // name fix in Settings also fixes the script.
+      update["sms.optInScript"] = buildOptInScript(dto.name);
+    }
     if (dto.address !== undefined) update.address = dto.address;
+    if (dto.phone !== undefined) {
+      if (dto.phone === null) unset.phone = 1;
+      else update.phone = dto.phone;
+    }
     if (dto.timezone !== undefined) update.timezone = dto.timezone;
     if (dto.settings?.aiTone !== undefined) update["settings.aiTone"] = dto.settings.aiTone;
     if (dto.settings?.autoReplyEnabled !== undefined) {
@@ -59,7 +70,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
 
     const shop = await Shop.findOneAndUpdate(
       { _id: user.shopId },
-      { $set: update },
+      { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
       { new: true }
     ).lean();
     if (!shop) return notFound("Shop not found");
@@ -71,6 +82,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         slug: shop.slug ?? null,
         oldSlugs: shop.oldSlugs ?? [],
         address: shop.address,
+        phone: shop.phone ?? null,
         timezone: shop.timezone,
         sms: { phoneNumber: shop.sms?.phoneNumber },
         billing: shop.billing,

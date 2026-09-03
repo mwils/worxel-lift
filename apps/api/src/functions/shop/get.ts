@@ -14,6 +14,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
       slug: shop.slug ?? null,
       oldSlugs: shop.oldSlugs ?? [],
       address: shop.address,
+      phone: shop.phone ?? null,
       timezone: shop.timezone,
       sms: { phoneNumber: shop.sms?.phoneNumber },
       billing: shop.billing,

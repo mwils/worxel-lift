@@ -25,8 +25,18 @@ import {
   SERVICE_CATEGORIES,
   SERVICE_INTERVALS,
   SHOP_SLUG_REGEX,
+  US_STATE_CODES,
+  US_STATE_NAMES,
+  US_TIMEZONES,
+  isValidTimezone,
+  slugifyShopName,
 } from "@lift/shared/constants";
-import { useAuth, type BookingHour, type BookingSettings } from "../../lib/auth";
+import {
+  useAuth,
+  type BookingHour,
+  type BookingSettings,
+  type ShopAddress,
+} from "../../lib/auth";
 import { api } from "../../lib/api";
 import { notifyError } from "../../lib/notify";
 
@@ -34,6 +44,26 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL ?? "https://lift.worxel.com";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const STATE_OPTIONS = US_STATE_CODES.map((code) => ({
+  value: code,
+  label: `${code} — ${US_STATE_NAMES[code]}`,
+}));
+// Sentinel Select value that reveals the free-text IANA zone input.
+const TZ_OTHER = "__other";
+const TZ_OPTIONS = [...US_TIMEZONES, { value: TZ_OTHER, label: "Other — type a timezone" }];
+
+/**
+ * Slugify as the user types, but keep a trailing hyphen so "mikes-" can still
+ * become "mikes-auto". The final trim happens in saveSlug via slugifyShopName.
+ */
+function liveSlug(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "");
+}
 
 interface TeamMember {
   id: string;
@@ -78,7 +108,11 @@ export function SettingsRoute() {
 
   const patchShop = useMutation({
     mutationFn: (patch: {
+      name?: string;
       slug?: string;
+      address?: ShopAddress;
+      phone?: string | null;
+      timezone?: string;
       settings?: {
         aiTone?: "plain" | "friendly";
         autoReplyEnabled?: boolean;
@@ -98,6 +132,79 @@ export function SettingsRoute() {
   const [laborRateDollars, setLaborRateDollars] = useState<number | undefined>(
     initialRate != null ? initialRate / 100 : undefined
   );
+
+  // ── Shop profile (name, address, phone, timezone) ──────────────
+  // Drafts are seeded from `me` and re-seeded whenever the server copy
+  // changes (after a save, or on first load).
+  const shop = me?.shop;
+  const [profile, setProfile] = useState({
+    name: shop?.name ?? "",
+    line1: shop?.address?.line1 ?? "",
+    line2: shop?.address?.line2 ?? "",
+    city: shop?.address?.city ?? "",
+    state: (shop?.address?.state ?? null) as string | null,
+    zip: shop?.address?.zip ?? "",
+    phone: shop?.phone ?? "",
+    timezone: shop?.timezone ?? "America/Chicago",
+  });
+  const [tzOther, setTzOther] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!shop) return;
+    setProfile({
+      name: shop.name ?? "",
+      line1: shop.address?.line1 ?? "",
+      line2: shop.address?.line2 ?? "",
+      city: shop.address?.city ?? "",
+      state: shop.address?.state ?? null,
+      zip: shop.address?.zip ?? "",
+      phone: shop.phone ?? "",
+      timezone: shop.timezone ?? "America/Chicago",
+    });
+    setTzOther(!US_TIMEZONES.some((z) => z.value === (shop.timezone ?? "America/Chicago")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    shop?.name,
+    shop?.address?.line1,
+    shop?.address?.line2,
+    shop?.address?.city,
+    shop?.address?.state,
+    shop?.address?.zip,
+    shop?.phone,
+    shop?.timezone,
+  ]);
+  const tzIsCurated = US_TIMEZONES.some((z) => z.value === profile.timezone);
+
+  function saveProfile() {
+    const name = profile.name.replace(/\s+/g, " ").trim();
+    if (name.length < 2) {
+      setProfileError("Shop name needs at least 2 characters.");
+      return;
+    }
+    const phone = profile.phone.trim() ? normalizePhone(profile.phone) : null;
+    if (profile.phone.trim() && !phone) {
+      setProfileError("Phone should be a 10-digit US number.");
+      return;
+    }
+    const timezone = profile.timezone.trim();
+    if (!isValidTimezone(timezone)) {
+      setProfileError("Timezone should be an IANA name like America/New_York.");
+      return;
+    }
+    setProfileError(null);
+    patchShop.mutate({
+      name,
+      address: {
+        line1: profile.line1,
+        line2: profile.line2,
+        city: profile.city,
+        state: profile.state ?? undefined,
+        zip: profile.zip,
+      },
+      phone,
+      timezone,
+    });
+  }
 
   const openBillingPortal = useMutation({
     mutationFn: () => api.post<{ url: string }>("/billing/portal-session"),
@@ -216,7 +323,10 @@ export function SettingsRoute() {
   }
 
   function saveSlug() {
-    const v = slugDraft.trim().toLowerCase();
+    // "Agent Test Garage" → "agent-test-garage"; only a result that is still
+    // unusable (too short/long, empty) gets the error.
+    const v = slugifyShopName(slugDraft);
+    setSlugDraft(v);
     if (!SHOP_SLUG_REGEX.test(v)) {
       setSlugError(
         "Lowercase letters, digits, and hyphens only. 2–42 chars, can't start or end with a hyphen."
@@ -232,7 +342,98 @@ export function SettingsRoute() {
   return (
     <Stack>
       <Title order={2}>Settings</Title>
-      <Text c="dimmed">Shop: {me?.shop?.name}</Text>
+
+      <Divider label="Shop profile" />
+      <Text size="sm" c="dimmed">
+        The name goes on every text and estimate. Address and timezone drive your booking page
+        and visit times.
+      </Text>
+      <TextInput
+        label="Shop name"
+        value={profile.name}
+        onChange={(e) => setProfile({ ...profile, name: e.currentTarget.value })}
+        required
+      />
+      <Group grow align="start">
+        <TextInput
+          label="Address"
+          value={profile.line1}
+          onChange={(e) => setProfile({ ...profile, line1: e.currentTarget.value })}
+          placeholder="123 Main St"
+        />
+        <TextInput
+          label="Suite / unit"
+          value={profile.line2}
+          onChange={(e) => setProfile({ ...profile, line2: e.currentTarget.value })}
+        />
+      </Group>
+      <Group grow align="start">
+        <TextInput
+          label="City"
+          value={profile.city}
+          onChange={(e) => setProfile({ ...profile, city: e.currentTarget.value })}
+        />
+        <Select
+          label="State"
+          placeholder="Pick a state"
+          data={STATE_OPTIONS}
+          value={profile.state}
+          onChange={(v) => setProfile({ ...profile, state: v })}
+          searchable
+          clearable
+          nothingFoundMessage="No match"
+        />
+        <TextInput
+          label="ZIP"
+          value={profile.zip}
+          onChange={(e) => setProfile({ ...profile, zip: e.currentTarget.value })}
+          maxLength={10}
+        />
+      </Group>
+      <Group grow align="start">
+        <TextInput
+          label="Shop phone"
+          description="The number customers call. Texts still come from Lift's number."
+          placeholder="(864) 555-0134"
+          type="tel"
+          value={profile.phone}
+          onChange={(e) => setProfile({ ...profile, phone: e.currentTarget.value })}
+        />
+        <Select
+          label="Timezone"
+          description="Sets visit times and the booking calendar."
+          data={TZ_OPTIONS}
+          value={tzOther || !tzIsCurated ? TZ_OTHER : profile.timezone}
+          onChange={(v) => {
+            if (!v) return;
+            if (v === TZ_OTHER) {
+              setTzOther(true);
+            } else {
+              setTzOther(false);
+              setProfile({ ...profile, timezone: v });
+            }
+          }}
+        />
+      </Group>
+      {(tzOther || !tzIsCurated) && (
+        <TextInput
+          label="Timezone (IANA name)"
+          placeholder="America/New_York"
+          value={profile.timezone}
+          onChange={(e) => setProfile({ ...profile, timezone: e.currentTarget.value })}
+          w={280}
+        />
+      )}
+      {profileError && (
+        <Text size="sm" c="red">
+          {profileError}
+        </Text>
+      )}
+      <Group>
+        <Button onClick={saveProfile} loading={patchShop.isPending}>
+          Save shop profile
+        </Button>
+      </Group>
 
       <Divider label="AI" />
       <Select
@@ -321,7 +522,7 @@ export function SettingsRoute() {
                   : undefined
               }
               value={slugDraft}
-              onChange={(e) => setSlugDraft(e.currentTarget.value)}
+              onChange={(e) => setSlugDraft(liveSlug(e.currentTarget.value))}
               error={slugError}
               placeholder="mikes-auto"
               w={280}

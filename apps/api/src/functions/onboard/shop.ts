@@ -1,6 +1,10 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { OnboardShopDto, Shop, User } from "@lift/shared";
-import { PLAN_TRIAL_DAYS } from "@lift/shared/constants";
+import { OnboardShopDto, STARTER_DEFAULT_LABOR_RATE_CENTS, Shop, User } from "@lift/shared";
+import {
+  PLAN_TRIAL_DAYS,
+  buildOptInScript,
+  resolveShopTimezone,
+} from "@lift/shared/constants";
 import { signSessionCookie } from "../../lib/auth.js";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { created, ok } from "../../lib/response.js";
@@ -63,7 +67,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const shop = await Shop.create({
       name: dto.name,
       address: dto.address,
-      timezone: dto.timezone,
+      // State decides the zone (SC → Eastern); the browser's zone from the
+      // onboarding client breaks ties for split states and covers "no state".
+      timezone: resolveShopTimezone(dto.address?.state, dto.timezone),
       ownerUserId: user.userId,
       // No phoneNumber: shops without one send from the shared Lift number
       // (SMS_POOL_ID), and inbound routes by the customer's phone (snsInbound).
@@ -72,17 +78,17 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       // only once shops get dedicated numbers.
       sms: {
         // Mirrors the verbal disclosure registered with our 10DLC campaign —
-        // keep the frequency, rates, STOP/HELP, and privacy-URL clauses intact.
-        // Sender identity is Worxel Lift (the registered 10DLC brand); the shop
-        // is the service context. Keep it that way — "texts from [shop]" reads
-        // as reseller/ISV messaging to carrier vetting.
-        optInScript:
-          `By providing your phone number, you agree to receive text messages from Worxel Lift about your repair order at ${dto.name}. ` +
-          `Message frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help. ` +
-          `Terms & privacy: lift.worxel.com/privacy`,
+        // see buildOptInScript for the carrier-vetting constraints on its wording.
+        optInScript: buildOptInScript(dto.name),
       },
       billing: { plan: "lift_79", trialEndsAt },
-      settings: { aiTone: "plain", autoReplyEnabled: true },
+      settings: {
+        aiTone: "plain",
+        autoReplyEnabled: true,
+        // Matches the starter templates' $135/hr so the first labor row and
+        // the imported jobs agree.
+        defaultLaborRate: dto.defaultLaborRate ?? STARTER_DEFAULT_LABOR_RATE_CENTS,
+      },
     });
 
     await User.updateOne({ _id: user.userId }, { $set: { shopId: shop._id } });

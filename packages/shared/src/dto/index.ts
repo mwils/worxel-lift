@@ -9,6 +9,10 @@ import {
   SERVICE_CATEGORIES,
   SHOP_SLUG_REGEX,
   USER_ROLES,
+  US_STATE_CODES,
+  collapseWhitespace,
+  isValidTimezone,
+  slugifyShopName,
 } from "../constants.js";
 
 // ── shared primitives ───────────────────────────────────────────
@@ -35,6 +39,24 @@ export const e164 = z
     return `+1${digits}`;
   });
 export const money = z.number().int().nonnegative(); // cents
+// Free text that gets trimmed with internal whitespace collapsed, so a shop
+// name typed as "  Mike's   Auto " never reaches an SMS as-is.
+export const cleanText = z.string().transform(collapseWhitespace);
+const blankToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
+// Optional free text: blank input clears the field instead of storing "".
+export const optionalCleanText = z.preprocess(blankToUndefined, cleanText.optional());
+// Two-letter US state code. Uppercased, then checked against the code list —
+// "sc" → "SC"; "south carolina" is rejected with a plain message.
+export const usState = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .transform((s) => s.trim().toUpperCase())
+    .pipe(z.enum(US_STATE_CODES, { errorMap: () => ({ message: "Pick a two-letter state" }) }))
+    .optional()
+);
+// An IANA zone the runtime knows ("America/New_York").
+export const ianaTimezone = z.string().trim().refine(isValidTimezone, "Unknown timezone");
 
 // ── auth ────────────────────────────────────────────────────────
 export const RequestMagicLinkDto = z.object({ email: z.string().email() });
@@ -53,18 +75,28 @@ export const InviteMemberDto = z.object({
 });
 
 // ── onboarding ──────────────────────────────────────────────────
+export const ShopNameDto = cleanText.pipe(z.string().min(2, "Shop name needs at least 2 characters"));
+export const ShopAddressDto = z
+  .object({
+    line1: optionalCleanText,
+    line2: optionalCleanText,
+    city: optionalCleanText,
+    state: usState,
+    zip: optionalCleanText,
+  })
+  .optional();
+
 export const OnboardShopDto = z.object({
-  name: z.string().min(2),
-  address: z
-    .object({
-      line1: z.string().optional(),
-      line2: z.string().optional(),
-      city: z.string().optional(),
-      state: z.string().length(2).optional(),
-      zip: z.string().optional(),
-    })
-    .optional(),
-  timezone: z.string().default("America/Chicago"),
+  name: ShopNameDto,
+  address: ShopAddressDto,
+  // The browser's zone (Intl.DateTimeFormat().resolvedOptions().timeZone). The
+  // server derives the shop zone from `address.state` and uses this only as a
+  // tiebreaker for split states or a fallback when no state was given — see
+  // resolveShopTimezone. Not validated here: a bad hint is ignored, not fatal.
+  timezone: z.string().optional(),
+  // Cents per hour. Seeds settings.defaultLaborRate so the first line item and
+  // the starter templates agree.
+  defaultLaborRate: money.optional(),
   // Cold-email tracking id forwarded from lift.worxel.com via the marketing CTA.
   // Optional — only present when the user came in through a cold-outreach email.
   pid: z.string().regex(/^[a-fA-F0-9]{24}$/).optional(),
@@ -88,17 +120,26 @@ export const BookingSettingsDto = z.object({
   confirmationMessage: z.string().max(320).optional(),
 });
 
+// Normalizes first ("Agent Test Garage" → "agent-test-garage"), then validates
+// what's left so a genuinely unusable result still gets the plain message.
 export const ShopSlugDto = z
   .string()
-  .min(2)
-  .max(42)
-  .regex(SHOP_SLUG_REGEX, "slug must be lowercase letters, digits, or hyphens");
+  .transform(slugifyShopName)
+  .pipe(
+    z
+      .string()
+      .min(2)
+      .max(42)
+      .regex(SHOP_SLUG_REGEX, "slug must be lowercase letters, digits, or hyphens")
+  );
 
 export const UpdateShopDto = z.object({
-  name: z.string().min(2).optional(),
+  name: ShopNameDto.optional(),
   slug: ShopSlugDto.optional(),
-  address: OnboardShopDto.shape.address,
-  timezone: z.string().optional(),
+  address: ShopAddressDto,
+  // Front-desk number shown to customers. null clears it.
+  phone: e164.nullable().optional(),
+  timezone: ianaTimezone.optional(),
   settings: z
     .object({
       aiTone: z.enum(AI_TONES).optional(),

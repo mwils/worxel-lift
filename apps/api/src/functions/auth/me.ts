@@ -44,6 +44,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
             id: String(shop._id),
             name: shop.name,
             slug: shop.slug ?? null,
+            // Settings' Shop profile edits these in place.
+            address: shop.address ?? null,
+            phone: shop.phone ?? null,
             // Scheduled visit times are rendered in the shop's zone, not the
             // browser's — an owner travelling must still see local bay times.
             timezone: shop.timezone,
