@@ -8,3 +8,4 @@ export * from "./voiceCustomer.js";
 export * from "./voiceVehicle.js";
 export * from "./voiceConcern.js";
 export * from "./blogPost.js";
+export * from "./freeform.js";
