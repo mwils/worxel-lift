@@ -79,7 +79,14 @@ interface RoDetail {
     publicToken: string | null;
     payment: RoPayment | null;
     scheduledFor: string | null;
-    estimate: { sentAt?: string; approvedAt?: string; declinedAt?: string } | null;
+    estimate: {
+      sentAt?: string | null;
+      viewedAt?: string | null;
+      approvedAt?: string | null;
+      declinedAt?: string | null;
+      approvedTotal?: number | null;
+      changedSinceApproval?: boolean;
+    } | null;
     inspection: InspectionState;
     customer: {
       id: string;
@@ -460,6 +467,23 @@ export function RoDetailRoute() {
 
   const inspectionItemCount = ro.inspection?.items.length ?? 0;
 
+  // Estimate state for the header badge + the sent/viewed/approved trail. An
+  // approval only counts against the numbers the customer actually saw — once
+  // the lines drift from the snapshot, the API flips changedSinceApproval.
+  const estimateChanged = !!ro.estimate?.approvedAt && !!ro.estimate?.changedSinceApproval;
+  const estimateTimeline = ro.estimate?.sentAt
+    ? [
+        `sent ${formatVisit(ro.estimate.sentAt, tz)}`,
+        ro.estimate.viewedAt ? `viewed ${formatVisit(ro.estimate.viewedAt, tz)}` : null,
+        ro.estimate.approvedAt ? `approved ${formatVisit(ro.estimate.approvedAt, tz)}` : null,
+        !ro.estimate.approvedAt && ro.estimate.declinedAt
+          ? `declined ${formatVisit(ro.estimate.declinedAt, tz)}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+
   const balanceCents = roBalanceCents(ro.total, ro.payment);
   const isPaid = ro.payment?.status === "paid";
   const paidViaStripe = ro.payment?.method === "stripe" || !!ro.payment?.stripePaymentIntentId;
@@ -556,11 +580,23 @@ export function RoDetailRoute() {
                 Unpaid · {formatMoney(balanceCents)}
               </Badge>
             ))}
-          {ro.estimate?.sentAt && (
-            <Badge variant="light" color={ro.estimate.approvedAt ? "green" : "blue"}>
-              Estimate {ro.estimate.approvedAt ? "approved" : "sent"}
+          {estimateChanged ? (
+            <Badge variant="light" color="orange">
+              Changed since approval · {formatMoney(ro.estimate?.approvedTotal ?? 0)} approved
             </Badge>
-          )}
+          ) : ro.estimate?.approvedAt ? (
+            <Badge variant="light" color="green">
+              Estimate approved
+            </Badge>
+          ) : ro.estimate?.declinedAt ? (
+            <Badge variant="light" color="red">
+              Estimate declined
+            </Badge>
+          ) : ro.estimate?.sentAt ? (
+            <Badge variant="light" color="blue">
+              Estimate sent{ro.estimate.viewedAt ? " · viewed" : ""}
+            </Badge>
+          ) : null}
         </Stack>
       </Group>
 
@@ -639,6 +675,25 @@ export function RoDetailRoute() {
         </Group>
       </Stack>
 
+      {estimateChanged && (
+        <Alert color="orange" variant="light" title="Changed since the customer approved">
+          <Group justify="space-between" wrap="wrap" gap="xs">
+            <Text size="sm">
+              They approved {formatMoney(ro.estimate?.approvedTotal ?? 0)}; it's now{" "}
+              {formatMoney(ro.total)}. Re-send so they can OK the new number.
+            </Text>
+            <Button
+              size="xs"
+              color="orange"
+              onClick={openSendEstimate}
+              loading={estimateLoading}
+              disabled={ro.lineItems.length === 0 || !ro.customer}
+            >
+              Re-send for approval
+            </Button>
+          </Group>
+        </Alert>
+      )}
       <Group>
         <Button
           leftSection={<IconSend size={16} />}
@@ -646,7 +701,7 @@ export function RoDetailRoute() {
           loading={estimateLoading}
           disabled={ro.lineItems.length === 0 || !ro.customer}
         >
-          Send estimate
+          {ro.estimate?.sentAt ? "Re-send estimate" : "Send estimate"}
         </Button>
         <Button
           variant="default"
@@ -680,6 +735,11 @@ export function RoDetailRoute() {
           )
         )}
       </Group>
+      {estimateTimeline && (
+        <Text size="xs" c="dimmed" mt={-8}>
+          Estimate {estimateTimeline}
+        </Text>
+      )}
 
       <Card withBorder>
         <Group justify="space-between" mb="xs" wrap="wrap">
@@ -1004,6 +1064,7 @@ export function RoDetailRoute() {
         itemCount={inspectionItemCount}
         totalCents={ro.total}
         hasLineItems={ro.lineItems.length > 0}
+        estimateApproved={!!ro.estimate?.approvedAt}
         onSent={() => qc.invalidateQueries({ queryKey: ["ro", id] })}
       />
 
