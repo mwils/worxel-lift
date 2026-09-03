@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNoindex } from "../seo";
 import { useParams } from "react-router-dom";
 import {
@@ -18,37 +18,12 @@ import {
   Title,
 } from "@mantine/core";
 import { DatePicker } from "@mantine/dates";
-import { useDisclosure } from "@mantine/hooks";
+import { useDisclosure, useDocumentTitle } from "@mantine/hooks";
 import { IconCalendarCheck, IconX } from "@tabler/icons-react";
 import { api, ApiError } from "../api";
-import type { ManageBooking, Slot, SlotResponse } from "../api";
+import type { ManageBooking } from "../api";
 import { BookingShell } from "./BookRoute";
-
-function formatYmd(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatTimeInTz(iso: string, tz: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    timeZone: tz,
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatLongInTz(iso: string, tz: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    timeZone: tz,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatLongInTz, formatTimeInTz, formatYmd, useSlotWindow } from "./bookingSlots";
 
 export function ManageBookingRoute() {
   // Per-shop booking pages are functional widgets, not content — keep them
@@ -60,6 +35,10 @@ export function ManageBookingRoute() {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [cancelOpen, { open: openCancel, close: closeCancel }] = useDisclosure(false);
+  // Not pre-rendered — the shell ships the marketing <title>; fix it client-side.
+  useDocumentTitle(
+    data?.shop?.name ? `Your appointment · ${data.shop.name}` : "Your appointment"
+  );
 
   const refetch = () => {
     if (!token) return;
@@ -149,6 +128,7 @@ export function ManageBookingRoute() {
               token={token!}
               slug={slug}
               tz={tz}
+              horizonDays={data.booking.horizonDays}
               onDone={(scheduledFor) => {
                 setPickerOpen(false);
                 setData({
@@ -223,50 +203,35 @@ function ReschedulePicker({
   token,
   slug,
   tz,
+  horizonDays,
   onDone,
   onCancel,
 }: {
   token: string;
   slug: string;
   tz: string;
+  horizonDays: number | null | undefined;
   onDone: (scheduledFor: string) => void;
   onCancel: () => void;
 }) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [slotData, setSlotData] = useState<SlotResponse | null>(null);
-  const [slotsLoading, setSlotsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const today = new Date();
-  const maxDate = useMemo(() => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), []);
+  // Same window the booking page requests (today..today+horizonDays-1) so the
+  // API accepts the range. `excludeToken` keeps this booking's own slot from
+  // counting against capacity while the customer picks a new time.
+  const {
+    today,
+    maxDate,
+    dayHasSlots,
+    loading: slotsLoading,
+    error: slotsError,
+    slotsForDay,
+  } = useSlotWindow({ slug, horizonDays, excludeToken: token });
 
-  useEffect(() => {
-    const from = formatYmd(today);
-    const to = formatYmd(maxDate);
-    setSlotsLoading(true);
-    api
-      .get<SlotResponse>(`/public/book/${slug}/slots?from=${from}&to=${to}`)
-      .then((res) => setSlotData(res))
-      .catch((err: ApiError) => setError(err.message))
-      .finally(() => setSlotsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
-
-  const dayHasSlots = useMemo(() => {
-    const out: Record<string, boolean> = {};
-    for (const d of slotData?.days ?? []) {
-      out[d.date] = d.slots.some((s) => s.available);
-    }
-    return out;
-  }, [slotData]);
-
-  const slotsForSelectedDay: Slot[] = useMemo(() => {
-    if (!selectedDate || !slotData) return [];
-    const key = formatYmd(selectedDate);
-    return slotData.days.find((d) => d.date === key)?.slots ?? [];
-  }, [selectedDate, slotData]);
+  const slotsForSelectedDay = slotsForDay(selectedDate);
 
   async function submit() {
     if (!selectedSlot) return;
@@ -288,7 +253,7 @@ function ReschedulePicker({
   return (
     <Stack>
       <Title order={4}>Pick a new time</Title>
-      {error && <Alert color="red">{error}</Alert>}
+      {(error || slotsError) && <Alert color="red">{error ?? slotsError}</Alert>}
       {slotsLoading ? (
         <Center py="md">
           <Loader size="sm" />
