@@ -11,6 +11,20 @@ export const RO_STATUSES = [
 ] as const;
 export type RoStatus = (typeof RO_STATUSES)[number];
 
+// Human labels for every place a status renders (board columns, RO status
+// select, history badges). Never show the raw enum to the shop owner.
+export const RO_STATUS_LABELS: Record<RoStatus, string> = {
+  scheduled: "Scheduled",
+  in: "Checked in",
+  diagnosing: "Diagnosing",
+  awaiting_parts: "Awaiting parts",
+  in_repair: "In repair",
+  ready: "Ready for pickup",
+  picked_up: "Picked up",
+  voided: "Voided",
+  cancelled_by_customer: "Cancelled by customer",
+};
+
 // `cancelled_by_customer` is intentionally NOT in the open set — a cancelled
 // booking shouldn't occupy a bay or count toward a slot's maxPerSlot.
 export const RO_OPEN_STATUSES: RoStatus[] = [

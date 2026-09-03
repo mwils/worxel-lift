@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -95,11 +95,37 @@ export function NewRoRoute() {
   });
 
   // Selected customer + their vehicles (used in step 2)
-  const { data: selectedCustomerData, isPending: selectedLoading } = useQuery({
+  const {
+    data: selectedCustomerData,
+    isPending: selectedLoading,
+    isFetching: selectedFetching,
+  } = useQuery({
     queryKey: ["customer", selectedCustomerId],
     queryFn: () => api.get<CustomerWithVehicles>(`/customers/${selectedCustomerId}`),
     enabled: !!selectedCustomerId,
   });
+
+  // Brand-new shop: nothing to search, so land on the "New customer" form
+  // instead of an empty result list. Once only — the owner can still flip
+  // back to "Existing" and search.
+  const seededCustomerMode = useRef(false);
+  useEffect(() => {
+    if (seededCustomerMode.current || customerMode !== "existing" || customersLoading) return;
+    if (customerQuery === "" && customerList && customerList.customers.length === 0) {
+      seededCustomerMode.current = true;
+      setCustomerMode("new");
+    }
+  }, [customerList, customersLoading, customerMode, customerQuery]);
+
+  // Same for vehicles, re-seeded whenever a different customer is picked:
+  // no vehicles on file → "New vehicle"; otherwise the pick list.
+  const seededVehicleModeFor = useRef<string | null>(null);
+  useEffect(() => {
+    const cid = selectedCustomerData?.customer.id;
+    if (!cid || selectedFetching || seededVehicleModeFor.current === cid) return;
+    seededVehicleModeFor.current = cid;
+    setVehicleMode(selectedCustomerData.vehicles.length === 0 ? "new" : "existing");
+  }, [selectedCustomerData, selectedFetching]);
 
   // Auto-skip to step 1 if we came in with a customerId in the query.
   useEffect(() => {
