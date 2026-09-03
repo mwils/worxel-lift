@@ -47,6 +47,8 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
         stripePaymentIntentId: intent.id,
         status: "paid",
         paidAt: new Date(),
+        method: "stripe",
+        amountCents: intent.amount,
       };
       await ro.save();
 

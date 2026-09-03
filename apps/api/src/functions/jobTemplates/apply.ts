@@ -2,7 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { ApplyJobTemplateDto, JobTemplate, RepairOrder } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
-import { computeLineItemTotal, recomputeTotals, type LineItemLike } from "../repairOrders/_totals.js";
+import { applyRoTotals, computeLineItemTotal, type LineItemLike } from "../repairOrders/_totals.js";
 
 interface AppliedItem {
   kind: string;
@@ -59,10 +59,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       (ro.lineItems as any).push(item);
     }
 
-    const totals = recomputeTotals(ro.lineItems as unknown as LineItemLike[]);
-    ro.laborTotal = totals.laborTotal;
-    ro.partsTotal = totals.partsTotal;
-    ro.total = totals.total;
+    await applyRoTotals(ro, user.shopId);
     await ro.save();
 
     template.useCount = (template.useCount ?? 0) + 1;

@@ -35,6 +35,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (dto.settings?.serviceRemindersEnabled !== undefined) {
       update["settings.serviceRemindersEnabled"] = dto.settings.serviceRemindersEnabled;
     }
+    if (dto.settings?.taxRatePct !== undefined) {
+      update["settings.taxRatePct"] = dto.settings.taxRatePct;
+    }
+    if (dto.settings?.taxLabor !== undefined) {
+      update["settings.taxLabor"] = dto.settings.taxLabor;
+    }
     if (dto.settings?.booking !== undefined) {
       const b = dto.settings.booking;
       if (b.enabled !== undefined) update["settings.booking.enabled"] = b.enabled;

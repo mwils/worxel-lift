@@ -118,6 +118,8 @@ export function SettingsRoute() {
         autoReplyEnabled?: boolean;
         defaultLaborRate?: number;
         serviceRemindersEnabled?: boolean;
+        taxRatePct?: number;
+        taxLabor?: boolean;
         booking?: BookingSettings;
       };
     }) => api.patch("/shop", patch),
@@ -131,6 +133,11 @@ export function SettingsRoute() {
   const initialRate = me?.shop?.settings.defaultLaborRate ?? null;
   const [laborRateDollars, setLaborRateDollars] = useState<number | undefined>(
     initialRate != null ? initialRate / 100 : undefined
+  );
+  // Sales tax: a percent (8.25 = 8.25%), applied to parts on every RO as line
+  // items change. Labor is untaxed unless the shop's state says otherwise.
+  const [taxRatePct, setTaxRatePct] = useState<number | string>(
+    me?.shop?.settings.taxRatePct ?? 0
   );
 
   // ── Shop profile (name, address, phone, timezone) ──────────────
@@ -666,6 +673,34 @@ export function SettingsRoute() {
           Save rate
         </Button>
       </Group>
+
+      <Divider label="Sales tax" />
+      <Group align="end">
+        <NumberInput
+          label="Tax rate (%)"
+          description="Applied to parts on each RO. 0 turns tax off."
+          min={0}
+          max={30}
+          decimalScale={3}
+          suffix="%"
+          value={taxRatePct}
+          onChange={setTaxRatePct}
+          w={240}
+        />
+        <Button
+          variant="default"
+          onClick={() => patchShop.mutate({ settings: { taxRatePct: Number(taxRatePct || 0) } })}
+          disabled={Number(taxRatePct || 0) === (me?.shop?.settings.taxRatePct ?? 0)}
+        >
+          Save tax rate
+        </Button>
+      </Group>
+      <Switch
+        label="Also tax labor"
+        description="Most states don't. Turn on if yours does."
+        checked={me?.shop?.settings.taxLabor ?? false}
+        onChange={(e) => patchShop.mutate({ settings: { taxLabor: e.currentTarget.checked } })}
+      />
 
       <Divider label="Team" />
       <Text size="sm" c="dimmed">
