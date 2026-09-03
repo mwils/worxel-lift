@@ -150,7 +150,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
         direction: "out",
         body: confirmBody,
         awsMessageId: sendResult.messageId,
-        autoReplied: true,
+        automated: true,
       });
     }
 
@@ -171,7 +171,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
         direction: "out",
         body: ownerBody,
         awsMessageId: ownerSend.messageId,
-        autoReplied: true,
+        automated: true,
       });
     } else {
       console.warn("[book] owner has no phone — skipping owner notification SMS", {

@@ -41,14 +41,14 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     // Opt-in confirmation text, required by our 10DLC registration ("verbal
     // opt-in gets a written confirmation"). Best-effort: never fail customer
     // creation over a carrier hiccup — the record and consent stand either way.
+    const shop = await Shop.findById(user.shopId).lean();
+    // "Worxel" (registered 10DLC DBA) must appear in the opt-in confirmation
+    // — carrier vetting rejects opt-in/opt-out texts without the brand name.
+    const confirmBody =
+      `${shop?.name ?? "Your repair shop"} via Worxel Lift: You're set to get text updates ` +
+      `about your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
+      `Reply HELP for help, STOP to cancel.`;
     try {
-      const shop = await Shop.findById(user.shopId).lean();
-      // "Worxel" (registered 10DLC DBA) must appear in the opt-in confirmation
-      // — carrier vetting rejects opt-in/opt-out texts without the brand name.
-      const confirmBody =
-        `${shop?.name ?? "Your repair shop"} via Worxel Lift: You're set to get text updates ` +
-        `about your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
-        `Reply HELP for help, STOP to cancel.`;
       const sendResult = await sendSms({
         to: customer.phone,
         from: shop?.sms?.phoneNumber ?? undefined,
@@ -62,10 +62,26 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         body: confirmBody,
         sentAt: new Date(),
         awsMessageId: sendResult.messageId,
-        autoReplied: true,
+        automated: true,
+        deliveryStatus: "sent",
       });
     } catch (err) {
       console.error("[customers/create] opt-in confirmation SMS failed", err);
+      // Still record the attempt so the thread shows a "Not delivered" marker
+      // instead of silently having no opt-in text at all.
+      try {
+        await Message.create({
+          shopId: user.shopId,
+          customerId: customer._id,
+          direction: "out",
+          body: confirmBody,
+          sentAt: new Date(),
+          automated: true,
+          deliveryStatus: "failed",
+        });
+      } catch (recordErr) {
+        console.error("[customers/create] could not record failed opt-in text", recordErr);
+      }
     }
 
     return created({

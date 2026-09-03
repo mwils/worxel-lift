@@ -8,10 +8,37 @@ const inboundPid = (): string | null => {
   const pid = new URLSearchParams(window.location.search).get("pid");
   return pid && /^[a-fA-F0-9]{24}$/.test(pid) ? pid : null;
 };
+/**
+ * Attribution for the app-signup CTAs. If the visitor arrived with utm_*
+ * params (cold-email, blog, ads), pass them through untouched so the signup
+ * is credited to the campaign that brought them. Otherwise it's organic
+ * traffic to lift.worxel.com — never default to a campaign. `utm_content` is
+ * always the CTA position so we can see which button converts.
+ *
+ * `window` is undefined during pre-render, so the static HTML carries the
+ * organic default; the client render (createRoot) recomputes from the URL.
+ */
 const ctaHref = (position: string) => {
-  const base = `${CTA_BASE}?utm_source=cold-email&utm_medium=email&utm_campaign=2026-q2-lift-launch&utm_content=${position}`;
+  const params = new URLSearchParams();
+  const inbound =
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
+  let hasUtm = false;
+  if (inbound) {
+    for (const [k, v] of inbound) {
+      if (k.startsWith("utm_") && k !== "utm_content" && v) {
+        params.set(k, v);
+        hasUtm = true;
+      }
+    }
+  }
+  if (!hasUtm) {
+    params.set("utm_source", "lift.worxel.com");
+    params.set("utm_medium", "organic");
+  }
+  params.set("utm_content", position);
   const pid = inboundPid();
-  return pid ? `${base}&pid=${pid}` : base;
+  if (pid) params.set("pid", pid);
+  return `${CTA_BASE}?${params.toString()}`;
 };
 
 const COLORS = {

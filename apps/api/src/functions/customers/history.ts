@@ -191,6 +191,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       aiDrafted: m.aiDrafted,
       inboundClassification: m.inboundClassification ?? null,
       autoReplied: m.autoReplied,
+      automated: m.automated ?? false,
+      deliveryStatus: m.deliveryStatus ?? null,
     })),
   });
 });

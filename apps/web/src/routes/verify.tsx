@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Center, Loader, Stack, Text, Title, Container, TextInput, Button, Paper } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
+import { notifications } from "@mantine/notifications";
 import { api } from "../lib/api";
+
+interface VerifyResponse {
+  ok: true;
+  needsOnboarding: boolean;
+  /** True when this click is what flipped emailVerified — show the confirmation toast. */
+  emailConfirmed?: boolean;
+}
 
 export function VerifyRoute() {
   const [params] = useSearchParams();
@@ -20,11 +28,20 @@ export function VerifyRoute() {
     async function run() {
       if (token && email) {
         try {
-          const res = await api.post<{ ok: true; needsOnboarding: boolean }>("/auth/verify", {
+          const res = await api.post<VerifyResponse>("/auth/verify", {
             token,
             email,
           });
           await qc.invalidateQueries({ queryKey: ["me"] });
+          if (res.emailConfirmed) {
+            // Lands on the board with the "confirm your email" banner gone —
+            // say so, or it looks like nothing happened.
+            notifications.show({
+              color: "green",
+              title: "Email confirmed",
+              message: "You're all set — texts, estimates, and pay links are unlocked.",
+            });
+          }
           navigate(res.needsOnboarding ? "/onboarding" : "/", { replace: true });
         } catch (err) {
           setState("error");
@@ -42,7 +59,7 @@ export function VerifyRoute() {
 
   async function submitCode() {
     try {
-      const res = await api.post<{ ok: true; needsOnboarding: boolean }>("/auth/verify", {
+      const res = await api.post<VerifyResponse>("/auth/verify", {
         phone,
         code,
       });

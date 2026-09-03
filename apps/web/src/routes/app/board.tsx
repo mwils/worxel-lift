@@ -1,9 +1,10 @@
-import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader } from "@mantine/core";
+import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader, Skeleton } from "@mantine/core";
 import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { readSnapshot, writeSnapshot } from "../../lib/snapshot";
 import { formatMoney, formatRoNumber, formatVisit, relativeTime, shopTimezone } from "../../lib/format";
 import type { RoStatus } from "@lift/shared/constants";
 import { useAuth } from "../../lib/auth";
@@ -44,10 +45,18 @@ export function BoardRoute() {
   // Open statuses only — closed ROs pile up forever and would crowd the
   // 100-row payload out from under the live columns.
   const openStatuses = STATUS_BUCKETS.map((b) => b.status).join(",");
-  const { data, isPending } = useQuery({
+  // Paint the last known board instantly on a fresh page load (PWA launch,
+  // tab reopen) while the real fetch runs — TanStack's cache is in-memory, so
+  // without this every launch is a "Loading…" round-trip. Keyed by shop.
+  const snapshotKey = `board:${me?.shop?.id ?? "none"}`;
+  const { data, isPending, isPlaceholderData } = useQuery({
     queryKey: ["ros", "board"],
     queryFn: () => api.get<{ ros: BoardRO[] }>(`/repair-orders?status=${openStatuses}`),
+    placeholderData: () => readSnapshot<{ ros: BoardRO[] }>(snapshotKey),
   });
+  useEffect(() => {
+    if (data && !isPlaceholderData) writeSnapshot(snapshotKey, data);
+  }, [data, isPlaceholderData, snapshotKey]);
 
   // Closed jobs, fetched only when the strip is opened. Collapsed by default:
   // the board is for today's work, history stays one tap away.
@@ -89,7 +98,17 @@ export function BoardRoute() {
       <StarterLibraryPrompt />
 
       {isPending ? (
-        <Text c="dimmed">Loading…</Text>
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md" aria-busy="true" aria-label="Loading board">
+          {STATUS_BUCKETS.map((bucket) => (
+            <Stack key={bucket.status} gap="xs">
+              <Group justify="space-between">
+                <Skeleton height={20} width={96} radius="xl" />
+                <Skeleton height={14} width={16} />
+              </Group>
+              <Skeleton height={84} radius="md" />
+            </Stack>
+          ))}
+        </SimpleGrid>
       ) : (data?.ros ?? []).length === 0 ? (
         <Center py="xl">
           <Stack align="center" gap="xs">

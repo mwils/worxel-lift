@@ -176,6 +176,7 @@ export function VehicleForm({
                 onClick={decodeVin}
                 loading={decoding}
                 type="button"
+                aria-label={decoding ? "Decoding VIN" : "Decode VIN"}
               >
                 Decode VIN
               </Button>
@@ -200,7 +201,7 @@ export function VehicleForm({
                 Scan
               </Button>
             )}
-            <Button variant="default" onClick={decodeVin} loading={decoding} type="button">
+            <Button variant="default" onClick={decodeVin} loading={decoding} type="button" aria-label={decoding ? "Decoding VIN" : "Decode VIN"}>
               Decode VIN
             </Button>
           </Group>

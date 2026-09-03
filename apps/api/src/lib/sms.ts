@@ -65,6 +65,10 @@ export async function sendSms(args: SendSmsArgs): Promise<{ messageId?: string }
       OriginationIdentity: args.from ?? process.env.SMS_POOL_ID,
       MessageBody: args.body,
       MessageType: "TRANSACTIONAL",
+      // Delivery receipts (TEXT_DELIVERED / TEXT_INVALID / …) only flow to the
+      // SmsDeliveryTopic → snsDelivery Lambda when the send is tied to an End
+      // User Messaging configuration set whose event destination is that topic.
+      ConfigurationSetName: process.env.SMS_CONFIGURATION_SET || undefined,
     })
   );
   return { messageId: out.MessageId };

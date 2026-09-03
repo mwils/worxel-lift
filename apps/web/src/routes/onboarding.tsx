@@ -113,10 +113,12 @@ export function OnboardingRoute() {
 
       <Paper p="lg" withBorder>
         <Stepper active={step}>
-          <Stepper.Step label="Your shop">
+          <Stepper.Step label="Your shop" aria-label="Step 1 of 3: Your shop">
             <Stack mt="md">
               <TextInput
                 label="Shop name"
+                id="onboarding-shop-name"
+                name="shopName"
                 value={shopName}
                 onChange={(e) => setShopName(e.currentTarget.value)}
                 placeholder="Mike's Auto"
@@ -136,7 +138,7 @@ export function OnboardingRoute() {
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Shop number">
+          <Stepper.Step label="Shop number" aria-label="Step 2 of 3: Shop number">
             <Stack mt="md">
               <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
                 Your customers get texts from your shop's Lift number — estimates, status
@@ -146,7 +148,7 @@ export function OnboardingRoute() {
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Start trial">
+          <Stepper.Step label="Start trial" aria-label="Step 3 of 3: Start trial">
             <Stack mt="md">
               <Text>
                 14-day free trial. Add a card on file — we'll only charge after the trial unless

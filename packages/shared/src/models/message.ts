@@ -23,7 +23,13 @@ const MessageSchema = new Schema(
     serviceReminderId: { type: Schema.Types.ObjectId, ref: "ServiceReminder" },
 
     inboundClassification: { type: String, enum: MESSAGE_CLASSIFICATIONS },
+    // Outbound text sent *in reply to* an inbound customer text without the
+    // owner touching it (AI status reply, booking-keyword reply, etc.).
     autoReplied: { type: Boolean, default: false },
+    // Outbound text the system sent on its own — opt-in confirmation, booking
+    // confirmation / change notices, service reminders. Not a reply to anything,
+    // so the UI must not tag it "Auto-replied".
+    automated: { type: Boolean, default: false },
 
     // Updated by the snsDelivery Lambda based on End User Messaging delivery events.
     deliveryStatus: { type: String, enum: ["sent", "delivered", "failed"] },
