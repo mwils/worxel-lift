@@ -62,9 +62,27 @@ const RepairOrderSchema = new Schema(
 
     estimate: {
       sentAt: Date,
+      viewedAt: Date, // first open of the public estimate page
       approvedAt: Date,
       declinedAt: Date,
       publicToken: String,
+      // Snapshot taken when the customer approves, so later line-item edits
+      // can be flagged as "changed since approval" against the number the
+      // customer actually agreed to. Cleared when the estimate is re-sent.
+      approvedTotal: Number, // cents
+      approvedLineItems: {
+        type: [
+          new Schema(
+            {
+              kind: { type: String, enum: LINE_ITEM_KINDS, required: true },
+              description: { type: String, required: true },
+              total: { type: Number, required: true }, // cents
+            },
+            { _id: false }
+          ),
+        ],
+        default: undefined,
+      },
     },
 
     inspection: {

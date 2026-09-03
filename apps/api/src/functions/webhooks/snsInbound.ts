@@ -20,6 +20,7 @@ import {
 } from "@lift/shared/prompts";
 import { invokeModel, modelClassify, modelDraft } from "../../lib/bedrock.js";
 import { sendSms } from "../../lib/sms.js";
+import { approvalStamp } from "../repairOrders/_estimate.js";
 
 interface InboundSnsPayload {
   originationNumber: string;
@@ -350,8 +351,13 @@ export const handler: SNSHandler = async (event) => {
       }
 
       if (classification === "approval" && openRo && hasOpenEstimate) {
+        // Same snapshot the public Approve button takes, so a later line edit
+        // is flagged "changed since approval" regardless of how they said yes.
+        const stamp = approvalStamp(openRo);
         openRo.estimate = openRo.estimate ?? {};
-        openRo.estimate.approvedAt = new Date();
+        openRo.estimate.approvedAt = stamp.approvedAt;
+        openRo.estimate.approvedTotal = stamp.approvedTotal;
+        openRo.estimate.approvedLineItems = stamp.approvedLineItems as any;
         openRo.status = "in_repair";
         await openRo.save();
 

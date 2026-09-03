@@ -2,13 +2,14 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { ok, notFound } from "../../lib/response.js";
 import { RepairOrder } from "@lift/shared";
+import { estimateTokenQuery } from "../repairOrders/_estimate.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event) => {
   const token = event.pathParameters?.token;
   if (!token) return notFound();
 
   const updated = await RepairOrder.findOneAndUpdate(
-    { publicToken: token },
+    estimateTokenQuery(token),
     { $set: { "estimate.declinedAt": new Date() } },
     { new: true }
   );

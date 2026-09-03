@@ -188,9 +188,12 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
       awsMessageId: smsResult.messageId,
     });
 
-    // Stamp the RO with sentAt + persist mint of publicToken.
+    // Stamp the RO with sentAt + persist mint of publicToken. A (re-)send asks
+    // the customer to agree to the *current* numbers, so any earlier
+    // approval/decline and its snapshot are superseded — drop them along with
+    // the viewed marker so the RO page tracks this send, not the last one.
     ro.estimate = {
-      ...(ro.estimate ?? {}),
+      publicToken: ro.estimate?.publicToken,
       sentAt: new Date(),
     } as typeof ro.estimate;
     await ro.save();
