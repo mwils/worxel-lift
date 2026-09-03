@@ -15,6 +15,9 @@ export interface SendInspectionModalProps {
   itemCount: number;
   totalCents: number;
   hasLineItems: boolean;
+  // Customer already approved the estimate — the text shouldn't ask them to
+  // approve again, and "Include estimate" defaults off.
+  estimateApproved?: boolean;
   onSent?: () => void;
 }
 
@@ -24,9 +27,22 @@ function buildClientDraft(args: {
   itemCount: number;
   totalCents: number;
   includeEstimate: boolean;
+  estimateApproved: boolean;
 }): string {
   const veh = args.vehicleSummary || "your vehicle";
   const head = `Hi ${args.customerFirstName} — we pulled ${veh} in and walked through it.`;
+  if (args.estimateApproved) {
+    const approvedHead = `Hi ${args.customerFirstName} — here's the inspection from today's visit on ${veh}.`;
+    return [
+      args.includeEstimate && args.totalCents > 0
+        ? `${approvedHead} Photos and notes are here, with the estimate you approved (${formatMoney(
+            args.totalCents
+          )}) at the bottom for reference.`
+        : `${approvedHead} Photos and notes are here so you can see what we found.`,
+      "",
+      "(secure link arrives when you tap send)",
+    ].join("\n");
+  }
   if (args.includeEstimate && args.totalCents > 0) {
     return [
       `${head} Photos and notes are here, with the estimate (${formatMoney(
@@ -52,9 +68,10 @@ export function SendInspectionModal({
   itemCount,
   totalCents,
   hasLineItems,
+  estimateApproved = false,
   onSent,
 }: SendInspectionModalProps) {
-  const [includeEstimate, setIncludeEstimate] = useState(true);
+  const [includeEstimate, setIncludeEstimate] = useState(!estimateApproved);
   const [draft, setDraft] = useState("");
   const [touched, setTouched] = useState(false);
 
@@ -66,9 +83,24 @@ export function SendInspectionModal({
         itemCount,
         totalCents,
         includeEstimate: includeEstimate && hasLineItems,
+        estimateApproved,
       }),
-    [customerFirstName, vehicleSummary, itemCount, totalCents, includeEstimate, hasLineItems]
+    [
+      customerFirstName,
+      vehicleSummary,
+      itemCount,
+      totalCents,
+      includeEstimate,
+      hasLineItems,
+      estimateApproved,
+    ]
   );
+
+  // Re-derive the default toggle each time the modal opens — approval state
+  // may have changed since the last send.
+  useEffect(() => {
+    if (opened) setIncludeEstimate(!estimateApproved);
+  }, [opened, estimateApproved]);
 
   useEffect(() => {
     if (!opened) {
@@ -107,9 +139,11 @@ export function SendInspectionModal({
           }}
           label="Include estimate in this message"
           description={
-            hasLineItems
-              ? "Customer can approve or decline right from the link."
-              : "No line items on this RO yet — the inspection page won't show an estimate."
+            !hasLineItems
+              ? "No line items on this RO yet — the inspection page won't show an estimate."
+              : estimateApproved
+              ? "Already approved — the page shows it for reference, no second approval asked."
+              : "Customer can approve or decline right from the link."
           }
           disabled={!hasLineItems && !includeEstimate}
         />

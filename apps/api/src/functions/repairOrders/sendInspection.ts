@@ -33,6 +33,8 @@ interface InspectionSmsInput {
   vehicle: { year?: number; make?: string; model?: string };
   itemCount: number;
   hasEstimate: boolean;
+  // Customer already approved the estimate — don't ask them to approve again.
+  estimateApproved?: boolean;
   totalCents: number;
   inspectionUrl: string;
   estimateUrl?: string;
@@ -44,8 +46,15 @@ export function buildInspectionTemplate(input: InspectionSmsInput): string {
     .join(" ");
   const vehiclePart = veh ? ` your ${veh}` : " your vehicle";
   const lines: string[] = [];
-  if (input.hasEstimate && input.totalCents > 0) {
-    const total = `$${(input.totalCents / 100).toFixed(2)}`;
+  const total = `$${(input.totalCents / 100).toFixed(2)}`;
+  if (input.estimateApproved) {
+    lines.push(
+      `Hi ${input.customerFirstName} — here's the inspection from today's visit on${vehiclePart}. ` +
+        (input.hasEstimate && input.totalCents > 0
+          ? `Photos and notes are here, with the estimate you approved (${total}) at the bottom for reference.`
+          : `Photos and notes are here so you can see what we found.`)
+    );
+  } else if (input.hasEstimate && input.totalCents > 0) {
     lines.push(
       `Hi ${input.customerFirstName} — we pulled${vehiclePart} in and walked through it. ` +
         `Photos and notes are here, with the estimate (${total}) at the bottom — you can approve right from the page.`
@@ -118,6 +127,7 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
             },
             itemCount: inspection.items.length,
             hasEstimate: includeEstimate && (ro.lineItems?.length ?? 0) > 0,
+            estimateApproved: !!ro.estimate?.approvedAt,
             totalCents: ro.total ?? 0,
             inspectionUrl,
             estimateUrl,
@@ -147,6 +157,18 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
 
     inspection.status = "sent";
     inspection.sentAt = new Date();
+    // The inspection page embeds the estimate with Approve/Decline, so if this
+    // is the first time the customer can act on it, it counts as sent — the RO
+    // badge and the public estimate link both key off estimate.sentAt.
+    if (
+      includeEstimate &&
+      (ro.lineItems?.length ?? 0) > 0 &&
+      ro.estimate?.publicToken &&
+      !ro.estimate.sentAt &&
+      !ro.estimate.approvedAt
+    ) {
+      ro.estimate.sentAt = inspection.sentAt;
+    }
     await ro.save();
 
     return created({

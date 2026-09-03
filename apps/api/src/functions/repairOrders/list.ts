@@ -69,6 +69,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         customerName: customerName(c),
         vehicleSummary: vehicleSummary(v),
         total: r.total,
+        paymentStatus: r.payment?.status ?? "unpaid",
         updatedAt: r.updatedAt,
         // Board cards show the visit date for scheduled ROs.
         scheduledFor: r.scheduledFor ?? null,

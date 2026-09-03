@@ -306,6 +306,10 @@ export default $config({
       timeout: "30 seconds" as const,
     });
     api.route(
+      "POST /repair-orders/{id}/mark-paid",
+      fn("apps/api/src/functions/repairOrders/markPaid.handler")
+    );
+    api.route(
       "POST /repair-orders/{id}/send-estimate",
       fn("apps/api/src/functions/repairOrders/sendEstimate.handler")
     );

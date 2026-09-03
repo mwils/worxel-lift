@@ -3,6 +3,7 @@ import {
   INSPECTION_SEVERITIES,
   INSPECTION_STATUSES,
   LINE_ITEM_KINDS,
+  PAYMENT_METHODS,
   PAYMENT_STATUSES,
   RO_STATUSES,
 } from "../constants.js";
@@ -62,9 +63,27 @@ const RepairOrderSchema = new Schema(
 
     estimate: {
       sentAt: Date,
+      viewedAt: Date, // first open of the public estimate page
       approvedAt: Date,
       declinedAt: Date,
       publicToken: String,
+      // Snapshot taken when the customer approves, so later line-item edits
+      // can be flagged as "changed since approval" against the number the
+      // customer actually agreed to. Cleared when the estimate is re-sent.
+      approvedTotal: Number, // cents
+      approvedLineItems: {
+        type: [
+          new Schema(
+            {
+              kind: { type: String, enum: LINE_ITEM_KINDS, required: true },
+              description: { type: String, required: true },
+              total: { type: Number, required: true }, // cents
+            },
+            { _id: false }
+          ),
+        ],
+        default: undefined,
+      },
     },
 
     inspection: {
@@ -79,6 +98,13 @@ const RepairOrderSchema = new Schema(
       status: { type: String, enum: PAYMENT_STATUSES, default: "unpaid" },
       stripePaymentIntentId: String,
       paidAt: Date,
+      // Set by POST /repair-orders/:id/mark-paid (cash / in-person card /
+      // check / other) or "stripe" by the pay-link + card-on-file paths.
+      method: { type: String, enum: PAYMENT_METHODS },
+      // What was actually collected, in cents. Defaults to `total` at mark-paid
+      // time; may be lower if the owner knocked something off at the counter.
+      amountCents: Number,
+      note: { type: String, maxlength: 200 },
     },
 
     publicToken: { type: String, index: true }, // for pay/estimate links

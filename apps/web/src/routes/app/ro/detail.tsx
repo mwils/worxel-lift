@@ -26,6 +26,7 @@ import {
   IconClipboardList,
   IconChecklist,
   IconCalendarEvent,
+  IconCash,
 } from "@tabler/icons-react";
 import { RO_STATUSES, RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
@@ -54,6 +55,13 @@ import type { JobTemplate } from "../../../features/jobTemplates/types";
 import { InspectionEditor } from "../../../features/inspection/InspectionEditor";
 import { SendInspectionModal } from "../../../features/inspection/SendInspectionModal";
 import type { InspectionState } from "../../../features/inspection/types";
+import {
+  MarkPaidModal,
+  PAYMENT_METHOD_LABELS,
+  roBalanceCents,
+  type RoPayment,
+} from "../../../features/payments/MarkPaidModal";
+import { StatusTextPrompt, type PromptableStatus } from "../../../features/ro/StatusTextPrompt";
 
 interface RoDetail {
   repairOrder: {
@@ -69,8 +77,16 @@ interface RoDetail {
     total: number;
     photos: GalleryPhoto[];
     publicToken: string | null;
+    payment: RoPayment | null;
     scheduledFor: string | null;
-    estimate: { sentAt?: string; approvedAt?: string; declinedAt?: string } | null;
+    estimate: {
+      sentAt?: string | null;
+      viewedAt?: string | null;
+      approvedAt?: string | null;
+      declinedAt?: string | null;
+      approvedTotal?: number | null;
+      changedSinceApproval?: boolean;
+    } | null;
     inspection: InspectionState;
     customer: {
       id: string;
@@ -117,6 +133,13 @@ export function RoDetailRoute() {
   });
   const { data, isPending } = roQ;
 
+  // ── Status change follow-ups ─────────────────────────────────────────────
+  // Every status change toasts; Ready / Picked up also offer a one-tap text
+  // to the customer (never auto-sent). Picked up with a balance warns first.
+  const [textPromptStatus, setTextPromptStatus] = useState<PromptableStatus | null>(null);
+  const [unpaidPickupOpen, setUnpaidPickupOpen] = useState(false);
+  const [markPaidOpen, setMarkPaidOpen] = useState(false);
+
   const patchRo = useMutation({
     mutationFn: (
       patch: Partial<{
@@ -127,11 +150,30 @@ export function RoDetailRoute() {
       }>
     ) =>
       api.patch(`/repair-orders/${id}`, patch),
-    onSuccess: () => {
+    onSuccess: (_res, patch) => {
       qc.invalidateQueries({ queryKey: ["ro", id] });
       qc.invalidateQueries({ queryKey: ["ros"] });
+      if (patch.status) {
+        const label = STATUS_OPTIONS.find((o) => o.value === patch.status)?.label ?? patch.status;
+        notifications.show({ color: "green", message: `Moved to ${label}.` });
+        if (patch.status === "ready" || patch.status === "picked_up") {
+          setTextPromptStatus(patch.status);
+        }
+      }
     },
     onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
+  });
+
+  const markUnpaid = useMutation({
+    mutationFn: () => api.post(`/repair-orders/${id}/mark-paid`, { paid: false }),
+    onSuccess: () => {
+      notifications.show({ color: "green", message: "Marked unpaid." });
+      qc.invalidateQueries({ queryKey: ["ro", id] });
+      qc.invalidateQueries({ queryKey: ["ros"] });
+      qc.invalidateQueries({ queryKey: ["customer-history"] });
+      qc.invalidateQueries({ queryKey: ["vehicle-history"] });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't mark unpaid" }),
   });
 
   const createLine = useMutation({
@@ -425,6 +467,37 @@ export function RoDetailRoute() {
 
   const inspectionItemCount = ro.inspection?.items.length ?? 0;
 
+  // Estimate state for the header badge + the sent/viewed/approved trail. An
+  // approval only counts against the numbers the customer actually saw — once
+  // the lines drift from the snapshot, the API flips changedSinceApproval.
+  const estimateChanged = !!ro.estimate?.approvedAt && !!ro.estimate?.changedSinceApproval;
+  const estimateTimeline = ro.estimate?.sentAt
+    ? [
+        `sent ${formatVisit(ro.estimate.sentAt, tz)}`,
+        ro.estimate.viewedAt ? `viewed ${formatVisit(ro.estimate.viewedAt, tz)}` : null,
+        ro.estimate.approvedAt ? `approved ${formatVisit(ro.estimate.approvedAt, tz)}` : null,
+        !ro.estimate.approvedAt && ro.estimate.declinedAt
+          ? `declined ${formatVisit(ro.estimate.declinedAt, tz)}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+
+  const balanceCents = roBalanceCents(ro.total, ro.payment);
+  const isPaid = ro.payment?.status === "paid";
+  const paidViaStripe = ro.payment?.method === "stripe" || !!ro.payment?.stripePaymentIntentId;
+  const closedStatus = ["picked_up", "voided", "cancelled_by_customer"].includes(ro.status);
+
+  const changeStatus = (next: RoStatus) => {
+    if (next === ro.status) return;
+    if (next === "picked_up" && balanceCents > 0) {
+      setUnpaidPickupOpen(true);
+      return;
+    }
+    patchRo.mutate({ status: next });
+  };
+
   const openSchedule = () => {
     setScheduleDraft(ro.scheduledFor ? instantToPickerDate(ro.scheduledFor, tz) : null);
     // A fresh manual RO ("in") being given a date is almost always a future
@@ -492,15 +565,38 @@ export function RoDetailRoute() {
             label="Status"
             data={STATUS_OPTIONS}
             value={ro.status}
-            onChange={(v) => v && patchRo.mutate({ status: v as RoStatus })}
+            onChange={(v) => v && changeStatus(v as RoStatus)}
             allowDeselect={false}
             w={200}
           />
-          {ro.estimate?.sentAt && (
-            <Badge variant="light" color={ro.estimate.approvedAt ? "green" : "blue"}>
-              Estimate {ro.estimate.approvedAt ? "approved" : "sent"}
+          {ro.total > 0 &&
+            (isPaid ? (
+              <Badge variant="light" color="teal">
+                Paid
+                {ro.payment?.method ? ` · ${PAYMENT_METHOD_LABELS[ro.payment.method]}` : ""}
+              </Badge>
+            ) : (
+              <Badge variant="light" color={ro.status === "ready" || closedStatus ? "orange" : "gray"}>
+                Unpaid · {formatMoney(balanceCents)}
+              </Badge>
+            ))}
+          {estimateChanged ? (
+            <Badge variant="light" color="orange">
+              Changed since approval · {formatMoney(ro.estimate?.approvedTotal ?? 0)} approved
             </Badge>
-          )}
+          ) : ro.estimate?.approvedAt ? (
+            <Badge variant="light" color="green">
+              Estimate approved
+            </Badge>
+          ) : ro.estimate?.declinedAt ? (
+            <Badge variant="light" color="red">
+              Estimate declined
+            </Badge>
+          ) : ro.estimate?.sentAt ? (
+            <Badge variant="light" color="blue">
+              Estimate sent{ro.estimate.viewedAt ? " · viewed" : ""}
+            </Badge>
+          ) : null}
         </Stack>
       </Group>
 
@@ -565,12 +661,39 @@ export function RoDetailRoute() {
           </Text>
           <Text>{formatMoney(ro.partsTotal)}</Text>
         </Group>
+        {ro.taxTotal > 0 && (
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              Tax
+            </Text>
+            <Text>{formatMoney(ro.taxTotal)}</Text>
+          </Group>
+        )}
         <Group justify="space-between">
           <Text fw={700}>Total</Text>
           <Text fw={700}>{formatMoney(ro.total)}</Text>
         </Group>
       </Stack>
 
+      {estimateChanged && (
+        <Alert color="orange" variant="light" title="Changed since the customer approved">
+          <Group justify="space-between" wrap="wrap" gap="xs">
+            <Text size="sm">
+              They approved {formatMoney(ro.estimate?.approvedTotal ?? 0)}; it's now{" "}
+              {formatMoney(ro.total)}. Re-send so they can OK the new number.
+            </Text>
+            <Button
+              size="xs"
+              color="orange"
+              onClick={openSendEstimate}
+              loading={estimateLoading}
+              disabled={ro.lineItems.length === 0 || !ro.customer}
+            >
+              Re-send for approval
+            </Button>
+          </Group>
+        </Alert>
+      )}
       <Group>
         <Button
           leftSection={<IconSend size={16} />}
@@ -578,7 +701,7 @@ export function RoDetailRoute() {
           loading={estimateLoading}
           disabled={ro.lineItems.length === 0 || !ro.customer}
         >
-          Send estimate
+          {ro.estimate?.sentAt ? "Re-send estimate" : "Send estimate"}
         </Button>
         <Button
           variant="default"
@@ -589,7 +712,34 @@ export function RoDetailRoute() {
         >
           Text pay link
         </Button>
+        {!isPaid ? (
+          <Button
+            variant="default"
+            leftSection={<IconCash size={16} />}
+            onClick={() => setMarkPaidOpen(true)}
+            disabled={ro.total === 0}
+          >
+            Mark paid
+          </Button>
+        ) : (
+          !paidViaStripe && (
+            <Button
+              variant="subtle"
+              color="gray"
+              size="compact-sm"
+              onClick={() => markUnpaid.mutate()}
+              loading={markUnpaid.isPending}
+            >
+              Undo mark paid
+            </Button>
+          )
+        )}
       </Group>
+      {estimateTimeline && (
+        <Text size="xs" c="dimmed" mt={-8}>
+          Estimate {estimateTimeline}
+        </Text>
+      )}
 
       <Card withBorder>
         <Group justify="space-between" mb="xs" wrap="wrap">
@@ -842,6 +992,69 @@ export function RoDetailRoute() {
         </Stack>
       </Modal>
 
+      <MarkPaidModal
+        opened={markPaidOpen}
+        onClose={() => setMarkPaidOpen(false)}
+        repairOrderId={id!}
+        balanceCents={balanceCents}
+        onPaid={() => {
+          qc.invalidateQueries({ queryKey: ["ro", id] });
+          qc.invalidateQueries({ queryKey: ["ros"] });
+          qc.invalidateQueries({ queryKey: ["customer-history"] });
+          qc.invalidateQueries({ queryKey: ["vehicle-history"] });
+          // Marking paid from the pickup warning finishes the pickup too.
+          if (unpaidPickupOpen) {
+            setUnpaidPickupOpen(false);
+            patchRo.mutate({ status: "picked_up" });
+          }
+        }}
+      />
+
+      {/* Picked up with money still owed */}
+      <Modal
+        opened={unpaidPickupOpen}
+        onClose={() => setUnpaidPickupOpen(false)}
+        title="Balance unpaid"
+        centered
+      >
+        <Stack>
+          <Text size="sm">
+            {formatMoney(balanceCents)} is still due on {formatRoNumber(ro.number)}. Mark it
+            paid now, or pick up anyway and settle later.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setUnpaidPickupOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                setUnpaidPickupOpen(false);
+                patchRo.mutate({ status: "picked_up" });
+              }}
+              loading={patchRo.isPending}
+            >
+              Pick up anyway
+            </Button>
+            <Button leftSection={<IconCash size={16} />} onClick={() => setMarkPaidOpen(true)}>
+              Mark paid
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <StatusTextPrompt
+        status={textPromptStatus}
+        onClose={() => setTextPromptStatus(null)}
+        repairOrderId={id!}
+        customer={ro.customer ? { id: ro.customer.id, firstName: ro.customer.firstName } : null}
+        vehicleSummary={vehicleSummary}
+        shopName={me?.shop?.name ?? "the shop"}
+        balanceCents={balanceCents}
+        paymentsReady={paymentsReady}
+        onSent={() => qc.invalidateQueries({ queryKey: ["conversation"] })}
+      />
+
       <SendInspectionModal
         opened={sendInspectionOpen}
         onClose={() => setSendInspectionOpen(false)}
@@ -851,6 +1064,7 @@ export function RoDetailRoute() {
         itemCount={inspectionItemCount}
         totalCents={ro.total}
         hasLineItems={ro.lineItems.length > 0}
+        estimateApproved={!!ro.estimate?.approvedAt}
         onSent={() => qc.invalidateQueries({ queryKey: ["ro", id] })}
       />
 
