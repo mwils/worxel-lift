@@ -87,6 +87,7 @@ interface CustomerHistory {
   recentMessages: Array<{
     id: string;
     direction: "in" | "out";
+    kind?: "sms" | "system";
     body: string;
     sentAt: string;
     aiDrafted: boolean;
@@ -336,7 +337,7 @@ export function CustomerDetailRoute() {
                 <Card key={m.id} withBorder padding="sm">
                   <Group justify="space-between">
                     <Badge variant="light" color={m.direction === "in" ? "blue" : "gray"} size="xs">
-                      {m.direction === "in" ? "Inbound" : "Outbound"}
+                      {m.kind === "system" ? "Note" : m.direction === "in" ? "Inbound" : "Outbound"}
                     </Badge>
                     <Text size="xs" c="dimmed">
                       {relativeTime(m.sentAt)}

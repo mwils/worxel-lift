@@ -1,5 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { CreateVehicleDto, Customer, Vehicle } from "@lift/shared";
+import { CreateVehicleDto, Customer, Vehicle, normalizePlate } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
 
@@ -26,6 +26,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       engine: dto.engine,
       mileage: dto.mileage,
       plate: dto.plate,
+      plateNormalized: dto.plate ? normalizePlate(dto.plate) || undefined : undefined,
       color: dto.color,
       notes: dto.notes,
     });

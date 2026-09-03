@@ -1,8 +1,8 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { CreateCustomerDto, Customer, Message, Shop } from "@lift/shared";
+import { CreateCustomerDto, Customer } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, ok } from "../../lib/response.js";
-import { sendSms } from "../../lib/sms.js";
+import { sendOptInConfirmation } from "./_optIn.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
@@ -38,35 +38,13 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       smsOptInAt: new Date(),
     });
 
-    // Opt-in confirmation text, required by our 10DLC registration ("verbal
-    // opt-in gets a written confirmation"). Best-effort: never fail customer
-    // creation over a carrier hiccup — the record and consent stand either way.
-    try {
-      const shop = await Shop.findById(user.shopId).lean();
-      // "Worxel" (registered 10DLC DBA) must appear in the opt-in confirmation
-      // — carrier vetting rejects opt-in/opt-out texts without the brand name.
-      const confirmBody =
-        `${shop?.name ?? "Your repair shop"} via Worxel Lift: You're set to get text updates ` +
-        `about your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
-        `Reply HELP for help, STOP to cancel.`;
-      const sendResult = await sendSms({
-        to: customer.phone,
-        from: shop?.sms?.phoneNumber ?? undefined,
-        body: confirmBody,
-        mockEmailRecipient: customer.email ?? undefined,
-      });
-      await Message.create({
-        shopId: user.shopId,
-        customerId: customer._id,
-        direction: "out",
-        body: confirmBody,
-        sentAt: new Date(),
-        awsMessageId: sendResult.messageId,
-        autoReplied: true,
-      });
-    } catch (err) {
-      console.error("[customers/create] opt-in confirmation SMS failed", err);
-    }
+    // Opt-in confirmation text (10DLC). Best-effort — see _optIn.ts.
+    await sendOptInConfirmation({
+      shopId: user.shopId,
+      customerId: customer._id,
+      phone: customer.phone,
+      email: customer.email,
+    });
 
     return created({
       customer: {

@@ -86,9 +86,11 @@ export function CustomersRoute() {
         ) : !data || data.customers.length === 0 ? (
           <Center p="xl">
             <Stack align="center" gap="xs">
-              <Text c="dimmed">No customers yet.</Text>
+              <Text c="dimmed">
+                {q.trim() ? `No customers match “${q.trim()}”.` : "No customers yet."}
+              </Text>
               <Button leftSection={<IconPlus size={16} />} onClick={open}>
-                Add your first customer
+                {q.trim() ? "Add a customer" : "Add your first customer"}
               </Button>
             </Stack>
           </Center>
