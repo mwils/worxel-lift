@@ -2,6 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Customer, RepairOrder, Shop, Vehicle } from "@lift/shared";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { notFound, ok } from "../../lib/response.js";
+import { readBookingConfig } from "./_slots.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event) => {
   const token = event.pathParameters?.token;
@@ -41,6 +42,9 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       concern: ro.concern ?? null,
       cancellable,
       rescheduleable: cancellable && ro.status === "scheduled",
+      // The reschedule picker must request the same window the slots endpoint
+      // accepts — hand it the shop's horizon rather than guessing.
+      horizonDays: shop ? readBookingConfig(shop).horizonDays : null,
     },
   });
 });

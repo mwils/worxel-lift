@@ -4,54 +4,32 @@ import {
   AiInteraction,
   Customer,
   DraftMessageDto,
+  Message,
+  RO_OPEN_STATUSES,
   RepairOrder,
   Shop,
   Vehicle,
+  assemblePolishedEstimate,
   buildEstimatePrompt,
   buildEstimateTemplate,
+  buildFreeformPrompt,
   buildPayLinkPrompt,
   buildPayLinkTemplate,
   buildStatusReplyPrompt,
   buildStatusReplyTemplate,
   type EstimatePromptInput,
+  type FreeformPromptInput,
+  type FreeformRoSituation,
   type PayLinkPromptInput,
   type StatusReplyInput,
   ESTIMATE_PROMPT_VERSION,
+  FREEFORM_PROMPT_VERSION,
   PAY_LINK_PROMPT_VERSION,
   STATUS_REPLY_PROMPT_VERSION,
 } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, forbidden, notFound, ok } from "../../lib/response.js";
 import { invokeModel, modelDraft } from "../../lib/bedrock.js";
-
-const FREEFORM_PROMPT_VERSION = "freeform.v1";
-
-function buildFreeformPrompt(input: {
-  shopName: string;
-  customerFirstName: string;
-  aiTone: "plain" | "friendly";
-  context?: string;
-}): string {
-  const tone =
-    input.aiTone === "friendly"
-      ? "Warm, neighborly, first-name basis. At most one emoji."
-      : "Plain, matter-of-fact, no emojis.";
-  return `
-You are drafting a short SMS from a small independent auto shop to a customer.
-
-TONE: ${tone}
-SHOP: ${input.shopName}
-CUSTOMER FIRST NAME: ${input.customerFirstName}
-CONTEXT FROM OWNER: ${input.context?.trim() || "(no extra context — draft a friendly check-in)"}
-
-Rules:
-- 1–3 sentences, under 320 chars.
-- Address the customer by first name.
-- Plain text only, no markdown.
-- Do NOT add a signature — the shop name is the sender ID.
-- Return ONLY the SMS body. No preamble.
-`.trim();
-}
 
 function publicEstimateUrl(token: string): string {
   const base = (process.env.WEB_APP_URL ?? "https://app.lift.com").replace(/\/+$/, "");
@@ -61,6 +39,68 @@ function publicEstimateUrl(token: string): string {
 function publicPayUrl(token: string): string {
   const base = (process.env.WEB_APP_URL ?? "https://app.lift.com").replace(/\/+$/, "");
   return `${base}/public/pay/${token}`;
+}
+
+/**
+ * Freeform drafts need to know what's actually going on with this customer
+ * (QA M2): open ROs with vehicle + estimate state, the last completed job when
+ * nothing is open, and the tail of the thread.
+ */
+async function loadFreeformSituation(
+  shopId: unknown,
+  customerId: unknown,
+  focusedRoId?: string
+): Promise<Pick<FreeformPromptInput, "openRos" | "lastCompletedRo" | "recentMessages">> {
+  const [openRos, lastCompleted, recent] = await Promise.all([
+    RepairOrder.find({ shopId, customerId, status: { $in: RO_OPEN_STATUSES } })
+      .sort({ updatedAt: -1 })
+      .limit(3)
+      .lean(),
+    RepairOrder.findOne({ shopId, customerId, status: "picked_up" })
+      .sort({ completedAt: -1, updatedAt: -1 })
+      .lean(),
+    Message.find({ shopId, customerId }).sort({ sentAt: -1 }).limit(6).lean(),
+  ]);
+
+  const ros = [...openRos, ...(lastCompleted ? [lastCompleted] : [])];
+  const vehicleIds = [...new Set(ros.map((r) => String(r.vehicleId)))];
+  const vehicles = vehicleIds.length
+    ? await Vehicle.find({ _id: { $in: vehicleIds }, shopId }).lean()
+    : [];
+  const vehicleById = new Map(vehicles.map((v) => [String(v._id), v]));
+
+  const toSituation = (ro: (typeof ros)[number]): FreeformRoSituation => {
+    const v = vehicleById.get(String(ro.vehicleId));
+    return {
+      roNumber: ro.number,
+      vehicle: {
+        year: v?.year ?? undefined,
+        make: v?.make ?? undefined,
+        model: v?.model ?? undefined,
+      },
+      status: ro.status,
+      concern: ro.concern ?? undefined,
+      estimateSentAt: ro.estimate?.sentAt ?? null,
+      estimateApprovedAt: ro.estimate?.approvedAt ?? null,
+      estimateDeclinedAt: ro.estimate?.declinedAt ?? null,
+      scheduledFor: ro.scheduledFor ?? null,
+      totalCents: ro.total ?? 0,
+      focused: focusedRoId ? String(ro._id) === focusedRoId : false,
+    };
+  };
+
+  return {
+    openRos: openRos.map(toSituation),
+    lastCompletedRo: lastCompleted ? toSituation(lastCompleted) : null,
+    recentMessages: recent
+      .slice()
+      .reverse()
+      .map((m) => ({
+        direction: m.direction as "in" | "out",
+        body: m.body,
+        sentAt: m.sentAt ?? null,
+      })),
+  };
 }
 
 /**
@@ -173,6 +213,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         totalCents: ro.total ?? 0,
         approveLinkUrl: publicEstimateUrl(ro.publicToken ?? "PENDING"),
         aiTone,
+        concern: ro.concern ?? undefined,
       };
     } else if (dto.kind === "status_update" || dto.kind === "ready_for_pickup") {
       let roStatus = dto.kind === "ready_for_pickup" ? "ready" : "in_repair";
@@ -223,11 +264,17 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       kindLabel =
         dto.kind === "ready_for_pickup" ? "draft_ready_for_pickup" : "draft_status_update";
     } else {
+      const situation = await loadFreeformSituation(
+        user.shopId,
+        customer._id,
+        dto.repairOrderId
+      );
       prompt = buildFreeformPrompt({
         shopName: shop.name,
         customerFirstName: customer.firstName,
         aiTone,
         context: dto.context,
+        ...situation,
       });
       promptVersion = FREEFORM_PROMPT_VERSION;
       kindLabel = "draft_freeform";
@@ -260,8 +307,22 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       }).catch((e) => console.error("[messages/draft] failed to log AiInteraction", e));
     }
 
+    let draft = result!.text.trim();
+    if (estimateInput) {
+      // The model only wrote the opener; the itemized block, total and
+      // "Approve:" line are assembled here so they can't be dropped (QA M1).
+      const assembled = assemblePolishedEstimate(estimateInput, draft);
+      if (assembled.usedFallback) {
+        console.warn("[messages/draft] estimate polish unusable, fell back to template", {
+          promptVersion,
+          sample: draft.slice(0, 120),
+        });
+      }
+      draft = assembled.sms;
+    }
+
     return ok({
-      draft: result!.text.trim(),
+      draft,
       source: "ai" as const,
       promptVersion,
       model,
