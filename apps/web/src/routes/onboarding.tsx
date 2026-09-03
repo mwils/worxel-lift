@@ -178,11 +178,13 @@ export function OnboardingRoute() {
 
       <Paper p="lg" withBorder>
         <Stepper active={step}>
-          <Stepper.Step label="Your shop">
+          <Stepper.Step label="Your shop" aria-label="Step 1 of 2: Your shop">
             <Stack mt="md">
               <TextInput
                 label="Shop name"
                 description="Customers see this on every text and estimate."
+                id="onboarding-shop-name"
+                name="shopName"
                 value={shopName}
                 onChange={(e) => setShopName(e.currentTarget.value)}
                 placeholder="Mike's Auto"
@@ -215,7 +217,7 @@ export function OnboardingRoute() {
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Start trial">
+          <Stepper.Step label="Start trial" aria-label="Step 2 of 2: Start trial">
             <Stack mt="md">
               <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
                 Your customers get texts about their car — estimates, status updates, and pay

@@ -93,6 +93,8 @@ interface CustomerHistory {
     aiDrafted: boolean;
     inboundClassification: string | null;
     autoReplied: boolean;
+    automated?: boolean;
+    deliveryStatus?: "sent" | "delivered" | "failed" | null;
   }>;
 }
 
@@ -346,7 +348,10 @@ export function CustomerDetailRoute() {
                   <Text size="sm" mt={4}>
                     {m.body}
                   </Text>
-                  {(m.aiDrafted || m.autoReplied) && (
+                  {(m.aiDrafted ||
+                    m.autoReplied ||
+                    m.automated ||
+                    (m.direction === "out" && m.deliveryStatus === "failed")) && (
                     <Group gap="xs" mt="xs">
                       {m.aiDrafted && (
                         <Badge size="xs" variant="light">
@@ -357,6 +362,16 @@ export function CustomerDetailRoute() {
                         <Badge size="xs" color="grape" variant="light">
                           Auto-replied
                         </Badge>
+                      )}
+                      {m.automated && !m.autoReplied && (
+                        <Badge size="xs" color="gray" variant="light">
+                          Automated
+                        </Badge>
+                      )}
+                      {m.direction === "out" && m.deliveryStatus === "failed" && (
+                        <Text size="xs" c="red.7" fw={500}>
+                          Not delivered
+                        </Text>
                       )}
                     </Group>
                   )}

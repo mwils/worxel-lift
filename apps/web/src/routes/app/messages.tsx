@@ -41,6 +41,8 @@ interface LatestMessage {
   sentAt: string;
   aiDrafted: boolean;
   autoReplied: boolean;
+  automated?: boolean;
+  deliveryStatus?: "sent" | "delivered" | "failed" | null;
 }
 
 interface ConversationResponse {
@@ -188,6 +190,16 @@ function InboxTab() {
                       {latest?.autoReplied && (
                         <Badge size="xs" color="grape" variant="light">
                           Auto-replied
+                        </Badge>
+                      )}
+                      {latest?.automated && !latest.autoReplied && (
+                        <Badge size="xs" color="gray" variant="light">
+                          Automated
+                        </Badge>
+                      )}
+                      {latest?.direction === "out" && latest.deliveryStatus === "failed" && (
+                        <Badge size="xs" color="red" variant="light">
+                          Not delivered
                         </Badge>
                       )}
                       {latest?.aiDrafted && (

@@ -20,9 +20,10 @@ export async function sendOptInConfirmation(input: {
   phone: string;
   email?: string | null;
 }): Promise<void> {
+  let confirmBody: string | null = null;
   try {
     const shop = await Shop.findById(input.shopId).lean();
-    const confirmBody =
+    confirmBody =
       `${shop?.name ?? "Your repair shop"} via Worxel Lift: You're set to get text updates ` +
       `about your vehicle. Msg frequency varies. Msg & data rates may apply. ` +
       `Reply HELP for help, STOP to cancel.`;
@@ -39,9 +40,28 @@ export async function sendOptInConfirmation(input: {
       body: confirmBody,
       sentAt: new Date(),
       awsMessageId: sendResult.messageId,
-      autoReplied: true,
+      // System-sent, not a reply to anything — the thread tags it "Automated".
+      automated: true,
+      deliveryStatus: "sent",
     });
   } catch (err) {
     console.error("[customers] opt-in confirmation SMS failed", err);
+    // Still record the attempt so the thread shows a "Not delivered" marker
+    // instead of silently having no opt-in text at all.
+    if (confirmBody) {
+      try {
+        await Message.create({
+          shopId: input.shopId,
+          customerId: input.customerId,
+          direction: "out",
+          body: confirmBody,
+          sentAt: new Date(),
+          automated: true,
+          deliveryStatus: "failed",
+        });
+      } catch (recordErr) {
+        console.error("[customers] could not record failed opt-in text", recordErr);
+      }
+    }
   }
 }

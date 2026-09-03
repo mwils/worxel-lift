@@ -16,6 +16,8 @@ import { notifications } from "@mantine/notifications";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { notifyError } from "../../lib/notify";
+import { clearSessionHint } from "../../lib/session";
+import { clearAllSnapshots } from "../../lib/snapshot";
 import { GlobalSearchBar, useHasCustomers } from "../../features/history/GlobalSearchBar";
 
 /** Shown until an instant-signup account clicks its confirmation link.
@@ -81,6 +83,10 @@ export function AppLayout() {
     } catch {
       // intentionally swallow — don't trap Mike on the app shell
     }
+    // Drop the "signed in before" hint so /login paints instantly, and the
+    // board snapshot so a shared device doesn't flash this shop's jobs.
+    clearSessionHint();
+    clearAllSnapshots();
     // Hard reload to /login. Bypasses all in-memory React + TanStack Query
     // state — guarantees the next page load sees a fresh /auth/me against
     // the now-cleared cookie. Avoids the brief "app shell with stale `me`"
@@ -97,7 +103,7 @@ export function AppLayout() {
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label={opened ? "Close menu" : "Open menu"} />
             <Title order={3}>Lift</Title>
           </Group>
           {hasCustomers && <GlobalSearchBar />}

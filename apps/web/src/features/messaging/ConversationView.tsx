@@ -8,7 +8,12 @@ export interface ConversationMessage {
   body: string;
   sentAt: string | Date;
   aiDrafted?: boolean;
+  /** Outbound reply sent without the owner, in response to an inbound text. */
   autoReplied?: boolean;
+  /** Outbound text the system sent on its own (opt-in, booking notice, reminder). */
+  automated?: boolean;
+  /** From End User Messaging delivery receipts; null/undefined = no receipt yet. */
+  deliveryStatus?: "sent" | "delivered" | "failed" | null;
 }
 
 export interface ConversationViewProps {
@@ -79,10 +84,25 @@ export function ConversationView({ messages, emptyText }: ConversationViewProps)
                     AI draft
                   </Badge>
                 )}
-                {m.autoReplied && !outbound && (
+                {m.autoReplied && outbound && (
                   <Badge size="xs" variant="light" color="grape">
                     Auto-replied
                   </Badge>
+                )}
+                {m.automated && !m.autoReplied && outbound && (
+                  <Badge size="xs" variant="light" color="gray">
+                    Automated
+                  </Badge>
+                )}
+                {outbound && m.deliveryStatus === "failed" && (
+                  <Text size="xs" c="red.7" fw={500}>
+                    Not delivered
+                  </Text>
+                )}
+                {outbound && m.deliveryStatus === "delivered" && (
+                  <Text size="xs" c="dimmed">
+                    Delivered
+                  </Text>
                 )}
               </Group>
             </Stack>

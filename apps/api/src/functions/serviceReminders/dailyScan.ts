@@ -209,6 +209,7 @@ async function processReminder(
     aiPromptVersion: SERVICE_REMINDER_PROMPT_VERSION,
     serviceReminderId: reminder._id,
     autoReplied: false,
+    automated: true,
   });
 
   reminder.status = "sent";

@@ -10,6 +10,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     const dto = await parseBody(event, VerifyAuthDto);
 
     let user: HydratedDocument<UserDoc> | null = null;
+    let emailConfirmed = false;
 
     if (dto.token && dto.email) {
       const hash = hashMagicToken(dto.token);
@@ -22,7 +23,9 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       user.set("auth.magicLinkHash", undefined);
       user.set("auth.magicLinkExpiresAt", undefined);
       // Completing the email round-trip proves ownership — unlocks the
-      // outbound-send routes gated by withVerifiedAuth.
+      // outbound-send routes gated by withVerifiedAuth. Remember whether this
+      // click is what confirmed it so the client can say "Email confirmed".
+      emailConfirmed = user.emailVerified === false;
       user.set("emailVerified", true);
     } else if (dto.phone && dto.code) {
       const hash = hashSmsCode(dto.code);
@@ -49,7 +52,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     });
 
     return ok(
-      { ok: true, needsOnboarding: !user.shopId },
+      { ok: true, needsOnboarding: !user.shopId, emailConfirmed },
       { headers: { "Set-Cookie": cookie } }
     );
   } catch (err) {

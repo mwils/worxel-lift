@@ -51,7 +51,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       direction: "out",
       body,
       awsMessageId: sendResult.messageId,
-      autoReplied: true,
+      automated: true,
     });
   }
 
@@ -72,7 +72,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       direction: "out",
       body,
       awsMessageId: ownerSend.messageId,
-      autoReplied: true,
+      automated: true,
     });
   }
 

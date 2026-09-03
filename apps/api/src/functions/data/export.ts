@@ -147,7 +147,7 @@ export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) 
   );
 
   const messagesCsv = buildCsv(
-    ["id", "customerId", "repairOrderId", "direction", "body", "sentAt", "aiDrafted", "autoReplied"],
+    ["id", "customerId", "repairOrderId", "direction", "body", "sentAt", "aiDrafted", "autoReplied", "automated", "deliveryStatus"],
     cap(messages, "messages").map((m) => [
       m._id,
       m.customerId,
@@ -157,6 +157,8 @@ export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) 
       m.sentAt,
       m.aiDrafted,
       m.autoReplied,
+      m.automated,
+      m.deliveryStatus,
     ])
   );
 

@@ -111,7 +111,7 @@ export function ConversationRoute() {
   return (
     <Stack gap="sm" style={{ height: "calc(100vh - 100px)" }}>
       <Group wrap="nowrap">
-        <ActionIcon component={Link} to="/messages" variant="subtle">
+        <ActionIcon component={Link} to="/messages" variant="subtle" aria-label="Back to messages">
           <IconChevronLeft size={20} />
         </ActionIcon>
         <Stack gap={0}>

@@ -59,6 +59,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         sentAt: m.sentAt,
         aiDrafted: m.aiDrafted ?? false,
         autoReplied: m.autoReplied ?? false,
+        automated: m.automated ?? false,
+        deliveryStatus: m.deliveryStatus ?? null,
         inboundClassification: m.inboundClassification ?? null,
         awsMessageId: m.awsMessageId ?? null,
       })),

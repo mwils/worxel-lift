@@ -72,6 +72,27 @@ export default $config({
       }),
     });
 
+    // Same grant for delivery receipts. End User Messaging only publishes
+    // TEXT_DELIVERED / TEXT_INVALID / … here once a configuration set with an
+    // SNS event destination pointing at this topic exists and sends carry its
+    // name (SMS_CONFIGURATION_SET below).
+    new aws.sns.TopicPolicy("SmsDeliveryTopicPolicy", {
+      arn: smsDeliveryTopic.arn,
+      policy: $jsonStringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Sid: "AllowEndUserMessagingPublish",
+            Effect: "Allow",
+            Principal: { Service: "sms-voice.amazonaws.com" },
+            Action: "sns:Publish",
+            Resource: smsDeliveryTopic.arn,
+            Condition: { StringEquals: { "AWS:SourceAccount": accountId } },
+          },
+        ],
+      }),
+    });
+
     // ── Common Lambda config ────────────────────────────────────
     const commonLink = [
       photosBucket,
@@ -138,6 +159,13 @@ export default $config({
       // SmsPoolId secret = its phone-number id) — real SMS is live.
       // Flip back to "1" to route outbound through SES email mocks again.
       MOCK_SMS: "0",
+      // End User Messaging configuration set whose SNS event destination is
+      // SmsDeliveryTopic. Empty = sends carry no configuration set and the
+      // thread never learns whether a text was delivered or bounced. Create
+      // the set + event destination (event types TEXT_ALL → the topic) in the
+      // End User Messaging console, then export SMS_CONFIGURATION_SET=<name>
+      // in the deploying shell.
+      SMS_CONFIGURATION_SET: process.env.SMS_CONFIGURATION_SET ?? "",
       WEB_APP_URL: urls.web,
       MARKETING_URL: urls.marketing,
       API_URL: urls.api,

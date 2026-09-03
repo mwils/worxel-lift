@@ -106,6 +106,9 @@ export function StarterLibraryPrompt() {
           {(startersQ.data?.starters ?? []).map((s) => (
             <Group key={s.starterKey} justify="space-between" wrap="nowrap">
               <Checkbox
+                name={`starter-${s.starterKey}`}
+                value={s.starterKey}
+                aria-label={s.name}
                 checked={selected.has(s.starterKey)}
                 disabled={s.imported}
                 onChange={() => toggle(s.starterKey)}
