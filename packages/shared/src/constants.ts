@@ -47,6 +47,13 @@ export const PAYMENT_STATUSES = [
 ] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
+// How an RO was settled. `stripe` is set by the pay-link / card-on-file
+// paths; the rest are recorded by the owner via "Mark paid" for shops that
+// take cash or run their own card terminal.
+export const PAYMENT_METHODS = ["cash", "card", "check", "other", "stripe"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export const MANUAL_PAYMENT_METHODS = ["cash", "card", "check", "other"] as const;
+
 export const MESSAGE_CLASSIFICATIONS = [
   "status_check",
   "approval",

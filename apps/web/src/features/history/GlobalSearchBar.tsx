@@ -12,6 +12,7 @@ import {
 } from "@mantine/spotlight";
 import { IconCar, IconSearch, IconUser } from "@tabler/icons-react";
 import { api } from "../../lib/api";
+import { formatPhone } from "../../lib/format";
 
 interface LookupCustomer {
   kind: "customer";
@@ -61,7 +62,7 @@ export function GlobalSearchBar() {
         actions: customers.map((c) => ({
           id: `customer-${c.id}`,
           label: c.label,
-          description: c.sublabel,
+          description: formatPhone(c.sublabel),
           leftSection: <IconUser size={18} />,
           onClick: () => navigate(`/customers/${c.id}`),
         })),

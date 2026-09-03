@@ -93,6 +93,8 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
       stripePaymentIntentId: pi.id,
       status: "paid",
       paidAt: new Date(),
+      method: "stripe",
+      amountCents: pi.amount,
     };
     await ro.save();
   }

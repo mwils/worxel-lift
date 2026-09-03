@@ -3,6 +3,8 @@ import { Badge, Group, Paper, Stack, Text } from "@mantine/core";
 export interface ConversationMessage {
   id: string;
   direction: "in" | "out";
+  /** "system" notes (e.g. phone number changed) were never texted. */
+  kind?: "sms" | "system";
   body: string;
   sentAt: string | Date;
   aiDrafted?: boolean;
@@ -41,6 +43,13 @@ export function ConversationView({ messages, emptyText }: ConversationViewProps)
   return (
     <Stack gap="sm">
       {messages.map((m) => {
+        if (m.kind === "system") {
+          return (
+            <Text key={m.id} size="xs" c="dimmed" ta="center" px="md">
+              {m.body} · {fmtTime(m.sentAt)}
+            </Text>
+          );
+        }
         const outbound = m.direction === "out";
         return (
           <Group key={m.id} justify={outbound ? "flex-end" : "flex-start"} wrap="nowrap">

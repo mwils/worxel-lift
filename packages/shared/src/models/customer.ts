@@ -11,6 +11,20 @@ const CustomerSchema = new Schema(
     smsOptOutAt: Date,
     notes: String,
     stripeCustomerId: String,
+    // Prior numbers, newest last. The thread stays keyed by customerId, so
+    // this is how we know which texts went to which number.
+    phoneHistory: {
+      type: [
+        new Schema(
+          {
+            phone: { type: String, required: true }, // E.164
+            changedAt: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: undefined,
+    },
   },
   { timestamps: true }
 );

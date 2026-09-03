@@ -8,6 +8,9 @@ const MessageSchema = new Schema(
     repairOrderId: { type: Schema.Types.ObjectId, ref: "RepairOrder" },
 
     direction: { type: String, enum: ["in", "out"], required: true },
+    // "system" = a note in the thread that was never texted (e.g. "phone
+    // number changed"). Everything else is a real SMS.
+    kind: { type: String, enum: ["sms", "system"], default: "sms" },
     body: { type: String, required: true },
     mediaUrls: { type: [String], default: [] }, // s3 keys
 

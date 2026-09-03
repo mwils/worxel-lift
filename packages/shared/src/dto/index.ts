@@ -3,6 +3,7 @@ import {
   AI_TONES,
   INSPECTION_SEVERITIES,
   LINE_ITEM_KINDS,
+  MANUAL_PAYMENT_METHODS,
   MESSAGE_CLASSIFICATIONS,
   PAYMENT_STATUSES,
   RO_STATUSES,
@@ -35,6 +36,26 @@ export const e164 = z
     return `+1${digits}`;
   });
 export const money = z.number().int().nonnegative(); // cents
+
+// Free-text name/label fields: trim and collapse runs of whitespace so
+// "  Mike   Jones " never lands in the DB (and never breaks name search).
+const collapseWs = (s: string) => s.trim().replace(/\s+/g, " ");
+export const cleanText = z.string().transform(collapseWs);
+/** Required single-line text (non-empty after cleanup). */
+export const requiredText = cleanText.pipe(z.string().min(1, "Required"));
+/** Optional single-line text — blank after cleanup is treated as "not provided". */
+export const optionalText = cleanText.transform((s) => (s.length ? s : undefined)).optional();
+/** 17-char VIN, stored uppercase (I/O/Q aren't valid VIN characters but we
+ *  don't enforce that — NHTSA handles bad VINs with an error). */
+export const vin17 = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .length(17, "VIN must be 17 characters");
+/** Plate as stored for search: uppercase, letters and digits only. */
+export function normalizePlate(s: string | null | undefined): string {
+  return (s ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
 
 // ── auth ────────────────────────────────────────────────────────
 export const RequestMagicLinkDto = z.object({ email: z.string().email() });
@@ -105,6 +126,9 @@ export const UpdateShopDto = z.object({
       autoReplyEnabled: z.boolean().optional(),
       defaultLaborRate: money.optional(),
       serviceRemindersEnabled: z.boolean().optional(),
+      // Percent, e.g. 8.25. See Shop model comment.
+      taxRatePct: z.number().min(0).max(30).optional(),
+      taxLabor: z.boolean().optional(),
       booking: BookingSettingsDto.optional(),
     })
     .optional(),
@@ -115,15 +139,16 @@ export type BookingSettingsInput = z.infer<typeof BookingSettingsDto>;
 
 // ── customers ───────────────────────────────────────────────────
 export const CreateCustomerDto = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().optional(),
+  firstName: requiredText,
+  lastName: optionalText,
   phone: e164,
   email: z.string().email().optional(),
-  notes: z.string().optional(),
+  notes: z.string().trim().optional(),
 });
 // PATCH semantics: undefined leaves a field alone, null clears it.
 export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
-  lastName: z.string().nullable().optional(),
+  // Blank after cleanup clears the field, same as an explicit null.
+  lastName: cleanText.transform((s) => (s.length ? s : null)).nullable().optional(),
   email: z.string().email().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
@@ -131,19 +156,19 @@ export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
 // ── vehicles ────────────────────────────────────────────────────
 export const CreateVehicleDto = z.object({
   customerId: objectId,
-  vin: z.string().length(17).optional(),
+  vin: vin17.optional(),
   year: z.number().int().min(1900).max(2100).optional(),
-  make: z.string().optional(),
-  model: z.string().optional(),
-  trim: z.string().optional(),
-  engine: z.string().optional(),
+  make: optionalText,
+  model: optionalText,
+  trim: optionalText,
+  engine: optionalText,
   mileage: z.number().int().nonnegative().optional(),
-  plate: z.string().optional(),
-  color: z.string().optional(),
-  notes: z.string().optional(),
+  plate: optionalText,
+  color: optionalText,
+  notes: z.string().trim().optional(),
 });
 export const UpdateVehicleDto = CreateVehicleDto.partial();
-export const DecodeVinDto = z.object({ vin: z.string().length(17) });
+export const DecodeVinDto = z.object({ vin: vin17 });
 
 // ── repair orders ───────────────────────────────────────────────
 // Quantities must be > 0 when supplied — a 0h labor line or 0-qty part is a
@@ -172,6 +197,17 @@ export const UpdateRepairOrderDto = z.object({
   diagnosis: z.string().optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
 });
+
+// Owner records a non-Stripe payment (or reverses one they entered by
+// mistake). `paid: false` only unwinds a manual payment — Stripe-settled ROs
+// are refunded through Stripe, not here.
+export const MarkPaidDto = z.object({
+  paid: z.boolean().default(true),
+  method: z.enum(MANUAL_PAYMENT_METHODS).optional(),
+  amountCents: money.optional(), // defaults to the RO total server-side
+  note: z.string().max(200).optional(),
+});
+export type MarkPaidInput = z.infer<typeof MarkPaidDto>;
 
 export const PresignPhotoDto = z.object({
   contentType: z.string().regex(/^image\//),
@@ -338,15 +374,15 @@ export const DeclineEstimateDto = z.object({
 export const CreateBookingDto = z.object({
   start: z.string().datetime(),
   customer: z.object({
-    firstName: z.string().min(1).max(80),
-    lastName: z.string().max(80).optional(),
+    firstName: cleanText.pipe(z.string().min(1).max(80)),
+    lastName: cleanText.pipe(z.string().max(80)).optional(),
     phone: e164,
     email: z.string().email().optional(),
   }),
   vehicle: z.object({
     year: z.number().int().min(1900).max(2100),
-    make: z.string().min(1).max(40),
-    model: z.string().min(1).max(40),
+    make: cleanText.pipe(z.string().min(1).max(40)),
+    model: cleanText.pipe(z.string().min(1).max(40)),
   }),
   concern: z.string().min(3).max(500),
 });

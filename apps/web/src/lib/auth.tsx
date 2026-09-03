@@ -22,6 +22,9 @@ export interface Me {
       autoReplyEnabled: boolean;
       defaultLaborRate?: number | null;
       serviceRemindersEnabled?: boolean;
+      /** Sales tax percent (8.25 = 8.25%). Parts only unless `taxLabor`. */
+      taxRatePct?: number | null;
+      taxLabor?: boolean;
       booking?: BookingSettings;
       businessHours?: BookingHour[];
     };
