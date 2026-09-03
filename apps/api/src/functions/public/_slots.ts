@@ -72,7 +72,8 @@ export async function computeSlots(
   shop: SlotShop,
   fromYmd: string,
   toYmd: string,
-  now: Date
+  now: Date,
+  opts?: { ignoreRoId?: string }
 ): Promise<SlotDay[]> {
   const tz = shop.timezone || "America/Chicago";
   const cfg = readBookingConfig(shop);
@@ -89,14 +90,15 @@ export async function computeSlots(
   // immediately, and RO_OPEN_STATUSES already contains it, but be explicit so a
   // future tweak to the open set doesn't silently break slot math.
   const reserved = new Set<string>([...RESERVED_STATUSES, "scheduled"]);
-  const existing = await RepairOrder.find(
-    {
-      shopId: shop._id,
-      status: { $in: Array.from(reserved) },
-      scheduledFor: { $gte: fromDt.toJSDate(), $lt: windowEnd.toJSDate() },
-    },
-    { scheduledFor: 1, status: 1 }
-  ).lean();
+  const existingFilter: Record<string, unknown> = {
+    shopId: shop._id,
+    status: { $in: Array.from(reserved) },
+    scheduledFor: { $gte: fromDt.toJSDate(), $lt: windowEnd.toJSDate() },
+  };
+  // Reschedule flow: the booking being moved shouldn't count against its own
+  // slot, otherwise (with maxPerSlot=1) the customer's current time reads as full.
+  if (opts?.ignoreRoId) existingFilter._id = { $ne: opts.ignoreRoId };
+  const existing = await RepairOrder.find(existingFilter, { scheduledFor: 1, status: 1 }).lean();
 
   // Bucket counts by ISO UTC slot start.
   const buckets = new Map<string, number>();

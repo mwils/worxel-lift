@@ -9,6 +9,7 @@ import {
   Shop,
   User,
   Vehicle,
+  assemblePolishedEstimate,
   buildEstimatePrompt,
   buildEstimateTemplate,
   ESTIMATE_PROMPT_VERSION,
@@ -115,6 +116,7 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
       totalCents: ro.total ?? 0,
       approveLinkUrl,
       aiTone,
+      concern: ro.concern ?? undefined,
     };
 
     if (dto.draftOverride && dto.draftOverride.trim().length > 0) {
@@ -138,9 +140,15 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
           maxTokens: 400,
           temperature: 0.5,
         });
-        draft = invokeResult.text.trim();
-        aiDrafted = true;
-        promptVersion = ESTIMATE_PROMPT_VERSION;
+        // Model wrote only the opener; itemized lines, total and the
+        // "Approve:" link are assembled deterministically (QA M1).
+        const assembled = assemblePolishedEstimate(estimateInput, invokeResult.text);
+        if (assembled.usedFallback) {
+          console.warn("[ro/sendEstimate] estimate polish unusable, fell back to template");
+        }
+        draft = assembled.sms;
+        aiDrafted = !assembled.usedFallback;
+        promptVersion = aiDrafted ? ESTIMATE_PROMPT_VERSION : TEMPLATE_VERSION;
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
         throw err;
