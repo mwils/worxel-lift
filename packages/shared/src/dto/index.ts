@@ -3,6 +3,7 @@ import {
   AI_TONES,
   INSPECTION_SEVERITIES,
   LINE_ITEM_KINDS,
+  MANUAL_PAYMENT_METHODS,
   MESSAGE_CLASSIFICATIONS,
   PAYMENT_STATUSES,
   RO_STATUSES,
@@ -105,6 +106,9 @@ export const UpdateShopDto = z.object({
       autoReplyEnabled: z.boolean().optional(),
       defaultLaborRate: money.optional(),
       serviceRemindersEnabled: z.boolean().optional(),
+      // Percent, e.g. 8.25. See Shop model comment.
+      taxRatePct: z.number().min(0).max(30).optional(),
+      taxLabor: z.boolean().optional(),
       booking: BookingSettingsDto.optional(),
     })
     .optional(),
@@ -170,6 +174,17 @@ export const UpdateRepairOrderDto = z.object({
   diagnosis: z.string().optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
 });
+
+// Owner records a non-Stripe payment (or reverses one they entered by
+// mistake). `paid: false` only unwinds a manual payment — Stripe-settled ROs
+// are refunded through Stripe, not here.
+export const MarkPaidDto = z.object({
+  paid: z.boolean().default(true),
+  method: z.enum(MANUAL_PAYMENT_METHODS).optional(),
+  amountCents: money.optional(), // defaults to the RO total server-side
+  note: z.string().max(200).optional(),
+});
+export type MarkPaidInput = z.infer<typeof MarkPaidDto>;
 
 export const PresignPhotoDto = z.object({
   contentType: z.string().regex(/^image\//),

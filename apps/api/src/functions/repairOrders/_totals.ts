@@ -1,3 +1,5 @@
+import { Shop } from "@lift/shared";
+
 export interface LineItemLike {
   _id?: unknown;
   kind: string;
@@ -40,19 +42,65 @@ export function computeLineItemTotal(li: PartialLineItem): number {
   return Math.round(li.unitPrice ?? 0);
 }
 
+/** Shop tax settings, as stored on `shop.settings`. `ratePct` is a percent (8.25 = 8.25%). */
+export interface TaxConfig {
+  ratePct: number;
+  taxLabor: boolean;
+}
+
 /**
- * Recompute laborTotal / partsTotal / total from the RO's current line items.
- * "fee" items roll into partsTotal — they're flat-line, not labor — so the
- * board still shows the right grand total. Tax is unmanaged in v1.
+ * Recompute laborTotal / partsTotal / taxTotal / total from the RO's current
+ * line items. "fee" items roll into partsTotal — they're flat-line, not labor —
+ * so the board still shows the right grand total.
+ *
+ * Tax applies to `part` items (never fees), plus labor when the shop has
+ * `taxLabor` on. Rounded to the cent. No tax config → taxTotal 0.
  */
 export function recomputeTotals(
-  items: LineItemLike[]
-): { laborTotal: number; partsTotal: number; total: number } {
+  items: LineItemLike[],
+  tax?: TaxConfig | null
+): { laborTotal: number; partsTotal: number; taxTotal: number; total: number } {
   let laborTotal = 0;
   let partsTotal = 0;
+  let taxableParts = 0;
   for (const item of items) {
     if (item.kind === "labor") laborTotal += item.total;
     else partsTotal += item.total;
+    if (item.kind === "part") taxableParts += item.total;
   }
-  return { laborTotal, partsTotal, total: laborTotal + partsTotal };
+  const rate = tax?.ratePct ?? 0;
+  const taxable = taxableParts + (tax?.taxLabor ? laborTotal : 0);
+  const taxTotal = rate > 0 ? Math.round((taxable * rate) / 100) : 0;
+  return { laborTotal, partsTotal, taxTotal, total: laborTotal + partsTotal + taxTotal };
+}
+
+/** Read the shop's tax settings; null when no tax is configured. */
+export async function loadTaxConfig(shopId: unknown): Promise<TaxConfig | null> {
+  const shop = await Shop.findById(shopId).select("settings.taxRatePct settings.taxLabor").lean();
+  const ratePct = shop?.settings?.taxRatePct ?? 0;
+  if (!ratePct || ratePct <= 0) return null;
+  return { ratePct, taxLabor: shop?.settings?.taxLabor === true };
+}
+
+/**
+ * Recompute and write the four totals onto a (mutable) RO document from its
+ * current line items, using the shop's tax settings. Caller still `save()`s.
+ */
+export async function applyRoTotals(
+  ro: {
+    shopId: unknown;
+    lineItems: unknown;
+    laborTotal?: number;
+    partsTotal?: number;
+    taxTotal?: number;
+    total?: number;
+  },
+  shopId: unknown = ro.shopId
+): Promise<void> {
+  const tax = await loadTaxConfig(shopId);
+  const totals = recomputeTotals(ro.lineItems as LineItemLike[], tax);
+  ro.laborTotal = totals.laborTotal;
+  ro.partsTotal = totals.partsTotal;
+  ro.taxTotal = totals.taxTotal;
+  ro.total = totals.total;
 }

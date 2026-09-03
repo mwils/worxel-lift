@@ -2,7 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { LineItemDto, RepairOrder, UpdateLineItemDto } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound, ok } from "../../lib/response.js";
-import { recomputeTotals, type LineItemLike } from "./_totals.js";
+import { applyRoTotals, type LineItemLike } from "./_totals.js";
 
 function serializeLineItem(li: LineItemLike) {
   return {
@@ -29,10 +29,7 @@ export const createHandler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, 
     if (!ro) return notFound("Repair order not found");
 
     ro.lineItems.push(dto as any);
-    const totals = recomputeTotals(ro.lineItems as unknown as LineItemLike[]);
-    ro.laborTotal = totals.laborTotal;
-    ro.partsTotal = totals.partsTotal;
-    ro.total = totals.total;
+    await applyRoTotals(ro, user.shopId);
     await ro.save();
 
     const created_ = ro.lineItems[ro.lineItems.length - 1] as unknown as LineItemLike;
@@ -76,10 +73,7 @@ export const patchHandler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, u
     if (dto.unitPrice !== undefined) li.unitPrice = dto.unitPrice;
     if (dto.total !== undefined) li.total = dto.total;
 
-    const totals = recomputeTotals(ro.lineItems as unknown as LineItemLike[]);
-    ro.laborTotal = totals.laborTotal;
-    ro.partsTotal = totals.partsTotal;
-    ro.total = totals.total;
+    await applyRoTotals(ro, user.shopId);
     await ro.save();
 
     return ok({
@@ -112,10 +106,7 @@ export const deleteHandler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, 
     if (!li) return notFound("Line item not found");
     li.deleteOne();
 
-    const totals = recomputeTotals(ro.lineItems as unknown as LineItemLike[]);
-    ro.laborTotal = totals.laborTotal;
-    ro.partsTotal = totals.partsTotal;
-    ro.total = totals.total;
+    await applyRoTotals(ro, user.shopId);
     await ro.save();
 
     return ok({
