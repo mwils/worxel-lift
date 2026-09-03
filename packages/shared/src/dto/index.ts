@@ -146,12 +146,14 @@ export const UpdateVehicleDto = CreateVehicleDto.partial();
 export const DecodeVinDto = z.object({ vin: z.string().length(17) });
 
 // ── repair orders ───────────────────────────────────────────────
+// Quantities must be > 0 when supplied — a 0h labor line or 0-qty part is a
+// $0.00 row that only ever comes from a typo. Prices (`money`) may be $0.
 export const LineItemDto = z.object({
   kind: z.enum(LINE_ITEM_KINDS),
   description: z.string().min(1),
-  hours: z.number().nonnegative().optional(),
+  hours: z.number().positive().optional(),
   rate: money.optional(),
-  qty: z.number().nonnegative().optional(),
+  qty: z.number().positive().optional(),
   unitPrice: money.optional(),
   total: money,
 });
