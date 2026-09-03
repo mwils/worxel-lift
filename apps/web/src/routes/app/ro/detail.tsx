@@ -27,7 +27,7 @@ import {
   IconChecklist,
   IconCalendarEvent,
 } from "@tabler/icons-react";
-import { RO_STATUSES, type RoStatus } from "@lift/shared/constants";
+import { RO_STATUSES, RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import {
@@ -45,6 +45,7 @@ import {
   type LineItemDraft,
   type LineItemRow,
 } from "../../../features/ro/LineItemEditor";
+import { NoteCard } from "../../../features/ro/NoteCard";
 import { PhotoCapture, type CapturedPhoto } from "../../../features/ro/PhotoCapture";
 import { PhotoGallery, type GalleryPhoto } from "../../../features/ro/PhotoGallery";
 import { VoiceCapture, type VoiceDraft } from "../../../features/ro/VoiceCapture";
@@ -94,7 +95,7 @@ interface LineItemMutationResp {
   totals: { laborTotal: number; partsTotal: number; taxTotal: number; total: number };
 }
 
-const STATUS_OPTIONS = RO_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+const STATUS_OPTIONS = RO_STATUSES.map((s) => ({ value: s, label: RO_STATUS_LABELS[s] }));
 
 export function RoDetailRoute() {
   const { id } = useParams<{ id: string }>();
@@ -117,7 +118,14 @@ export function RoDetailRoute() {
   const { data, isPending } = roQ;
 
   const patchRo = useMutation({
-    mutationFn: (patch: Partial<{ status: RoStatus; scheduledFor: string | null }>) =>
+    mutationFn: (
+      patch: Partial<{
+        status: RoStatus;
+        scheduledFor: string | null;
+        concern: string;
+        diagnosis: string;
+      }>
+    ) =>
       api.patch(`/repair-orders/${id}`, patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ro", id] });
@@ -496,14 +504,23 @@ export function RoDetailRoute() {
         </Stack>
       </Group>
 
-      {ro.concern && (
-        <Card withBorder>
-          <Text size="sm" c="dimmed">
-            Concern
-          </Text>
-          <Text>{ro.concern}</Text>
-        </Card>
-      )}
+      {/* Always present — quick/voice flows may create an RO with these blank. */}
+      <NoteCard
+        label="Concern"
+        value={ro.concern}
+        addLabel="Add concern"
+        placeholder="What the customer reported…"
+        saving={patchRo.isPending}
+        onSave={(concern) => patchRo.mutateAsync({ concern })}
+      />
+      <NoteCard
+        label="Diagnosis"
+        value={ro.diagnosis}
+        addLabel="Add diagnosis"
+        placeholder="What you found…"
+        saving={patchRo.isPending}
+        onSave={(diagnosis) => patchRo.mutateAsync({ diagnosis })}
+      />
 
       <Stack gap="xs">
         <Group justify="space-between">

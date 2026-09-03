@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Badge, Card, Collapse, Group, Stack, Text, UnstyledButton } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
+import { RO_STATUS_LABELS } from "@lift/shared/constants";
 import { formatMoney, formatRoNumber, relativeTime } from "../../lib/format";
 
 interface LineItem {
@@ -74,7 +75,7 @@ export function RepairOrderTimelineCard({ ro }: { ro: RepairOrder }) {
               {formatRoNumber(ro.number)}
             </Text>
             <Badge variant="light" size="sm">
-              {ro.status}
+              {(RO_STATUS_LABELS as Record<string, string>)[ro.status] ?? ro.status}
             </Badge>
             {ro.paymentStatus === "paid" && (
               <Badge variant="light" color="green" size="sm">
