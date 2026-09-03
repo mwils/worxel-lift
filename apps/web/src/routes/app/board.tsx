@@ -1,5 +1,5 @@
 import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader } from "@mantine/core";
-import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp, IconCash } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ interface BoardRO {
   customerName: string;
   vehicleSummary: string;
   total: number;
+  paymentStatus?: "unpaid" | "authorized" | "paid" | "refunded";
   updatedAt: string;
   scheduledFor: string | null;
 }
@@ -122,7 +123,10 @@ export function BoardRoute() {
                   <Card key={ro.id} component={Link as any} to={`/ro/${ro.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                     <Group justify="space-between">
                       <Text fw={600}>{formatRoNumber(ro.number)}</Text>
-                      <Text size="sm">{formatMoney(ro.total)}</Text>
+                      <Group gap={6} wrap="nowrap">
+                        <PaidMark ro={ro} />
+                        <Text size="sm">{formatMoney(ro.total)}</Text>
+                      </Group>
                     </Group>
                     <Text size="sm">{ro.customerName}</Text>
                     {ro.status === "scheduled" && <VisitLine ro={ro} tz={tz} />}
@@ -173,7 +177,10 @@ export function BoardRoute() {
                     >
                       <Group justify="space-between">
                         <Text fw={600}>{formatRoNumber(ro.number)}</Text>
-                        <Text size="sm">{formatMoney(ro.total)}</Text>
+                        <Group gap={6} wrap="nowrap">
+                          <PaidMark ro={ro} />
+                          <Text size="sm">{formatMoney(ro.total)}</Text>
+                        </Group>
                       </Group>
                       <Text size="sm">{ro.customerName}</Text>
                       <Group justify="space-between" mt={2}>
@@ -192,6 +199,28 @@ export function BoardRoute() {
         </>
       )}
     </Stack>
+  );
+}
+
+/**
+ * Paid / unpaid at a glance. Quiet until it matters: a paid RO gets a small
+ * teal mark; an unpaid one only shouts once the car is Ready or already gone.
+ */
+function PaidMark({ ro }: { ro: BoardRO }) {
+  if (ro.total <= 0) return null;
+  if (ro.paymentStatus === "paid") {
+    return (
+      <Badge size="xs" variant="light" color="teal" leftSection={<IconCash size={10} />}>
+        Paid
+      </Badge>
+    );
+  }
+  const loud = ro.status === "ready" || ro.status === "picked_up";
+  if (!loud) return null;
+  return (
+    <Badge size="xs" variant="light" color="orange">
+      Unpaid
+    </Badge>
   );
 }
 

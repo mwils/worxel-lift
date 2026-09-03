@@ -49,6 +49,11 @@ const ShopSchema = new Schema(
       aiTone: { type: String, enum: ["plain", "friendly"], default: "plain" },
       autoReplyEnabled: { type: Boolean, default: true },
       defaultLaborRate: { type: Number }, // cents per hour; set by owner on first template create
+      // Sales tax as a PERCENT with up to 3 decimals (8.25 = 8.25%). Applied
+      // to `part` line items; labor too when `taxLabor` is on. Fees are never
+      // taxed. Recomputed whenever line items change — not retroactively.
+      taxRatePct: { type: Number, default: 0, min: 0, max: 30 },
+      taxLabor: { type: Boolean, default: false },
       // Kill switch for service-due reminders. Defaults on; flipped off in
       // Settings if Mike wants to handle follow-ups manually.
       serviceRemindersEnabled: { type: Boolean, default: true },

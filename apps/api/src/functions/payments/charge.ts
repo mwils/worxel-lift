@@ -101,6 +101,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       stripePaymentIntentId: intent.id,
       status: succeeded ? "paid" : "authorized",
       paidAt: succeeded ? new Date() : ro.payment?.paidAt,
+      method: "stripe",
+      amountCents: ro.total,
     };
     await ro.save();
 
