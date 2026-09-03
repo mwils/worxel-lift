@@ -10,7 +10,13 @@ All 32 items resolved in code on `cycle/10dlc-resubmission` (merge `daeb609` and
 - **Deploy:** new Lambda route `POST /repair-orders/{id}/mark-paid`; new shop fields (`phone`, `settings.taxRatePct`, `settings.taxLabor`), RO fields (`estimate.approvedTotal/approvedLineItems/viewedAt`, `payment.method/amountCents/note`), vehicle `plateNormalized`, customer `phoneHistory`, message `kind/automated/deliveryStatus`. All optional; no migration required.
 - **Vehicle backfill (once, against prod):** `MONGODB_URI="<MongodbUri secret>" pnpm --filter @lift/api exec tsx scripts/backfillVehicleSearchFields.ts` (dry run), then add `--apply`. Fills `plateNormalized`, uppercases VINs, title-cases ALL-CAPS makes. Search works before the backfill via a JS fallback.
 - **Existing shops:** untrimmed names, lowercase states, `America/Chicago` and stale `optInScript` persist until the owner saves the Shop profile once in Settings. For the test shop, do that first.
-- **SMS delivery receipts (L6):** create an End User Messaging configuration set with an SNS event destination (TEXT_ALL → `SmsDeliveryTopic`), then export `SMS_CONFIGURATION_SET=<name>` in the deploying shell before `sst deploy`. Without it, every message stays "sent".
+- **SMS delivery receipts (L6):** done for the dev stage on 2026-09-03. Configuration set `lift-dev-sms-events` has an SNS event destination (TEXT_ALL → `SmsDeliveryTopic`); `sst.config.ts` defaults `SMS_CONFIGURATION_SET` to `lift-<stage>-sms-events`. For a new stage, create the set once:
+  ```
+  aws pinpoint-sms-voice-v2 create-configuration-set --configuration-set-name lift-<stage>-sms-events
+  aws pinpoint-sms-voice-v2 create-event-destination --configuration-set-name lift-<stage>-sms-events \
+    --event-destination-name sns-delivery --matching-event-types TEXT_ALL \
+    --sns-destination TopicArn=<SmsDeliveryTopic ARN from `aws sns list-topics`>
+  ```
 - **Prompt versions:** `estimate.v2`, `freeform.v2`.
 
 ### Behavior changes worth a look during retest

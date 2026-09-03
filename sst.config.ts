@@ -160,12 +160,11 @@ export default $config({
       // Flip back to "1" to route outbound through SES email mocks again.
       MOCK_SMS: "0",
       // End User Messaging configuration set whose SNS event destination is
-      // SmsDeliveryTopic. Empty = sends carry no configuration set and the
-      // thread never learns whether a text was delivered or bounced. Create
-      // the set + event destination (event types TEXT_ALL → the topic) in the
-      // End User Messaging console, then export SMS_CONFIGURATION_SET=<name>
-      // in the deploying shell.
-      SMS_CONFIGURATION_SET: process.env.SMS_CONFIGURATION_SET ?? "",
+      // SmsDeliveryTopic. Sends carry this name so TEXT_DELIVERED / TEXT_*
+      // receipts reach the snsDelivery Lambda. The set is NOT managed here —
+      // create it once per stage (see docs/QA-2026-09-03-production-walkthrough.md
+      // Follow-ups). Override with SMS_CONFIGURATION_SET in the shell if needed.
+      SMS_CONFIGURATION_SET: process.env.SMS_CONFIGURATION_SET ?? `lift-${$app.stage}-sms-events`,
       WEB_APP_URL: urls.web,
       MARKETING_URL: urls.marketing,
       API_URL: urls.api,
