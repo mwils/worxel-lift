@@ -10,7 +10,6 @@ import {
   SHOP_SLUG_REGEX,
   USER_ROLES,
   US_STATE_CODES,
-  collapseWhitespace,
   isValidTimezone,
   slugifyShopName,
 } from "../constants.js";
@@ -39,12 +38,7 @@ export const e164 = z
     return `+1${digits}`;
   });
 export const money = z.number().int().nonnegative(); // cents
-// Free text that gets trimmed with internal whitespace collapsed, so a shop
-// name typed as "  Mike's   Auto " never reaches an SMS as-is.
-export const cleanText = z.string().transform(collapseWhitespace);
 const blankToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
-// Optional free text: blank input clears the field instead of storing "".
-export const optionalCleanText = z.preprocess(blankToUndefined, cleanText.optional());
 // Two-letter US state code. Uppercased, then checked against the code list —
 // "sc" → "SC"; "south carolina" is rejected with a plain message.
 export const usState = z.preprocess(
@@ -98,11 +92,11 @@ export const InviteMemberDto = z.object({
 export const ShopNameDto = cleanText.pipe(z.string().min(2, "Shop name needs at least 2 characters"));
 export const ShopAddressDto = z
   .object({
-    line1: optionalCleanText,
-    line2: optionalCleanText,
-    city: optionalCleanText,
+    line1: optionalText,
+    line2: optionalText,
+    city: optionalText,
     state: usState,
-    zip: optionalCleanText,
+    zip: optionalText,
   })
   .optional();
 
