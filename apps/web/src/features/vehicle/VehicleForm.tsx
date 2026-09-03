@@ -159,6 +159,7 @@ export function VehicleForm({
               placeholder="17 chars"
               maxLength={17}
               {...form.getInputProps("vin")}
+              onChange={(e) => form.setFieldValue("vin", e.currentTarget.value.toUpperCase())}
             />
             <Group justify="flex-end">
               {scanSupported && (
@@ -189,6 +190,7 @@ export function VehicleForm({
               maxLength={17}
               style={{ flex: 1 }}
               {...form.getInputProps("vin")}
+              onChange={(e) => form.setFieldValue("vin", e.currentTarget.value.toUpperCase())}
             />
             {scanSupported && (
               <Button

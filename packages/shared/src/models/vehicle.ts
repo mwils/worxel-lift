@@ -12,6 +12,10 @@ const VehicleSchema = new Schema(
     engine: String,
     mileage: Number,
     plate: String,
+    // `plate` with everything but letters/digits stripped, uppercased — see
+    // normalizePlate() in dto. Search runs against this so "KLM-4471",
+    // "klm4471" and "SC KLM-4471" all find the same car.
+    plateNormalized: String,
     color: String,
     notes: String,
   },
@@ -21,6 +25,7 @@ const VehicleSchema = new Schema(
 VehicleSchema.index({ shopId: 1, customerId: 1 });
 VehicleSchema.index({ shopId: 1, vin: 1 }, { sparse: true });
 VehicleSchema.index({ shopId: 1, plate: 1 }, { sparse: true });
+VehicleSchema.index({ shopId: 1, plateNormalized: 1 }, { sparse: true });
 
 export type VehicleDoc = InferSchemaType<typeof VehicleSchema> & { _id: mongoose.Types.ObjectId };
 

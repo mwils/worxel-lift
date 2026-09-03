@@ -1,4 +1,4 @@
-import { Customer, Vehicle } from "@lift/shared";
+import { Customer, Vehicle, normalizePlate } from "@lift/shared";
 
 export interface VehicleMatchCandidate {
   id: string;
@@ -76,11 +76,13 @@ export async function matchVehicle(
     }
   }
 
-  // 2. Plate.
+  // 2. Plate — compared on the normalized form (letters/digits, uppercase).
   if (input.plate && out.length < 3) {
-    const plate = input.plate.replace(/\s+/g, "").toUpperCase();
-    const doc = await Vehicle.findOne({ shopId: input.shopId, plate }).lean();
-    if (doc) await push(doc, "exact");
+    const plateNormalized = normalizePlate(input.plate);
+    if (plateNormalized) {
+      const doc = await Vehicle.findOne({ shopId: input.shopId, plateNormalized }).lean();
+      if (doc) await push(doc, "exact");
+    }
   }
 
   // 3. Fuzzy: same customer + year/make/model.
