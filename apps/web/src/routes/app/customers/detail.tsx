@@ -33,6 +33,7 @@ import { CustomerRemindersPanel } from "../../../features/reminders/CustomerRemi
 import type { z } from "zod";
 import type { CreateVehicleDto } from "@lift/shared/dto";
 import type { CreateCustomerInput } from "@lift/shared/dto";
+import { RO_STATUS_LABELS } from "@lift/shared/constants";
 
 interface CustomerHistory {
   customer: {
@@ -149,16 +150,6 @@ export function CustomerDetailRoute() {
         </Button>
       </Stack>
     );
-
-  const STATUS_LABEL: Record<string, string> = {
-    scheduled: "Scheduled",
-    in: "In",
-    diagnosing: "Diagnosing",
-    awaiting_parts: "Awaiting parts",
-    in_repair: "In repair",
-    ready: "Ready",
-    picked_up: "Picked up",
-  };
 
   const { customer, stats, vehicles, recentRepairOrders, recentMessages } = data;
   const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(" ");
@@ -297,7 +288,7 @@ export function CustomerDetailRoute() {
                 <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
                   <Text fw={600}>{formatRoNumber(r.number)}</Text>
                   <Badge variant="light" size="sm">
-                    {STATUS_LABEL[r.status] ?? r.status}
+                    {(RO_STATUS_LABELS as Record<string, string>)[r.status] ?? r.status}
                   </Badge>
                   {r.paymentStatus === "paid" && (
                     <Badge variant="light" color="green" size="sm">

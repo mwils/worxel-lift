@@ -167,12 +167,14 @@ export const UpdateVehicleDto = CreateVehicleDto.partial();
 export const DecodeVinDto = z.object({ vin: vin17 });
 
 // ── repair orders ───────────────────────────────────────────────
+// Quantities must be > 0 when supplied — a 0h labor line or 0-qty part is a
+// $0.00 row that only ever comes from a typo. Prices (`money`) may be $0.
 export const LineItemDto = z.object({
   kind: z.enum(LINE_ITEM_KINDS),
   description: z.string().min(1),
-  hours: z.number().nonnegative().optional(),
+  hours: z.number().positive().optional(),
   rate: money.optional(),
-  qty: z.number().nonnegative().optional(),
+  qty: z.number().positive().optional(),
   unitPrice: money.optional(),
   total: money,
 });
@@ -377,6 +379,8 @@ export const RescheduleBookingDto = z.object({
 export const BookSlotsQueryDto = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "from must be YYYY-MM-DD"),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "to must be YYYY-MM-DD"),
+  /** Manage token of a booking being rescheduled — its RO is left out of slot capacity. */
+  exclude: z.string().min(1).max(128).optional(),
 });
 
 export type CreateBookingInput = z.infer<typeof CreateBookingDto>;

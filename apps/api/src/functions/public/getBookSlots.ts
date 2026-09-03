@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { DateTime } from "luxon";
-import { Shop } from "@lift/shared";
+import { RepairOrder, Shop } from "@lift/shared";
 import { BOOKING_DEFAULTS } from "@lift/shared/constants";
 import { BookSlotsQueryDto } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withErrorBoundary } from "../../lib/middleware.js";
@@ -35,7 +35,19 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       );
     }
 
-    const days = await computeSlots(shop, q.from, q.to, new Date());
+    // Reschedule flow passes the booking's manage token so its own RO doesn't
+    // count against slot capacity. Scoped to this shop so a token can't probe
+    // another shop's calendar.
+    let ignoreRoId: string | undefined;
+    if (q.exclude) {
+      const own = await RepairOrder.findOne(
+        { bookingToken: q.exclude, shopId: shop._id },
+        { _id: 1 }
+      ).lean();
+      if (own) ignoreRoId = String(own._id);
+    }
+
+    const days = await computeSlots(shop, q.from, q.to, new Date(), { ignoreRoId });
     return ok({
       timezone: tz,
       slotMinutes: cfg.slotMinutes ?? BOOKING_DEFAULTS.slotMinutes,
