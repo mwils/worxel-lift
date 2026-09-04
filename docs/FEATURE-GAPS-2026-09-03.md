@@ -1,6 +1,8 @@
 # Lift — post-QA feature gaps (2026-09-03)
 
-Context for the agent working this: these are missing capabilities a 1–3 bay shop owner ("Mike", see `docs/PERSONA.md`) will ask for in the first month, identified during a live-user walkthrough of production. None are on the v2 deferred list in `docs/PLAN.md`. Each item states the user problem, what exists today, scope boundaries, and a suggested shape. The shape is a suggestion — if the codebase points a different way, say so before building. Work in the order given; items 1–4 are prerequisites for 5–7.
+Context for the agent working this: these are missing capabilities a 1–3 bay shop owner ("Mike", see `docs/PERSONA.md`) will ask for in the first month, identified during a live-user walkthrough of production. None are on the v2 deferred list in `docs/PLAN.md`. Items 1–8 are capability gaps found during the walkthrough. Items 9–12 are scale/longevity
+gaps — things that work fine today and degrade over a year at five cars a day. Each item states
+the user problem, what exists today, scope boundaries, and a suggested shape. The shape is a suggestion — if the codebase points a different way, say so before building. Work in the order given; items 1–4 are prerequisites for 5–7.
 
 Conventions apply throughout (CLAUDE.md): money in cents, `shopId` from session, shared Zod DTOs, `withAuth` / `withErrorBoundary`, public pages token-scoped and unauthenticated.
 
@@ -42,7 +44,14 @@ Conventions apply throughout (CLAUDE.md): money in cents, `shopId` from session,
 
 ---
 
-## 3. Shop profile in Settings
+## 3. Shop profile in Settings — ALREADY SHIPPED (round-1 QA fixes, 2026-09-03)
+
+**Status: done.** Delivered as part of the QA H3/H4 fixes: Settings → Shop profile now has
+name, address, suite, city, state (dropdown), ZIP, shop phone, and timezone (US select +
+"Other"), with trim-on-save. Verified in production. Left here for the record; the scope
+below is satisfied except *business hours*, which still live only under the booking section —
+confirm whether bookable hours should default from a separate shop-hours field or stay as-is.
+
 
 **User problem.** Shop name, address, phone, hours, and timezone are set once at onboarding (name/city/state only) and can never be changed. Untrimmed name leaks into SMS (QA H3); timezone is wrong (QA H4); receipts and public pages have no shop contact info.
 
@@ -137,6 +146,87 @@ Conventions apply throughout (CLAUDE.md): money in cents, `shopId` from session,
 
 ---
 
+## 9. Recently closed / board backlog — the first thing that breaks at scale
+
+**User problem.** "Recently closed" is a collapsed accordion under the board with no date
+filter and no pagination, and it is currently the *only* path from the board to finished
+work. At five cars a day it holds ~1,250 ROs after a year. This is the first scale problem a
+real shop hits — probably month two, well before anything else on this list.
+
+**Exists today.** Accordion on the board; customer page "Recent activity"; global search.
+
+**Scope.**
+- Cap the accordion at the last 10 closed ROs with a "See all →" link into the RO history
+  page (item 4). That link is the whole fix; the history page does the work.
+- If item 4 is not built yet, at minimum paginate the accordion and add a date-range filter.
+
+**Out of scope.** Rebuilding the board itself — the board is correct. It only shows open
+work, so it looks the same in year two as in week one. Do not add closed work to it.
+
+---
+
+## 10. Message inbox at 800 customers
+
+**User problem.** The inbox is a flat list of threads ordered by recency, with no unread
+state, no "needs reply", no search, and no way to close or archive a thread. Every customer
+who has ever texted stays in the list forever, and auto-replies keep bumping resolved threads
+back to the top. For a product whose pitch is "the texts handle themselves," this is the
+screen that will feel worst after a year.
+
+**Exists today.** `/messages` Inbox + Reminders tabs; thread view; Draft with AI.
+
+**Scope.**
+- Unread state per thread (inbound message since the shop last opened it) and an
+  **Unread / Needs reply / All** filter. "Needs reply" = last message is inbound and was not
+  auto-answered — that is the queue Mike actually works.
+- Search across message bodies and customer names.
+- Mark a thread done / archive it; archived threads return to the top on a new inbound.
+- Auto-replied threads should not bump to the top unless the reply failed or the message was
+  classified as something other than a status check.
+- Paginate (cursor); do not load every thread.
+
+**Out of scope.** Team assignment of threads, canned-response library, MMS gallery.
+
+---
+
+## 11. Customer and vehicle records over years
+
+**User problem.** A regular on their fifteenth visit has 60+ messages and 15 ROs on one page
+behind "Show 6" expanders with no search and no grouping. Vehicles accumulate (sold cars,
+one-time customers) with no archive. Online booking creates near-duplicate customers when the
+same person types their name slightly differently, and there is no merge.
+
+**Exists today.** Customer page with Recent activity + Recent messages expanders; vehicle
+cards; no archive, no merge, no dedupe.
+
+**Scope.**
+- Customer page: paginate activity and messages, group by year, and default to the last 12
+  months with "Show older".
+- Duplicate detection on customer create (online booking and manual): match on normalized
+  phone first, then fuzzy name + vehicle VIN. Offer "Is this the same Dale O'Brien-Reyes?"
+  rather than silently merging.
+- **Merge customers** (pick a survivor; move vehicles, ROs, messages, payments; keep both
+  names as aliases). Irreversible — confirm explicitly.
+- **Archive a vehicle** (sold / totalled): hidden from pickers and reminders, still attached
+  to its historical ROs.
+
+**Out of scope.** Household/family grouping, company accounts (that is fleet — deferred).
+
+---
+
+## 12. Search and reminders at volume
+
+**User problem.** Global search returns a flat, ungrouped list — at 800 customers, "Smith"
+is a long undifferentiated scroll. The reminders queue (Pending / Sent / Dismissed) has no
+pagination and accrues a year of nudges.
+
+**Scope.**
+- Group global search results by type (Customers / Vehicles / Repair orders) with counts, and
+  make RO numbers searchable ("0142" → RO-0142).
+- Paginate reminders; add a date filter; bulk-dismiss.
+
+**Out of scope.** Fuzzy/typo-tolerant search, saved searches.
+
 ## Explicitly not doing (keep saying no)
 - Customer logins / accounts with passwords
 - Fleet or B2B billing, statements, net terms (Dale's "3 trucks" is the pull; resist)
@@ -145,4 +235,21 @@ Conventions apply throughout (CLAUDE.md): money in cents, `shopId` from session,
 - Anything on the PLAN.md "Explicitly deferred (v2+)" list
 
 ## Order of work
-1 → 2 → 3 → 4 → 5 → 6 → 7 → 8. Items 1–3 change shared data (payments, tax, shop profile) that everything after reads; land and deploy them first.
+
+**1 → 2 → 4 → 9 → 3 → 5 → 6 → 10 → 7 → 8 → 11 → 12.**
+
+Items 1 and 2 change shared data (payments, tax) that everything after reads — land and
+deploy them first. **Item 4 (RO history) moved ahead of item 3**: it is the single highest-value
+build here because it answers three separate questions at once — where did that job go, what
+did the customer pay, and how did I do this month — and there is no workaround for any of them
+today. Item 9 is a two-line change once item 4 exists, so it rides along behind it.
+
+Items 9–12 are the "year two" set, added 2026-09-03 after asking how the UI holds up at five
+cars a day for a year. They are not urgent for a shop in week one, and every one of them
+becomes urgent somewhere between month two and month twelve. Item 10 (inbox) is the one that
+will generate complaints soonest after item 9, because auto-replies keep bumping resolved
+threads.
+
+Note that none of items 9–12 require changing the board. The board only ever shows open work,
+so it looks the same in year two as in week one — that is the best structural decision in the
+product and it should stay that way.
