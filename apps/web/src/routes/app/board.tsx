@@ -1,5 +1,5 @@
-import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader, Skeleton } from "@mantine/core";
-import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp, IconCash } from "@tabler/icons-react";
+import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader, Skeleton, Alert, Anchor } from "@mantine/core";
+import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp, IconCash, IconMessageCircle } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +20,9 @@ interface BoardRO {
   paymentStatus?: "unpaid" | "authorized" | "paid" | "refunded";
   updatedAt: string;
   scheduledFor: string | null;
+  // Null unless the customer declined the estimate and hasn't since approved.
+  estimateDeclinedAt?: string | null;
+  estimateDeclineFollowedUpAt?: string | null;
 }
 
 // Closed = off the board but not out of the books. Muted colors on purpose —
@@ -87,6 +90,12 @@ export function BoardRoute() {
     return a.scheduledFor.localeCompare(b.scheduledFor);
   });
 
+  // Declined estimates nobody has texted back about. A silent decline is a
+  // lost job unless the owner notices — so it can't hide inside a card.
+  const needsReply = (data?.ros ?? []).filter(
+    (ro) => ro.estimateDeclinedAt && !ro.estimateDeclineFollowedUpAt
+  );
+
   return (
     <Stack>
       <Group justify="space-between">
@@ -97,6 +106,28 @@ export function BoardRoute() {
       </Group>
 
       <StarterLibraryPrompt />
+
+      {needsReply.length > 0 && (
+        <Alert
+          color="red"
+          variant="light"
+          icon={<IconMessageCircle size={18} />}
+          title={`${needsReply.length} declined estimate${needsReply.length === 1 ? "" : "s"} need${
+            needsReply.length === 1 ? "s" : ""
+          } a reply`}
+        >
+          <Stack gap={2}>
+            {needsReply.map((ro) => (
+              <Text key={ro.id} size="sm">
+                <Anchor component={Link} to={`/ro/${ro.id}`} size="sm" fw={600}>
+                  {formatRoNumber(ro.number)}
+                </Anchor>{" "}
+                · {ro.customerName} · {formatMoney(ro.total)}
+              </Text>
+            ))}
+          </Stack>
+        </Alert>
+      )}
 
       {isPending ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md" aria-busy="true" aria-label="Loading board">
@@ -143,6 +174,7 @@ export function BoardRoute() {
                     <Group justify="space-between">
                       <Text fw={600}>{formatRoNumber(ro.number)}</Text>
                       <Group gap={6} wrap="nowrap">
+                        <DeclinedMark ro={ro} />
                         <PaidMark ro={ro} />
                         <Text size="sm">{formatMoney(ro.total)}</Text>
                       </Group>
@@ -218,6 +250,16 @@ export function BoardRoute() {
         </>
       )}
     </Stack>
+  );
+}
+
+/** Customer declined the estimate. Red until the owner texts back, then gray. */
+function DeclinedMark({ ro }: { ro: BoardRO }) {
+  if (!ro.estimateDeclinedAt) return null;
+  return (
+    <Badge size="xs" variant="light" color={ro.estimateDeclineFollowedUpAt ? "gray" : "red"}>
+      Declined
+    </Badge>
   );
 }
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,6 +13,7 @@ import {
   Loader,
   Center,
   Anchor,
+  Textarea,
 } from "@mantine/core";
 import { api, ApiError } from "../../lib/api";
 import { formatMoney, formatPhone } from "../../lib/format";
@@ -113,9 +115,20 @@ export function PublicEstimateRoute() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["public-estimate", token] }),
     onError: (err) => notifyError(err, { title: "Couldn't approve — try again" }),
   });
+  // Decline is two taps: the first opens an optional "why" box, the second
+  // sends. Keeps a fat-finger off the Decline button from killing the job and
+  // gives the shop something to work with when they text back.
+  const [declining, setDeclining] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
   const decline = useMutation({
-    mutationFn: () => api.post(`/public/estimate/${token}/decline`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["public-estimate", token] }),
+    mutationFn: () =>
+      api.post(`/public/estimate/${token}/decline`, {
+        reason: declineReason.trim() || undefined,
+      }),
+    onSuccess: () => {
+      setDeclining(false);
+      qc.invalidateQueries({ queryKey: ["public-estimate", token] });
+    },
     onError: (err) => notifyError(err, { title: "Couldn't send that — try again" }),
   });
 
@@ -270,8 +283,13 @@ export function PublicEstimateRoute() {
             updated this estimate since — they'll send you the new version to approve.
           </Text>
         )}
-        {declined && <Text c="red">Declined.</Text>}
-        {!approved && !declined && (
+        {declined && (
+          <Text c="red">
+            Declined — we let {shop?.name ?? "the shop"} know. They may text you to talk through
+            options.
+          </Text>
+        )}
+        {!approved && !declined && !declining && (
           <Group grow>
             <Button
               color="green"
@@ -281,10 +299,35 @@ export function PublicEstimateRoute() {
             >
               Approve
             </Button>
-            <Button variant="default" onClick={() => decline.mutate()} loading={decline.isPending}>
+            <Button variant="default" onClick={() => setDeclining(true)}>
               Decline
             </Button>
           </Group>
+        )}
+        {!approved && !declined && declining && (
+          <Card withBorder>
+            <Stack gap="xs">
+              <Text fw={600}>Not right now?</Text>
+              <Textarea
+                label="Anything you want the shop to know? (optional)"
+                placeholder="Too much right now · Just do the brakes · Getting a second opinion"
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.currentTarget.value.slice(0, 200))}
+                maxLength={200}
+                autosize
+                minRows={2}
+                description={`${declineReason.length}/200`}
+              />
+              <Group grow>
+                <Button variant="default" onClick={() => setDeclining(false)}>
+                  Never mind
+                </Button>
+                <Button color="red" onClick={() => decline.mutate()} loading={decline.isPending}>
+                  Decline estimate
+                </Button>
+              </Group>
+            </Stack>
+          </Card>
         )}
         {!approved && !declined && (
           <Text size="xs" c="dimmed">

@@ -62,6 +62,7 @@ import {
   type RoPayment,
 } from "../../../features/payments/MarkPaidModal";
 import { StatusTextPrompt, type PromptableStatus } from "../../../features/ro/StatusTextPrompt";
+import { DeclineFollowUpPrompt } from "../../../features/ro/DeclineFollowUpPrompt";
 
 interface RoDetail {
   repairOrder: {
@@ -84,6 +85,8 @@ interface RoDetail {
       viewedAt?: string | null;
       approvedAt?: string | null;
       declinedAt?: string | null;
+      declineReason?: string | null;
+      declineFollowedUpAt?: string | null;
       approvedTotal?: number | null;
       changedSinceApproval?: boolean;
     } | null;
@@ -291,6 +294,9 @@ export function RoDetailRoute() {
   // ── Send inspection ──────────────────────────────────────────────────────
   const [sendInspectionOpen, setSendInspectionOpen] = useState(false);
 
+  // ── Declined-estimate follow-up ─────────────────────────────────────────
+  const [declineFollowUpOpen, setDeclineFollowUpOpen] = useState(false);
+
   // ── Pay link ─────────────────────────────────────────────────────────────
   // Mirrors the Send Estimate flow: fetch a drafted SMS (containing the pay
   // URL) and let the owner review/edit before it actually sends.
@@ -471,13 +477,19 @@ export function RoDetailRoute() {
   // approval only counts against the numbers the customer actually saw — once
   // the lines drift from the snapshot, the API flips changedSinceApproval.
   const estimateChanged = !!ro.estimate?.approvedAt && !!ro.estimate?.changedSinceApproval;
+  // The API already nulls declinedAt once an approval lands, but keep the
+  // guard so a stale cache can't show both.
+  const estimateDeclined = !!ro.estimate?.declinedAt && !ro.estimate?.approvedAt;
   const estimateTimeline = ro.estimate?.sentAt
     ? [
         `sent ${formatVisit(ro.estimate.sentAt, tz)}`,
         ro.estimate.viewedAt ? `viewed ${formatVisit(ro.estimate.viewedAt, tz)}` : null,
         ro.estimate.approvedAt ? `approved ${formatVisit(ro.estimate.approvedAt, tz)}` : null,
-        !ro.estimate.approvedAt && ro.estimate.declinedAt
+        estimateDeclined && ro.estimate.declinedAt
           ? `declined ${formatVisit(ro.estimate.declinedAt, tz)}`
+          : null,
+        estimateDeclined && ro.estimate.declineFollowedUpAt
+          ? `you texted ${formatVisit(ro.estimate.declineFollowedUpAt, tz)}`
           : null,
       ]
         .filter(Boolean)
@@ -588,7 +600,7 @@ export function RoDetailRoute() {
             <Badge variant="light" color="green">
               Estimate approved
             </Badge>
-          ) : ro.estimate?.declinedAt ? (
+          ) : estimateDeclined ? (
             <Badge variant="light" color="red">
               Estimate declined
             </Badge>
@@ -692,6 +704,41 @@ export function RoDetailRoute() {
               Re-send for approval
             </Button>
           </Group>
+        </Alert>
+      )}
+      {estimateDeclined && (
+        <Alert
+          color={ro.estimate?.declineFollowedUpAt ? "gray" : "red"}
+          variant="light"
+          title={`${ro.customer?.firstName ?? "Customer"} declined the ${formatMoney(ro.total)} estimate${
+            ro.estimate?.declineFollowedUpAt ? "" : " — text them?"
+          }`}
+        >
+          <Stack gap="xs">
+            {ro.estimate?.declineReason && (
+              <Text size="sm" fs="italic">
+                “{ro.estimate.declineReason}”
+              </Text>
+            )}
+            <Group justify="space-between" wrap="wrap" gap="xs">
+              <Text size="sm">
+                {ro.estimate?.declineFollowedUpAt
+                  ? `You texted them ${formatVisit(ro.estimate.declineFollowedUpAt, tz)}. Edit the lines and re-send when you've landed on a plan.`
+                  : "A quick text usually saves the job. Edit the lines and re-send once you've agreed on a plan."}
+              </Text>
+              {ro.customer && (
+                <Button
+                  size="xs"
+                  color={ro.estimate?.declineFollowedUpAt ? "gray" : "red"}
+                  variant={ro.estimate?.declineFollowedUpAt ? "default" : "filled"}
+                  leftSection={<IconSend size={14} />}
+                  onClick={() => setDeclineFollowUpOpen(true)}
+                >
+                  {ro.estimate?.declineFollowedUpAt ? "Text again" : `Text ${ro.customer.firstName}`}
+                </Button>
+              )}
+            </Group>
+          </Stack>
         </Alert>
       )}
       <Group>
@@ -1053,6 +1100,19 @@ export function RoDetailRoute() {
         balanceCents={balanceCents}
         paymentsReady={paymentsReady}
         onSent={() => qc.invalidateQueries({ queryKey: ["conversation"] })}
+      />
+
+      <DeclineFollowUpPrompt
+        opened={declineFollowUpOpen}
+        onClose={() => setDeclineFollowUpOpen(false)}
+        repairOrderId={id!}
+        customer={ro.customer ? { id: ro.customer.id, firstName: ro.customer.firstName } : null}
+        lineItemCount={ro.lineItems.length}
+        onSent={() => {
+          qc.invalidateQueries({ queryKey: ["ro", id] });
+          qc.invalidateQueries({ queryKey: ["ros"] });
+          qc.invalidateQueries({ queryKey: ["conversation"] });
+        }}
       />
 
       <SendInspectionModal
