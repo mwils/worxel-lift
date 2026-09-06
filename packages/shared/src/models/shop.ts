@@ -1,4 +1,5 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { MAX_TAX_RATE_BPS, TAX_APPLIES_TO } from "../constants.js";
 
 const ShopSchema = new Schema(
   {
@@ -52,11 +53,16 @@ const ShopSchema = new Schema(
       aiTone: { type: String, enum: ["plain", "friendly"], default: "plain" },
       autoReplyEnabled: { type: Boolean, default: true },
       defaultLaborRate: { type: Number }, // cents per hour; set by owner on first template create
-      // Sales tax as a PERCENT with up to 3 decimals (8.25 = 8.25%). Applied
-      // to `part` line items; labor too when `taxLabor` is on. Fees are never
-      // taxed. Recomputed whenever line items change — not retroactively.
-      taxRatePct: { type: Number, default: 0, min: 0, max: 30 },
-      taxLabor: { type: Boolean, default: false },
+      // Sales tax in BASIS POINTS (825 = 8.25%) and what it applies to — see
+      // TAX_APPLIES_TO in constants. No defaults on purpose: absence means
+      // "still on the round-1 shape below", and `resolveTaxSettings()` reads
+      // either. Snapshotted onto each RO at creation; never retroactive.
+      taxRateBps: { type: Number, min: 0, max: MAX_TAX_RATE_BPS },
+      taxAppliesTo: { type: String, enum: TAX_APPLIES_TO },
+      // DEPRECATED (round 1, 2026-09-03): percent + "also tax labor". Read
+      // only when `taxRateBps` is absent; unset on the next tax save.
+      taxRatePct: { type: Number, min: 0, max: 30 },
+      taxLabor: { type: Boolean },
       // Kill switch for service-due reminders. Defaults on; flipped off in
       // Settings if Mike wants to handle follow-ups manually.
       serviceRemindersEnabled: { type: Boolean, default: true },

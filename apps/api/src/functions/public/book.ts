@@ -10,6 +10,7 @@ import {
   User,
   Vehicle,
 } from "@lift/shared";
+import { resolveTaxSettings } from "@lift/shared/constants";
 import { handleKnownErrors, parseBody, withErrorBoundary } from "../../lib/middleware.js";
 import { badRequest, conflict, created, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
@@ -100,6 +101,8 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     const publicToken = randomBytes(24).toString("base64url");
     const bookingToken = randomBytes(24).toString("base64url");
     const confirmationCode = shortCode();
+    // Freeze the shop's tax setting on the RO — same as repairOrders/create.
+    const tax = resolveTaxSettings(shop.settings);
 
     const ro = await RepairOrder.create({
       shopId: shop._id,
@@ -115,6 +118,8 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       partsTotal: 0,
       taxTotal: 0,
       total: 0,
+      taxRateBps: tax.taxRateBps,
+      taxAppliesTo: tax.taxAppliesTo,
       publicToken,
       bookingToken,
     });

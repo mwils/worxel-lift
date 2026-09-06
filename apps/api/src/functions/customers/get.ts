@@ -23,6 +23,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       phone: customer.phone,
       email: customer.email ?? null,
       notes: customer.notes ?? null,
+      taxExempt: customer.taxExempt === true,
       smsOptInAt: customer.smsOptInAt ?? null,
       smsOptOutAt: customer.smsOptOutAt ?? null,
       createdAt: customer.createdAt,

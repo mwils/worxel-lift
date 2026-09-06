@@ -93,7 +93,8 @@ export function TemplatesRoute() {
                   </Group>
                   <Text size="xs" c="dimmed">
                     {t.category ? `${t.category} · ` : ""}
-                    {t.itemCount} item{t.itemCount === 1 ? "" : "s"} · ~{formatMoney(t.priceTotal)}
+                    {t.itemCount} item{t.itemCount === 1 ? "" : "s"} · ~{formatMoney(t.priceTotal)}{" "}
+                    pre-tax
                     {t.useCount > 0 ? ` · used ${t.useCount}×` : ""}
                   </Text>
                 </Stack>

@@ -53,6 +53,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       partsTotal: ro.partsTotal ?? 0,
       taxTotal: ro.taxTotal ?? 0,
       total: ro.total ?? 0,
+      // null = pre-snapshot RO; it picks up the shop's current rate the next
+      // time its line items change (see _totals.applyRoTotals).
+      taxRateBps: ro.taxRateBps ?? null,
+      taxAppliesTo: ro.taxAppliesTo ?? null,
       photos,
       estimate: serializeEstimate(ro),
       inspection: (ro as any).inspection
@@ -86,6 +90,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
             lastName: customer.lastName ?? null,
             phone: customer.phone,
             email: customer.email ?? null,
+            taxExempt: customer.taxExempt === true,
           }
         : null,
       vehicle: vehicle

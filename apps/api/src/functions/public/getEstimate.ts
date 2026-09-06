@@ -61,6 +61,10 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       partsTotal: ro.partsTotal ?? 0,
       taxTotal: ro.taxTotal ?? 0,
       total: ro.total ?? 0,
+      // Drives the "Tax (parts)" line even at $0.00. A tax-exempt customer
+      // sees no rate at all — nothing to explain.
+      taxRateBps: customer?.taxExempt ? 0 : ro.taxRateBps ?? 0,
+      taxAppliesTo: ro.taxAppliesTo ?? "parts",
       estimate: serializeEstimate(ro),
     },
     customer: customer

@@ -69,7 +69,7 @@ function TemplateRow({
           </Text>
         </Stack>
         <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-          ~{formatMoney(t.priceTotal)}
+          ~{formatMoney(t.priceTotal)} pre-tax
         </Text>
       </Group>
     </UnstyledButton>

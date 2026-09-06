@@ -10,6 +10,8 @@ const CustomerSchema = new Schema(
     smsOptInAt: Date,
     smsOptOutAt: Date,
     notes: String,
+    // Resale / farm / government accounts: no sales tax on their ROs.
+    taxExempt: { type: Boolean, default: false },
     stripeCustomerId: String,
     // Prior numbers, newest last. The thread stays keyed by customerId, so
     // this is how we know which texts went to which number.

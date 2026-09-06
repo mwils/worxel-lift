@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { Shop, UpdateShopDto } from "@lift/shared";
-import { buildOptInScript } from "@lift/shared/constants";
+import { buildOptInScript, resolveTaxSettings } from "@lift/shared/constants";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, conflict, notFound, ok } from "../../lib/response.js";
 
@@ -35,11 +35,16 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (dto.settings?.serviceRemindersEnabled !== undefined) {
       update["settings.serviceRemindersEnabled"] = dto.settings.serviceRemindersEnabled;
     }
-    if (dto.settings?.taxRatePct !== undefined) {
-      update["settings.taxRatePct"] = dto.settings.taxRatePct;
-    }
-    if (dto.settings?.taxLabor !== undefined) {
-      update["settings.taxLabor"] = dto.settings.taxLabor;
+    if (dto.settings?.taxRateBps !== undefined || dto.settings?.taxAppliesTo !== undefined) {
+      // Write both bps fields together so a save of just the rate also
+      // converts the round-1 percent shape (and drops it) in one step.
+      const current = await Shop.findById(user.shopId).select("settings").lean();
+      if (!current) return notFound("Shop not found");
+      const resolved = resolveTaxSettings(current.settings);
+      update["settings.taxRateBps"] = dto.settings.taxRateBps ?? resolved.taxRateBps;
+      update["settings.taxAppliesTo"] = dto.settings.taxAppliesTo ?? resolved.taxAppliesTo;
+      unset["settings.taxRatePct"] = 1;
+      unset["settings.taxLabor"] = 1;
     }
     if (dto.settings?.booking !== undefined) {
       const b = dto.settings.booking;
@@ -92,7 +97,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         timezone: shop.timezone,
         sms: { phoneNumber: shop.sms?.phoneNumber },
         billing: shop.billing,
-        settings: shop.settings,
+        settings: { ...shop.settings, ...resolveTaxSettings(shop.settings) },
       },
     });
   } catch (err) {

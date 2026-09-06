@@ -1,6 +1,7 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { randomBytes } from "node:crypto";
 import { CreateRepairOrderDto, Customer, RepairOrder, Shop, Vehicle } from "@lift/shared";
+import { resolveTaxSettings } from "@lift/shared/constants";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
 
@@ -31,6 +32,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const number = shop.counters?.ro ?? 1;
 
     const publicToken = randomBytes(24).toString("base64url");
+    // Freeze the shop's tax setting on the RO — see RepairOrder model.
+    const tax = resolveTaxSettings(shop.settings);
 
     const ro = await RepairOrder.create({
       shopId: user.shopId,
@@ -47,6 +50,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       partsTotal: 0,
       taxTotal: 0,
       total: 0,
+      taxRateBps: tax.taxRateBps,
+      taxAppliesTo: tax.taxAppliesTo,
       publicToken,
     });
 

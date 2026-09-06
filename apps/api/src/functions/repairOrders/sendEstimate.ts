@@ -114,6 +114,7 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
         total: li.total,
       })),
       totalCents: ro.total ?? 0,
+      taxCents: ro.taxTotal ?? 0,
       approveLinkUrl,
       aiTone,
       concern: ro.concern ?? undefined,
