@@ -47,14 +47,18 @@ interface PublicEstimate {
       approvedAt?: string | null;
       declinedAt?: string | null;
       approvedTotal?: number | null;
+      approvedTaxTotal?: number | null;
       changedSinceApproval?: boolean;
+      changedAt?: string | null;
     } | null;
   };
   customer: { firstName: string; lastName?: string | null } | null;
   vehicle: { year?: number | null; make?: string | null; model?: string | null } | null;
   shop: {
     name: string;
-    phone?: string | null;
+    phone?: string | null; // front-desk line
+    smsPhone?: string | null; // the number their texts come from
+    timezone?: string | null;
     address?: {
       line1?: string | null;
       line2?: string | null;
@@ -65,16 +69,22 @@ interface PublicEstimate {
   } | null;
 }
 
-function formatWhen(iso: string | null | undefined): string | null {
+// "Sep 3 at 3:55 PM" on the shop's clock — the approval time has to read the
+// same on the customer's phone as it does on the RO page in the bay.
+function formatWhen(iso: string | null | undefined, tz?: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const opts = { month: "short", day: "numeric" } as const;
+  const timeOpts = { hour: "numeric", minute: "2-digit" } as const;
+  try {
+    const zone = tz || undefined;
+    const day = d.toLocaleString("en-US", { ...opts, timeZone: zone });
+    const time = d.toLocaleString("en-US", { ...timeOpts, timeZone: zone });
+    return `${day} at ${time}`;
+  } catch {
+    return `${d.toLocaleString("en-US", opts)} at ${d.toLocaleString("en-US", timeOpts)}`;
+  }
 }
 
 function lineDetail(li: PublicLineItem): string | null {
@@ -166,6 +176,11 @@ export function PublicEstimateRoute() {
   const approved = !!est.approvedAt;
   const declined = !approved && !!est.declinedAt;
   const changedSinceApproval = approved && !!est.changedSinceApproval;
+  // Once approved, the API substitutes the approved snapshot for ro.lineItems
+  // and the totals, so everything rendered below is what the customer agreed
+  // to — the live numbers never reach this page after approval.
+  const shopTz = data.shop?.timezone ?? null;
+  const approvedWhen = approved ? formatWhen(est.approvedAt, shopTz) : null;
   const taxTotal = ro.taxTotal ?? 0;
   const laborTotal = ro.laborTotal ?? 0;
   const partsTotal = ro.partsTotal ?? 0;
@@ -195,6 +210,11 @@ export function PublicEstimateRoute() {
             </Text>
           )}
           <Title order={2}>Estimate</Title>
+          {approved && (
+            <Text size="sm" c="green" fw={600}>
+              Approved{approvedWhen ? ` ${approvedWhen}` : ""}
+            </Text>
+          )}
         </Stack>
         <Text c="dimmed">
           For {data.customer?.firstName ?? "you"}
@@ -266,17 +286,12 @@ export function PublicEstimateRoute() {
           </Stack>
         </Card>
 
-        {approved && !changedSinceApproval && (
-          <Text c="green">
-            Approved — thanks!
-            {formatWhen(est.approvedAt) ? ` (${formatWhen(est.approvedAt)})` : ""}
-          </Text>
+        {approved && (
+          <Text c="green">Approved — thanks! This is the estimate you agreed to.</Text>
         )}
         {changedSinceApproval && (
           <Text c="orange">
-            You approved {formatMoney(est.approvedTotal ?? 0)}
-            {formatWhen(est.approvedAt) ? ` on ${formatWhen(est.approvedAt)}` : ""}. The shop has
-            updated this estimate since — they'll send you the new version to approve.
+            The shop has since updated this estimate — they'll send a new one to approve.
           </Text>
         )}
         {declined && <Text c="red">Declined.</Text>}
@@ -302,19 +317,37 @@ export function PublicEstimateRoute() {
           </Text>
         )}
 
-        {shop && (shop.phone || addressLine1 || addressLine2) && (
+        {shop && (shop.phone || shop.smsPhone || addressLine1 || addressLine2) && (
           <>
             <Divider />
-            <Stack gap={2}>
-              <Text size="sm" fw={600}>
-                {shop.name}
-              </Text>
-              {addressLine1 && <Text size="sm">{addressLine1}</Text>}
-              {addressLine2 && <Text size="sm">{addressLine2}</Text>}
-              {shop.phone && (
-                <Text size="sm">
-                  Questions? Call or text{" "}
-                  <Anchor href={`tel:${shop.phone}`}>{formatPhone(shop.phone)}</Anchor>
+            <Stack gap={4}>
+              {shop.phone ? (
+                <Text fw={600}>
+                  Questions? Call {shop.name} at{" "}
+                  <Anchor href={`tel:${shop.phone}`} fw={600}>
+                    {formatPhone(shop.phone)}
+                  </Anchor>
+                </Text>
+              ) : shop.smsPhone ? (
+                <Text fw={600}>
+                  Questions? Text {shop.name} at{" "}
+                  <Anchor href={`sms:${shop.smsPhone}`} fw={600}>
+                    {formatPhone(shop.smsPhone)}
+                  </Anchor>
+                </Text>
+              ) : (
+                <Text size="sm" fw={600}>
+                  {shop.name}
+                </Text>
+              )}
+              {addressLine1 && (
+                <Text size="sm" c="dimmed">
+                  {addressLine1}
+                </Text>
+              )}
+              {addressLine2 && (
+                <Text size="sm" c="dimmed">
+                  {addressLine2}
                 </Text>
               )}
             </Stack>

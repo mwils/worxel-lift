@@ -60,6 +60,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     }
 
     await applyRoTotals(ro, user.shopId);
+    ro.lineItemsChangedAt = new Date();
     await ro.save();
 
     template.useCount = (template.useCount ?? 0) + 1;

@@ -3,7 +3,7 @@ import { Customer, RepairOrder, Vehicle } from "@lift/shared";
 import { withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
 import { presignDownload } from "../../lib/s3.js";
-import { serializeEstimate } from "./_estimate.js";
+import { ensureApprovalSnapshot, serializeEstimate } from "./_estimate.js";
 
 // Photo URLs are presigned for ~1h. The frontend re-fetches the RO often
 // enough that the link gets refreshed well before it expires.
@@ -16,6 +16,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
 
   const ro = await RepairOrder.findOne({ _id: id, shopId: user.shopId }).lean();
   if (!ro) return notFound("Repair order not found");
+
+  // Approvals recorded before snapshotting shipped: freeze the current lines
+  // as the approved set once, so later edits are flagged from here on.
+  await ensureApprovalSnapshot(ro as any);
 
   const [customer, vehicle] = await Promise.all([
     Customer.findOne({ _id: ro.customerId, shopId: user.shopId }).lean(),
