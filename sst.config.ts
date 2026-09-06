@@ -378,6 +378,19 @@ export default $config({
     );
     api.route("POST /messages/draft", fn("apps/api/src/functions/messages/draft.handler"));
     api.route("POST /messages/send", fn("apps/api/src/functions/messages/send.handler"));
+    api.route("GET /messages/inbox", fn("apps/api/src/functions/messages/inbox.handler"));
+    api.route(
+      "POST /messages/threads/{customerId}/read",
+      fn("apps/api/src/functions/messages/thread.read")
+    );
+    api.route(
+      "POST /messages/threads/{customerId}/archive",
+      fn("apps/api/src/functions/messages/thread.archive")
+    );
+    api.route(
+      "POST /messages/threads/{customerId}/unarchive",
+      fn("apps/api/src/functions/messages/thread.unarchive")
+    );
 
     // payments
     api.route(
