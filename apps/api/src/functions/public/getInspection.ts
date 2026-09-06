@@ -3,6 +3,7 @@ import { Customer, RepairOrder, Shop, Vehicle } from "@lift/shared";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { notFound, ok } from "../../lib/response.js";
 import { presignDownload } from "../../lib/s3.js";
+import { approvedSnapshotView, ensureApprovalSnapshot } from "../repairOrders/_estimate.js";
 
 const SEVERITY_RANK: Record<string, number> = { red: 0, yellow: 1, green: 2 };
 const PHOTO_URL_TTL_SEC = 24 * 60 * 60;
@@ -21,6 +22,18 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     inspection.viewedAt = new Date();
     await ro.save();
   }
+
+  // The embedded estimate follows the same rule as the estimate page: once
+  // approved, show the approved snapshot, not whatever the lines are now.
+  await ensureApprovalSnapshot(ro as any);
+  const approvedEstimate = approvedSnapshotView(ro as any);
+  const estimateLines: Array<{ kind: string; description: string; total: number }> =
+    approvedEstimate?.lineItems ??
+    (ro.lineItems ?? []).map((li: any) => ({
+      kind: li.kind,
+      description: li.description,
+      total: li.total,
+    }));
 
   const [customer, vehicle, shop] = await Promise.all([
     Customer.findById(ro.customerId).lean(),
@@ -74,12 +87,13 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     customer: customer ? { firstName: customer.firstName } : null,
     items,
     estimate: {
-      lineItems: (ro.lineItems ?? []).map((li: any) => ({
+      lineItems: estimateLines.map((li) => ({
         description: li.description,
         kind: li.kind,
         total: li.total,
       })),
-      total: ro.total ?? 0,
+      total: approvedEstimate?.total ?? ro.total ?? 0,
+      approvedAt: ro.estimate?.approvedAt ?? null,
       status: ro.estimate?.approvedAt
         ? "approved"
         : ro.estimate?.declinedAt
