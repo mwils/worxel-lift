@@ -39,20 +39,153 @@ export const RO_OPEN_STATUSES: RoStatus[] = [
 export const LINE_ITEM_KINDS = ["labor", "part", "fee"] as const;
 export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
 
+// ── Sales tax ─────────────────────────────────────────────────
+// Rate is stored in BASIS POINTS (825 = 8.25%) so it's an integer like every
+// other money-ish field. `taxAppliesTo` says what the rate hits: `parts` (the
+// default — most states, SC included, tax parts and not labor), `parts_labor`,
+// or `none`. Fees are never taxed. The shop's current setting is SNAPSHOTTED
+// onto each RO at creation (`taxRateBps` / `taxAppliesTo`) so a later rate
+// change leaves historical ROs alone.
+export const TAX_APPLIES_TO = ["parts", "parts_labor", "none"] as const;
+export type TaxAppliesTo = (typeof TAX_APPLIES_TO)[number];
+export const TAX_APPLIES_TO_LABELS: Record<TaxAppliesTo, string> = {
+  parts: "Parts only",
+  parts_labor: "Parts + labor",
+  none: "No sales tax",
+};
+export const MAX_TAX_RATE_BPS = 3000; // 30%
+
+export interface TaxSettings {
+  taxRateBps: number;
+  taxAppliesTo: TaxAppliesTo;
+}
+
+/**
+ * Read a shop's tax settings, tolerating the round-1 shape (`taxRatePct`
+ * percent + `taxLabor` boolean) until the next tax save converts it. Absent
+ * everything → 0 bps / parts.
+ */
+export function resolveTaxSettings(
+  settings:
+    | {
+        taxRateBps?: number | null;
+        taxAppliesTo?: string | null;
+        taxRatePct?: number | null;
+        taxLabor?: boolean | null;
+      }
+    | null
+    | undefined
+): TaxSettings {
+  if (!settings) return { taxRateBps: 0, taxAppliesTo: "parts" };
+  if (typeof settings.taxRateBps === "number") {
+    const appliesTo = (TAX_APPLIES_TO as readonly string[]).includes(settings.taxAppliesTo ?? "")
+      ? (settings.taxAppliesTo as TaxAppliesTo)
+      : "parts";
+    return { taxRateBps: clampBps(settings.taxRateBps), taxAppliesTo: appliesTo };
+  }
+  // Legacy: percent with up to 3 decimals → whole basis points.
+  const pct = typeof settings.taxRatePct === "number" ? settings.taxRatePct : 0;
+  return {
+    taxRateBps: clampBps(pctToBps(pct)),
+    taxAppliesTo: settings.taxLabor === true ? "parts_labor" : "parts",
+  };
+}
+
+function clampBps(bps: number): number {
+  if (!Number.isFinite(bps) || bps < 0) return 0;
+  return Math.min(Math.round(bps), MAX_TAX_RATE_BPS);
+}
+
+export function pctToBps(pct: number): number {
+  return Math.round(pct * 100);
+}
+
+export function bpsToPct(bps: number): number {
+  return bps / 100;
+}
+
+/** "8.25%" — trims trailing zeros so 700 bps reads "7%", 825 → "8.25%". */
+export function formatTaxRate(bps: number): string {
+  const s = bpsToPct(bps)
+    .toFixed(2)
+    .replace(/\.?0+$/, "");
+  return `${s}%`;
+}
+
+/** Customer-facing line label: "Tax (parts)" when labor is untaxed, else "Tax". */
+export function taxLineLabel(appliesTo: string | null | undefined): string {
+  return appliesTo === "parts_labor" ? "Tax" : "Tax (parts)";
+}
+
+/**
+ * Tax in cents for a set of line items under the given settings. Fees never
+ * count; labor counts only for `parts_labor`. Rounded to the cent.
+ */
+export function computeTaxCents(
+  items: Array<{ kind: string; total: number }>,
+  tax: TaxSettings | null | undefined
+): number {
+  if (!tax || tax.taxRateBps <= 0 || tax.taxAppliesTo === "none") return 0;
+  let taxable = 0;
+  for (const it of items) {
+    if (it.kind === "part") taxable += it.total;
+    else if (it.kind === "labor" && tax.taxAppliesTo === "parts_labor") taxable += it.total;
+  }
+  return Math.round((taxable * tax.taxRateBps) / 10_000);
+}
+
+// RO-level settlement state, derived from the RO's Payment rows:
+//   unpaid     nothing collected
+//   authorized Stripe intent in flight (card-on-file charge not yet settled)
+//   partial    something collected, balance still open
+//   paid       collected >= total
+//   refunded   money was collected and then all of it was given back
 export const PAYMENT_STATUSES = [
   "unpaid",
   "authorized",
+  "partial",
   "paid",
   "refunded",
 ] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-// How an RO was settled. `stripe` is set by the pay-link / card-on-file
+// How a payment was taken. `stripe` is set by the pay-link / card-on-file
 // paths; the rest are recorded by the owner via "Mark paid" for shops that
 // take cash or run their own card terminal.
-export const PAYMENT_METHODS = ["cash", "card", "check", "other", "stripe"] as const;
+export const PAYMENT_METHODS = ["cash", "card_in_person", "check", "other", "stripe"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-export const MANUAL_PAYMENT_METHODS = ["cash", "card", "check", "other"] as const;
+export const MANUAL_PAYMENT_METHODS = ["cash", "card_in_person", "check", "other"] as const;
+export type ManualPaymentMethod = (typeof MANUAL_PAYMENT_METHODS)[number];
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  card_in_person: "Card",
+  check: "Check",
+  other: "Other",
+  stripe: "Card (online)",
+};
+// Round-1 stored in-person card as "card"; Stripe Payment rows also used
+// "card". Normalize on read so old data renders and sums correctly.
+export function normalizePaymentMethod(
+  method: string | null | undefined,
+  opts?: { stripe?: boolean }
+): PaymentMethod | null {
+  if (!method) return opts?.stripe ? "stripe" : null;
+  if (method === "card") return opts?.stripe ? "stripe" : "card_in_person";
+  return (PAYMENT_METHODS as readonly string[]).includes(method) ? (method as PaymentMethod) : null;
+}
+// Payment-row lifecycle. Stripe rows walk the intent statuses; manual rows are
+// created `succeeded` and only ever move to `voided` (mis-entry, never counted)
+// or `refunded` (money went back to the customer).
+export const PAYMENT_ROW_STATUSES = [
+  "requires_payment_method",
+  "requires_action",
+  "processing",
+  "succeeded",
+  "canceled",
+  "voided",
+  "refunded",
+] as const;
+export type PaymentRowStatus = (typeof PAYMENT_ROW_STATUSES)[number];
 
 export const MESSAGE_CLASSIFICATIONS = [
   "status_check",

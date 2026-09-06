@@ -1,5 +1,4 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { DateTime } from "luxon";
 import {
   Customer,
   Message,
@@ -11,6 +10,7 @@ import {
 import { handleKnownErrors, parseBody, withErrorBoundary } from "../../lib/middleware.js";
 import { badRequest, conflict, notFound, ok } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
+import { bookingManageUrl, formatVisitTime } from "../../lib/visitTime.js";
 import { validateSlot } from "./_slots.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event) => {
@@ -53,11 +53,8 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       shop.ownerUserId ? User.findById(shop.ownerUserId).lean() : Promise.resolve(null),
     ]);
 
-    const tz = shop.timezone || "America/Chicago";
-    const whenHuman = DateTime.fromJSDate(validation.slotDate)
-      .setZone(tz)
-      .toFormat("ccc LLL d 'at' h:mm a");
-    const manageUrl = `${process.env.MARKETING_URL ?? ""}/booking/${token}`;
+    const whenHuman = formatVisitTime(validation.slotDate, shop.timezone);
+    const manageUrl = bookingManageUrl(token);
 
     if (customer && !customer.smsOptOutAt) {
       const body = `Booking moved to ${whenHuman} at ${shop.name}. Need to change it? ${manageUrl}`;

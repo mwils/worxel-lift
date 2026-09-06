@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { readSnapshot, writeSnapshot } from "../../lib/snapshot";
 import { formatMoney, formatRoNumber, formatVisit, relativeTime, shopTimezone } from "../../lib/format";
-import { RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
+import { RO_STATUS_LABELS, resolveTaxSettings, type RoStatus } from "@lift/shared/constants";
 import { useAuth } from "../../lib/auth";
 import { StarterLibraryPrompt } from "../../features/jobTemplates/StarterLibraryPrompt";
 
@@ -17,7 +17,9 @@ interface BoardRO {
   customerName: string;
   vehicleSummary: string;
   total: number;
-  paymentStatus?: "unpaid" | "authorized" | "paid" | "refunded";
+  paymentStatus?: "unpaid" | "authorized" | "partial" | "paid" | "refunded";
+  collectedCents?: number;
+  balanceCents?: number;
   updatedAt: string;
   scheduledFor: string | null;
   // Null unless the customer declined the estimate and hasn't since approved.
@@ -41,6 +43,14 @@ const STATUS_BUCKETS: Array<{ status: RoStatus; label: string; color: string }> 
   { status: "in_repair", label: RO_STATUS_LABELS.in_repair, color: "cyan" },
   { status: "ready", label: RO_STATUS_LABELS.ready, color: "green" },
 ];
+
+function readDismissed(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function BoardRoute() {
   const { me } = useAuth();
@@ -74,6 +84,28 @@ export function BoardRoute() {
     enabled: showClosed,
   });
   const closed = closedQ.data?.ros ?? [];
+
+  // One-time nudge to set a tax rate, once there's at least one RO to be wrong
+  // about. Dismissal is per shop, per browser — nothing to store server-side.
+  // Shops that chose "No sales tax" on purpose never see it.
+  const taxBannerKey = `taxBanner:dismissed:${me?.shop?.id ?? "none"}`;
+  const [taxBannerHidden, setTaxBannerHidden] = useState(false);
+  const shopTax = resolveTaxSettings(me?.shop?.settings);
+  const showTaxBanner =
+    !taxBannerHidden &&
+    !!me?.shop &&
+    shopTax.taxRateBps === 0 &&
+    shopTax.taxAppliesTo !== "none" &&
+    (data?.ros?.length ?? 0) > 0 &&
+    !readDismissed(taxBannerKey);
+  function dismissTaxBanner() {
+    try {
+      localStorage.setItem(taxBannerKey, "1");
+    } catch {
+      // private mode / storage blocked — hide for this visit anyway
+    }
+    setTaxBannerHidden(true);
+  }
 
   const grouped = new Map<RoStatus, BoardRO[]>();
   for (const bucket of STATUS_BUCKETS) grouped.set(bucket.status, []);
@@ -126,6 +158,21 @@ export function BoardRoute() {
               </Text>
             ))}
           </Stack>
+        </Alert>
+      )}
+
+      {showTaxBanner && (
+        <Alert
+          color="yellow"
+          variant="light"
+          withCloseButton
+          onClose={dismissTaxBanner}
+          title="Add your sales tax rate so estimates are right"
+        >
+          Estimates, texts and receipts are pre-tax until you set it.{" "}
+          <Anchor component={Link} to="/settings" size="sm">
+            Set it in Settings
+          </Anchor>
         </Alert>
       )}
 
@@ -264,8 +311,10 @@ function DeclinedMark({ ro }: { ro: BoardRO }) {
 }
 
 /**
- * Paid / unpaid at a glance. Quiet until it matters: a paid RO gets a small
- * teal mark; an unpaid one only shouts once the car is Ready or already gone.
+ * Paid / partial / unpaid at a glance. Quiet until it matters: a paid RO gets
+ * a small teal mark; a partial always shows what's still due (money changed
+ * hands, the rest is a loose end); an unpaid one only shouts once the car is
+ * Ready or already gone.
  */
 function PaidMark({ ro }: { ro: BoardRO }) {
   if (ro.total <= 0) return null;
@@ -276,8 +325,16 @@ function PaidMark({ ro }: { ro: BoardRO }) {
       </Badge>
     );
   }
+  const balance = ro.balanceCents ?? ro.total;
+  if (ro.paymentStatus === "partial" && balance > 0) {
+    return (
+      <Badge size="xs" variant="light" color="orange" leftSection={<IconCash size={10} />}>
+        Partial · {formatMoney(balance)} due
+      </Badge>
+    );
+  }
   const loud = ro.status === "ready" || ro.status === "picked_up";
-  if (!loud) return null;
+  if (!loud || balance <= 0) return null;
   return (
     <Badge size="xs" variant="light" color="orange">
       Unpaid

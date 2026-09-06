@@ -23,7 +23,7 @@ interface PublicPay {
   publishableKey: string;
   paid: boolean;
   payable: boolean;
-  ro: { number: number; total: number; status: string };
+  ro: { number: number; total: number; balanceCents?: number; status: string };
   customer: { firstName: string; lastName: string | null } | null;
   shop: { name: string } | null;
 }
@@ -107,7 +107,7 @@ export function PublicPayRoute() {
           <Stack gap="xs">
             <Group justify="space-between">
               <Text>Amount due</Text>
-              <Text fw={700}>{formatMoney(data.ro.total)}</Text>
+              <Text fw={700}>{formatMoney(data.ro.balanceCents ?? data.ro.total)}</Text>
             </Group>
             <Divider />
             {paid ? (

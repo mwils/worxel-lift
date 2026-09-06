@@ -4,6 +4,7 @@ import { Customer, RepairOrder, Shop } from "@lift/shared";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { ok, notFound, serverError } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
+import { roPaymentSnapshot } from "../repairOrders/_payments.js";
 
 /**
  * GET /public/pay/:token
@@ -31,15 +32,18 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
   ]);
   if (!shop) return notFound();
 
+  // The link collects what's still owed — cash already taken at the counter
+  // comes off first.
+  const balanceCents = roPaymentSnapshot(ro).balanceCents;
   const display = {
-    ro: { number: ro.number, total: ro.total, status: ro.status },
+    ro: { number: ro.number, total: ro.total, balanceCents, status: ro.status },
     customer: customer
       ? { firstName: customer.firstName, lastName: customer.lastName ?? null }
       : null,
     shop: { name: shop.name },
   };
 
-  if (ro.payment?.status === "paid") {
+  if (balanceCents <= 0) {
     // Already paid — still return basic info so the client can render a "paid" state.
     return ok({
       clientSecret: null,
@@ -78,7 +82,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
           connectOpts
         );
         const reusable = ["requires_payment_method", "requires_confirmation", "requires_action", "processing"];
-        if (reusable.includes(existing.status) && existing.amount === ro.total) {
+        if (reusable.includes(existing.status) && existing.amount === balanceCents) {
           intent = existing;
         }
       } catch (err) {
@@ -91,7 +95,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     if (!intent) {
       intent = await s.paymentIntents.create(
         {
-          amount: ro.total,
+          amount: balanceCents,
           currency: "usd",
           description: `RO-${String(ro.number).padStart(4, "0")} — ${shop.name}`,
           receipt_email: customer.email ?? undefined,
@@ -103,7 +107,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
             source: "public_pay",
           },
         },
-        { ...connectOpts, idempotencyKey: `ro-public-pay-${String(ro._id)}-${ro.total}` }
+        { ...connectOpts, idempotencyKey: `ro-public-pay-${String(ro._id)}-${balanceCents}` }
       );
 
       ro.payment = {

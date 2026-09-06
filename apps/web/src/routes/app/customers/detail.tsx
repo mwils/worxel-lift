@@ -43,6 +43,7 @@ interface CustomerHistory {
     phone: string;
     email: string | null;
     notes: string | null;
+    taxExempt?: boolean;
     smsOptInAt: string | null;
     smsOptOutAt: string | null;
     createdAt: string;
@@ -80,6 +81,7 @@ interface CustomerHistory {
     total: number;
     vehicleId: string;
     paymentStatus: string;
+    balanceCents?: number;
     createdAt: string;
     updatedAt: string;
     completedAt: string | null;
@@ -215,6 +217,11 @@ export function CustomerDetailRoute() {
                 SMS opted out
               </Badge>
             )}
+            {customer.taxExempt && (
+              <Badge size="xs" color="gray" variant="light">
+                Tax exempt
+              </Badge>
+            )}
           </Stack>
           <Button
             component={Link}
@@ -295,6 +302,11 @@ export function CustomerDetailRoute() {
                   {r.paymentStatus === "paid" && (
                     <Badge variant="light" color="green" size="sm">
                       paid
+                    </Badge>
+                  )}
+                  {r.paymentStatus === "partial" && (
+                    <Badge variant="light" color="orange" size="sm">
+                      partial{r.balanceCents ? ` · ${formatMoney(r.balanceCents)} due` : ""}
                     </Badge>
                   )}
                 </Group>
@@ -398,6 +410,7 @@ export function CustomerDetailRoute() {
             phone: formatPhone(customer.phone),
             email: customer.email ?? undefined,
             notes: customer.notes ?? undefined,
+            taxExempt: customer.taxExempt ?? false,
           }}
           loading={updateCustomer.isPending}
           onCancel={editModalCtl.close}

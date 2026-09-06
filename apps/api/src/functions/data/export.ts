@@ -6,6 +6,7 @@ const requireCjs = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const archiver = requireCjs("archiver") as typeof import("archiver");
 import { Customer, Message, Payment, RepairOrder, Vehicle } from "@lift/shared";
+import { bpsToPct } from "@lift/shared/constants";
 import { withOwnerAuth } from "../../lib/middleware.js";
 import { badRequest } from "../../lib/response.js";
 
@@ -105,6 +106,9 @@ export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) 
       "concern",
       "laborTotal",
       "partsTotal",
+      "taxRateBps",
+      "taxRatePct",
+      "taxTotal",
       "total",
       "completedAt",
       "createdAt",
@@ -118,6 +122,10 @@ export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) 
       r.concern,
       r.laborTotal,
       r.partsTotal,
+      // Pre-snapshot ROs export blank rate columns rather than a guessed one.
+      r.taxRateBps ?? "",
+      typeof r.taxRateBps === "number" ? bpsToPct(r.taxRateBps).toFixed(2) : "",
+      r.taxTotal ?? 0,
       r.total,
       r.completedAt,
       (r as any).createdAt,

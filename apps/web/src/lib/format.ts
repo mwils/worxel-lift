@@ -1,6 +1,8 @@
 export function formatMoney(cents: number | null | undefined): string {
   if (cents == null) return "—";
-  return `$${(cents / 100).toFixed(2)}`;
+  // Negative = a discount / write-off line: "-$94.50", not "$-94.50".
+  const sign = cents < 0 ? "-" : "";
+  return `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
 }
 
 export function formatRoNumber(n: number): string {

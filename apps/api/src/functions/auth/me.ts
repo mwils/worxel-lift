@@ -1,5 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { User, Shop } from "@lift/shared";
+import { resolveTaxSettings } from "@lift/shared/constants";
 import { isCompanyAdmin, signSessionCookie } from "../../lib/auth.js";
 import { withAuth } from "../../lib/middleware.js";
 import { notFound, ok } from "../../lib/response.js";
@@ -50,7 +51,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
             // Scheduled visit times are rendered in the shop's zone, not the
             // browser's — an owner travelling must still see local bay times.
             timezone: shop.timezone,
-            settings: shop.settings,
+            // Tax is always surfaced in the bps shape, even for shops still
+            // carrying the round-1 percent fields.
+            settings: { ...shop.settings, ...resolveTaxSettings(shop.settings) },
             billing: shop.billing,
             sms: { phoneNumber: shop.sms?.phoneNumber },
             payments: {

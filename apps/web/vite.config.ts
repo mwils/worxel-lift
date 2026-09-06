@@ -6,7 +6,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt": a new build installs in the background and waits; the
+      // UpdatePrompt component shows a "New version — Refresh" toast and calls
+      // updateServiceWorker() to activate it. autoUpdate reloaded the page under
+      // the owner mid-task and only ever checked on page load, so a tablet left
+      // open sat on a stale bundle indefinitely (QA round-2 H3).
+      registerType: "prompt",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Lift",

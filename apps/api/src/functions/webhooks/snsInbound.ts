@@ -2,6 +2,7 @@ import type { SNSHandler } from "aws-lambda";
 import { connectDb } from "@lift/shared/db";
 import {
   AiInteraction,
+  Conversation,
   Customer,
   MESSAGE_CLASSIFICATIONS,
   Message,
@@ -136,7 +137,12 @@ export const handler: SNSHandler = async (event) => {
         continue;
       }
 
-      // 3) Insert inbound Message.
+      // 3) Insert inbound Message. Remember where the thread sat first: an
+      //    auto-answered status check must not move it (un-bumped in 9).
+      const threadBefore = await Conversation.findOne(
+        { shopId: shop._id, customerId: customer._id },
+        { bumpedAt: 1 }
+      ).lean();
       const inboundMsg = await Message.create({
         shopId: shop._id,
         customerId: customer._id,
@@ -155,6 +161,11 @@ export const handler: SNSHandler = async (event) => {
         );
         inboundMsg.inboundClassification = "opt_out";
         await inboundMsg.save();
+        // Nothing to reply to — texting an opted-out customer is prohibited.
+        await Conversation.updateOne(
+          { shopId: shop._id, customerId: customer._id },
+          { $set: { needsReply: false } }
+        );
         console.log("[snsInbound] STOP keyword — opted customer out", {
           shopId: String(shop._id),
           customerId: String(customer._id),
@@ -346,6 +357,18 @@ export const handler: SNSHandler = async (event) => {
             aiPromptVersion: STATUS_REPLY_PROMPT_VERSION,
             autoReplied: true,
           });
+          // Handled without Mike: put the thread back where it was so the
+          // inbox doesn't churn on "is it ready yet?" texts. snsDelivery
+          // re-bumps it if the reply fails to deliver.
+          await Conversation.updateOne(
+            { shopId: shop._id, customerId: customer._id },
+            {
+              $set: {
+                needsReply: false,
+                bumpedAt: threadBefore?.bumpedAt ?? inboundMsg.sentAt ?? new Date(),
+              },
+            }
+          );
         }
         continue;
       }
@@ -357,6 +380,7 @@ export const handler: SNSHandler = async (event) => {
         openRo.estimate = openRo.estimate ?? {};
         openRo.estimate.approvedAt = stamp.approvedAt;
         openRo.estimate.approvedTotal = stamp.approvedTotal;
+        openRo.estimate.approvedTaxTotal = stamp.approvedTaxTotal;
         openRo.estimate.approvedLineItems = stamp.approvedLineItems as any;
         // A yes after a decline means they changed their mind — same as the
         // public Approve button, the approval supersedes the decline.

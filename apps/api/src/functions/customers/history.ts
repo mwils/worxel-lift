@@ -1,11 +1,29 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import mongoose from "mongoose";
-import { Customer, Message, RepairOrder, Vehicle } from "@lift/shared";
+import { Customer, Message, Payment, RepairOrder, Vehicle } from "@lift/shared";
 import { withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { roPaymentSnapshot } from "../repairOrders/_payments.js";
 
 const RECENT_RO_LIMIT = 10;
 const RECENT_MESSAGE_LIMIT = 20;
+
+// Spend sums Payment rows. ROs marked paid in round 1 have no row yet (until
+// scripts/backfillPayments.ts runs) — for those only, fall back to what the
+// RO itself says was collected. Once `collectedCents` exists the rows own it.
+const LEGACY_COLLECTED_EXPR = {
+  $cond: [
+    { $isNumber: "$payment.collectedCents" },
+    0,
+    {
+      $cond: [
+        { $eq: ["$payment.status", "paid"] },
+        { $ifNull: ["$payment.amountCents", "$total"] },
+        0,
+      ],
+    },
+  ],
+};
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   if (!user.shopId) return badRequest("No shop on session");
@@ -20,7 +38,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
 
   // Single aggregation: customer-level stats + per-vehicle stats + recent ROs.
   // Faceting trims us to one MongoDB round-trip instead of N + 3.
-  const [vehicles, messages, [agg]] = await Promise.all([
+  const [vehicles, messages, [agg], paymentsByVehicle] = await Promise.all([
     Vehicle.find({ shopId: user.shopId, customerId: customer._id })
       .sort({ updatedAt: -1 })
       .lean(),
@@ -31,7 +49,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     RepairOrder.aggregate<{
       customerStats: Array<{
         roCount: number;
-        lifetimeSpendCents: number;
+        legacySpendCents: number;
         lifetimeBilledCents: number;
         firstVisitAt: Date | null;
         lastVisitAt: Date | null;
@@ -39,7 +57,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       vehicleStats: Array<{
         _id: mongoose.Types.ObjectId;
         roCount: number;
-        lifetimeSpendCents: number;
+        legacySpendCents: number;
         lastServicedAt: Date | null;
         lastConcern: string | null;
       }>;
@@ -50,7 +68,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         concern: string | null;
         total: number;
         vehicleId: mongoose.Types.ObjectId;
-        payment: { status: string } | null;
+        payment: {
+          status: string;
+          amountCents?: number | null;
+          collectedCents?: number | null;
+        } | null;
         createdAt: Date;
         updatedAt: Date;
         completedAt: Date | null;
@@ -64,11 +86,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
               $group: {
                 _id: null,
                 roCount: { $sum: 1 },
-                lifetimeSpendCents: {
-                  $sum: {
-                    $cond: [{ $eq: ["$payment.status", "paid"] }, "$total", 0],
-                  },
-                },
+                legacySpendCents: { $sum: LEGACY_COLLECTED_EXPR },
                 lifetimeBilledCents: { $sum: "$total" },
                 firstVisitAt: { $min: "$createdAt" },
                 lastVisitAt: { $max: "$createdAt" },
@@ -84,11 +102,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
               $group: {
                 _id: "$vehicleId",
                 roCount: { $sum: 1 },
-                lifetimeSpendCents: {
-                  $sum: {
-                    $cond: [{ $eq: ["$payment.status", "paid"] }, "$total", 0],
-                  },
-                },
+                legacySpendCents: { $sum: LEGACY_COLLECTED_EXPR },
                 lastServicedAt: { $max: "$createdAt" },
                 lastConcern: { $first: "$concern" },
               },
@@ -115,15 +129,29 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         },
       },
     ]),
+    // What was actually collected, per vehicle. Rows with no vehicleId
+    // (Stripe rows written before the backfill) land under `null` and still
+    // count toward the customer total.
+    Payment.aggregate<{ _id: mongoose.Types.ObjectId | null; cents: number }>([
+      { $match: { shopId: shopOid, customerId: customerOid, status: "succeeded" } },
+      { $group: { _id: "$vehicleId", cents: { $sum: "$amountCents" } } },
+    ]),
   ]);
 
   const customerStats = agg?.customerStats?.[0] ?? {
     roCount: 0,
-    lifetimeSpendCents: 0,
+    legacySpendCents: 0,
     lifetimeBilledCents: 0,
     firstVisitAt: null,
     lastVisitAt: null,
   };
+  const paidByVehicle = new Map<string, number>();
+  let paidTotalCents = 0;
+  for (const p of paymentsByVehicle) {
+    paidTotalCents += p.cents;
+    if (p._id) paidByVehicle.set(String(p._id), p.cents);
+  }
+  const lifetimeSpendCents = paidTotalCents + customerStats.legacySpendCents;
 
   type VehicleStat = NonNullable<typeof agg>["vehicleStats"][number];
   const perVehicleMap = new Map<string, VehicleStat>();
@@ -146,7 +174,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     stats: {
       vehicleCount: vehicles.length,
       roCount: customerStats.roCount,
-      lifetimeSpendCents: customerStats.lifetimeSpendCents,
+      lifetimeSpendCents,
       lifetimeBilledCents: customerStats.lifetimeBilledCents,
       firstVisitAt: customerStats.firstVisitAt,
       lastVisitAt: customerStats.lastVisitAt,
@@ -168,7 +196,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         roCount: s?.roCount ?? 0,
         lastServicedAt: s?.lastServicedAt ?? null,
         lastConcern: s?.lastConcern ?? null,
-        lifetimeSpendCents: s?.lifetimeSpendCents ?? 0,
+        lifetimeSpendCents: (paidByVehicle.get(String(v._id)) ?? 0) + (s?.legacySpendCents ?? 0),
       };
     }),
     recentRepairOrders: (agg?.recentRepairOrders ?? []).map((r) => ({
@@ -178,7 +206,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       concern: r.concern ?? null,
       total: r.total,
       vehicleId: String(r.vehicleId),
-      paymentStatus: r.payment?.status ?? "unpaid",
+      paymentStatus: roPaymentSnapshot(r).status,
+      collectedCents: roPaymentSnapshot(r).collectedCents,
+      balanceCents: roPaymentSnapshot(r).balanceCents,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
       completedAt: r.completedAt ?? null,

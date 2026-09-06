@@ -21,6 +21,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
       $set: {
         "estimate.approvedAt": stamp.approvedAt,
         "estimate.approvedTotal": stamp.approvedTotal,
+        "estimate.approvedTaxTotal": stamp.approvedTaxTotal,
         "estimate.approvedLineItems": stamp.approvedLineItems,
         status: "in_repair",
       },

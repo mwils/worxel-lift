@@ -1,4 +1,4 @@
-import { Button, Group, Stack, Textarea, TextInput } from "@mantine/core";
+import { Button, Checkbox, Group, Stack, Textarea, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "mantine-form-zod-resolver";
 import { CreateCustomerDto, type CreateCustomerInput } from "@lift/shared/dto";
@@ -23,6 +23,7 @@ const EMPTY: CreateCustomerInput = {
   phone: "",
   email: undefined,
   notes: undefined,
+  taxExempt: false,
 };
 
 export function CustomerForm({
@@ -93,6 +94,11 @@ export function CustomerForm({
         />
         <TextInput label="Email" type="email" {...form.getInputProps("email")} />
         <Textarea label="Notes" minRows={2} {...form.getInputProps("notes")} />
+        <Checkbox
+          label="Tax exempt"
+          description="No sales tax on this customer's repair orders (resale, farm, government)."
+          {...form.getInputProps("taxExempt", { type: "checkbox" })}
+        />
 
         <Group justify="flex-end">
           {onCancel && (

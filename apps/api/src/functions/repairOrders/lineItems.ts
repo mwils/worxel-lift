@@ -30,6 +30,7 @@ export const createHandler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, 
 
     ro.lineItems.push(dto as any);
     await applyRoTotals(ro, user.shopId);
+    ro.lineItemsChangedAt = new Date();
     await ro.save();
 
     const created_ = ro.lineItems[ro.lineItems.length - 1] as unknown as LineItemLike;
@@ -74,6 +75,7 @@ export const patchHandler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, u
     if (dto.total !== undefined) li.total = dto.total;
 
     await applyRoTotals(ro, user.shopId);
+    ro.lineItemsChangedAt = new Date();
     await ro.save();
 
     return ok({
@@ -107,6 +109,7 @@ export const deleteHandler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, 
     li.deleteOne();
 
     await applyRoTotals(ro, user.shopId);
+    ro.lineItemsChangedAt = new Date();
     await ro.save();
 
     return ok({

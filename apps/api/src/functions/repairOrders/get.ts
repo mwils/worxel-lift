@@ -3,7 +3,8 @@ import { Customer, RepairOrder, Vehicle } from "@lift/shared";
 import { withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
 import { presignDownload } from "../../lib/s3.js";
-import { serializeEstimate } from "./_estimate.js";
+import { ensureApprovalSnapshot, serializeEstimate } from "./_estimate.js";
+import { loadPaymentRows, serializePaymentRow, serializeRoPayment } from "./_payments.js";
 
 // Photo URLs are presigned for ~1h. The frontend re-fetches the RO often
 // enough that the link gets refreshed well before it expires.
@@ -17,10 +18,16 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
   const ro = await RepairOrder.findOne({ _id: id, shopId: user.shopId }).lean();
   if (!ro) return notFound("Repair order not found");
 
-  const [customer, vehicle] = await Promise.all([
+  // Approvals recorded before snapshotting shipped: freeze the current lines
+  // as the approved set once, so later edits are flagged from here on.
+  await ensureApprovalSnapshot(ro as any);
+
+  const [customer, vehicle, paymentRows] = await Promise.all([
     Customer.findOne({ _id: ro.customerId, shopId: user.shopId }).lean(),
     Vehicle.findOne({ _id: ro.vehicleId, shopId: user.shopId }).lean(),
+    loadPaymentRows(user.shopId, ro._id),
   ]);
+  const payment = serializeRoPayment(ro, paymentRows);
 
   const photos = await Promise.all(
     (ro.photos ?? []).map(async (p: any) => ({
@@ -53,6 +60,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       partsTotal: ro.partsTotal ?? 0,
       taxTotal: ro.taxTotal ?? 0,
       total: ro.total ?? 0,
+      // null = pre-snapshot RO; it picks up the shop's current rate the next
+      // time its line items change (see _totals.applyRoTotals).
+      taxRateBps: ro.taxRateBps ?? null,
+      taxAppliesTo: ro.taxAppliesTo ?? null,
       photos,
       estimate: serializeEstimate(ro),
       inspection: (ro as any).inspection
@@ -73,7 +84,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
             // publicToken intentionally omitted — server-side only.
           }
         : { status: "draft", sentAt: null, viewedAt: null, items: [] },
-      payment: ro.payment ?? null,
+      payment,
+      // Every payment row, oldest first — voided rows included so Undo is visible.
+      payments: paymentRows.map((r) => serializePaymentRow(r)),
+      collectedCents: payment.collectedCents,
+      balanceCents: payment.balanceCents,
+      receiptToken: ro.receiptToken ?? null,
       publicToken: ro.publicToken ?? null,
       scheduledFor: ro.scheduledFor ?? null,
       completedAt: ro.completedAt ?? null,
@@ -86,6 +102,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
             lastName: customer.lastName ?? null,
             phone: customer.phone,
             email: customer.email ?? null,
+            taxExempt: customer.taxExempt === true,
           }
         : null,
       vehicle: vehicle

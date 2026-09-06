@@ -4,11 +4,13 @@ import {
   INSPECTION_SEVERITIES,
   LINE_ITEM_KINDS,
   MANUAL_PAYMENT_METHODS,
+  MAX_TAX_RATE_BPS,
   MESSAGE_CLASSIFICATIONS,
   PAYMENT_STATUSES,
   RO_STATUSES,
   SERVICE_CATEGORIES,
   SHOP_SLUG_REGEX,
+  TAX_APPLIES_TO,
   USER_ROLES,
   US_STATE_CODES,
   isValidTimezone,
@@ -155,18 +157,31 @@ export const UpdateShopDto = z.object({
   // Front-desk number shown to customers. null clears it.
   phone: e164.nullable().optional(),
   timezone: ianaTimezone.optional(),
+  // Only read when `timezone` actually changes and the shop has upcoming
+  // scheduled ROs. keep_clock (default) re-anchors each visit so 9:00 AM stays
+  // 9:00 AM in the new zone; keep_instant leaves the stored instants alone and
+  // the labels move instead (QA round-2 M1).
+  appointmentMode: z.enum(["keep_clock", "keep_instant"]).optional(),
   settings: z
     .object({
       aiTone: z.enum(AI_TONES).optional(),
       autoReplyEnabled: z.boolean().optional(),
       defaultLaborRate: money.optional(),
       serviceRemindersEnabled: z.boolean().optional(),
-      // Percent, e.g. 8.25. See Shop model comment.
-      taxRatePct: z.number().min(0).max(30).optional(),
-      taxLabor: z.boolean().optional(),
+      // Basis points (825 = 8.25%) + what it applies to. See Shop model comment.
+      taxRateBps: z.number().int().min(0).max(MAX_TAX_RATE_BPS).optional(),
+      taxAppliesTo: z.enum(TAX_APPLIES_TO).optional(),
       booking: BookingSettingsDto.optional(),
     })
     .optional(),
+});
+
+// POST /shop/appointment-notices — after a keep_instant timezone change, text
+// the affected customers their corrected visit time. `previousTimezone` lets
+// the copy say "(not 9:00 AM)" so the customer knows which text to trust.
+export const AppointmentNoticesDto = z.object({
+  roIds: z.array(objectId).min(1).max(200),
+  previousTimezone: ianaTimezone,
 });
 
 export type BookingHoursInput = z.infer<typeof BookingHoursDto>;
@@ -179,6 +194,7 @@ export const CreateCustomerDto = z.object({
   phone: e164,
   email: z.string().email().optional(),
   notes: z.string().trim().optional(),
+  taxExempt: z.boolean().optional(),
 });
 // PATCH semantics: undefined leaves a field alone, null clears it.
 export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
@@ -233,16 +249,29 @@ export const UpdateRepairOrderDto = z.object({
   scheduledFor: z.string().datetime().nullable().optional(),
 });
 
-// Owner records a non-Stripe payment (or reverses one they entered by
-// mistake). `paid: false` only unwinds a manual payment — Stripe-settled ROs
-// are refunded through Stripe, not here.
+// Owner records a non-Stripe payment. Each call appends a Payment row; the
+// RO's paid / partial state is derived from the rows, so a short amount leaves
+// the RO PARTIAL with the difference still due. `writeOffRemainder` adds a
+// negative "Discount" fee line for exactly that difference so total and
+// collected agree — never inferred from a short amount alone.
 export const MarkPaidDto = z.object({
-  paid: z.boolean().default(true),
-  method: z.enum(MANUAL_PAYMENT_METHODS).optional(),
-  amountCents: money.optional(), // defaults to the RO total server-side
+  method: z.enum(MANUAL_PAYMENT_METHODS),
+  amountCents: money.optional(), // defaults to the open balance server-side
   note: z.string().max(200).optional(),
+  paidAt: z.string().datetime().optional(), // defaults to now
+  writeOffRemainder: z.boolean().default(false),
 });
 export type MarkPaidInput = z.infer<typeof MarkPaidDto>;
+
+// Undo a mis-entered manual payment (`kind: "void"`, never counted again) or
+// record that money went back to the customer (`kind: "refund"`). Neither
+// touches Stripe — a Stripe refund is issued from the Stripe dashboard and
+// recorded here for the books.
+export const VoidPaymentDto = z.object({
+  kind: z.enum(["void", "refund"]).default("void"),
+  note: z.string().max(200).optional(),
+});
+export type VoidPaymentInput = z.infer<typeof VoidPaymentDto>;
 
 export const PresignPhotoDto = z.object({
   contentType: z.string().regex(/^image\//),

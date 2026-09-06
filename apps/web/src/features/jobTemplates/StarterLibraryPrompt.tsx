@@ -118,7 +118,7 @@ export function StarterLibraryPrompt() {
                       {s.name}
                     </Text>
                     <Text size="xs" c="dimmed">
-                      {s.category} · {s.itemCount} items · ~{formatMoney(s.priceTotal)}
+                      {s.category} · {s.itemCount} items · ~{formatMoney(s.priceTotal)} pre-tax
                       {s.imported ? " · already added" : ""}
                     </Text>
                   </Stack>

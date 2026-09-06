@@ -28,7 +28,16 @@ import {
   IconCalendarEvent,
   IconCash,
 } from "@tabler/icons-react";
-import { RO_STATUSES, RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
+import {
+  RO_STATUSES,
+  RO_STATUS_LABELS,
+  TAX_APPLIES_TO_LABELS,
+  formatTaxRate,
+  resolveTaxSettings,
+  taxLineLabel,
+  type RoStatus,
+  type TaxAppliesTo,
+} from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import {
@@ -58,9 +67,10 @@ import type { InspectionState } from "../../../features/inspection/types";
 import {
   MarkPaidModal,
   PAYMENT_METHOD_LABELS,
-  roBalanceCents,
+  type PaymentRow,
   type RoPayment,
 } from "../../../features/payments/MarkPaidModal";
+import { PaymentsCard } from "../../../features/payments/PaymentsCard";
 import { StatusTextPrompt, type PromptableStatus } from "../../../features/ro/StatusTextPrompt";
 import { DeclineFollowUpPrompt } from "../../../features/ro/DeclineFollowUpPrompt";
 
@@ -76,9 +86,17 @@ interface RoDetail {
     partsTotal: number;
     taxTotal: number;
     total: number;
+    /** Tax snapshot taken at creation; null = pre-snapshot RO. */
+    taxRateBps: number | null;
+    taxAppliesTo: TaxAppliesTo | null;
     photos: GalleryPhoto[];
     publicToken: string | null;
-    payment: RoPayment | null;
+    receiptToken: string | null;
+    // Derived from Payment rows server-side (see api repairOrders/_payments.ts).
+    payment: RoPayment;
+    payments: PaymentRow[];
+    collectedCents: number;
+    balanceCents: number;
     scheduledFor: string | null;
     estimate: {
       sentAt?: string | null;
@@ -89,6 +107,7 @@ interface RoDetail {
       declineFollowedUpAt?: string | null;
       approvedTotal?: number | null;
       changedSinceApproval?: boolean;
+      changedAt?: string | null;
     } | null;
     inspection: InspectionState;
     customer: {
@@ -97,6 +116,7 @@ interface RoDetail {
       lastName: string | null;
       phone: string;
       email: string | null;
+      taxExempt?: boolean;
     } | null;
     vehicle: {
       id: string;
@@ -167,17 +187,14 @@ export function RoDetailRoute() {
     onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
   });
 
-  const markUnpaid = useMutation({
-    mutationFn: () => api.post(`/repair-orders/${id}/mark-paid`, { paid: false }),
-    onSuccess: () => {
-      notifications.show({ color: "green", message: "Marked unpaid." });
-      qc.invalidateQueries({ queryKey: ["ro", id] });
-      qc.invalidateQueries({ queryKey: ["ros"] });
-      qc.invalidateQueries({ queryKey: ["customer-history"] });
-      qc.invalidateQueries({ queryKey: ["vehicle-history"] });
-    },
-    onError: (err) => notifyError(err, { title: "Couldn't mark unpaid" }),
-  });
+  // Any payment write (mark paid / undo / refund) touches the RO, the board
+  // pill, and both spend figures.
+  const invalidatePaymentViews = () => {
+    qc.invalidateQueries({ queryKey: ["ro", id] });
+    qc.invalidateQueries({ queryKey: ["ros"] });
+    qc.invalidateQueries({ queryKey: ["customer-history"] });
+    qc.invalidateQueries({ queryKey: ["vehicle-history"] });
+  };
 
   const createLine = useMutation({
     mutationFn: (draft: LineItemDraft) =>
@@ -197,6 +214,18 @@ export function RoDetailRoute() {
     mutationFn: (lineId: string) => api.del(`/repair-orders/${id}/line-items/${lineId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ro", id] }),
     onError: (err) => notifyError(err, { title: "Couldn't delete line" }),
+  });
+
+  // Re-stamp the shop's current tax setting onto this RO (its snapshot is
+  // from creation time, so a Settings change doesn't touch it otherwise).
+  const applyTax = useMutation({
+    mutationFn: () => api.post(`/repair-orders/${id}/apply-tax`),
+    onSuccess: () => {
+      notifications.show({ color: "green", message: "Tax updated on this RO." });
+      qc.invalidateQueries({ queryKey: ["ro", id] });
+      qc.invalidateQueries({ queryKey: ["ros"] });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't update tax" }),
   });
 
   // ── Saved-job template apply ────────────────────────────────────────────
@@ -491,14 +520,20 @@ export function RoDetailRoute() {
         estimateDeclined && ro.estimate.declineFollowedUpAt
           ? `you texted ${formatVisit(ro.estimate.declineFollowedUpAt, tz)}`
           : null,
+        estimateChanged && ro.estimate.changedAt
+          ? `changed ${formatVisit(ro.estimate.changedAt, tz)}`
+          : null,
       ]
         .filter(Boolean)
         .join(" · ")
     : null;
 
-  const balanceCents = roBalanceCents(ro.total, ro.payment);
-  const isPaid = ro.payment?.status === "paid";
-  const paidViaStripe = ro.payment?.method === "stripe" || !!ro.payment?.stripePaymentIntentId;
+  const balanceCents = ro.balanceCents ?? ro.payment?.balanceCents ?? ro.total;
+  const collectedCents = ro.collectedCents ?? ro.payment?.collectedCents ?? 0;
+  const payStatus = ro.payment?.status ?? "unpaid";
+  const isPaid = payStatus === "paid";
+  const isPartial = payStatus === "partial";
+  const payMethodLabel = ro.payment?.method ? PAYMENT_METHOD_LABELS[ro.payment.method] : null;
   const closedStatus = ["picked_up", "voided", "cancelled_by_customer"].includes(ro.status);
 
   const changeStatus = (next: RoStatus) => {
@@ -583,15 +618,35 @@ export function RoDetailRoute() {
           />
           {ro.total > 0 &&
             (isPaid ? (
+              // PAID · CASH · $294.50
               <Badge variant="light" color="teal">
-                Paid
-                {ro.payment?.method ? ` · ${PAYMENT_METHOD_LABELS[ro.payment.method]}` : ""}
+                Paid{payMethodLabel ? ` · ${payMethodLabel}` : ""} · {formatMoney(collectedCents)}
+              </Badge>
+            ) : isPartial ? (
+              // PARTIAL · CASH · $200.00 of $294.50, with what's left underneath
+              <Stack gap={2} align="flex-end">
+                <Badge variant="light" color="orange">
+                  Partial{payMethodLabel ? ` · ${payMethodLabel}` : ""} · {formatMoney(collectedCents)} of{" "}
+                  {formatMoney(ro.total)}
+                </Badge>
+                <Text size="xs" c="orange.7" fw={600}>
+                  {formatMoney(balanceCents)} due
+                </Text>
+              </Stack>
+            ) : payStatus === "refunded" ? (
+              <Badge variant="light" color="red">
+                Refunded
               </Badge>
             ) : (
               <Badge variant="light" color={ro.status === "ready" || closedStatus ? "orange" : "gray"}>
                 Unpaid · {formatMoney(balanceCents)}
               </Badge>
             ))}
+          {(isPaid || isPartial) && ro.payment?.note && (
+            <Text size="xs" c="dimmed" ta="right" style={{ maxWidth: 240 }}>
+              {ro.payment.note}
+            </Text>
+          )}
           {estimateChanged ? (
             <Badge variant="light" color="orange">
               Changed since approval · {formatMoney(ro.estimate?.approvedTotal ?? 0)} approved
@@ -673,14 +728,49 @@ export function RoDetailRoute() {
           </Text>
           <Text>{formatMoney(ro.partsTotal)}</Text>
         </Group>
-        {ro.taxTotal > 0 && (
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Tax
-            </Text>
-            <Text>{formatMoney(ro.taxTotal)}</Text>
-          </Group>
-        )}
+        {(() => {
+          // The RO's own snapshot vs. what Settings says now. A pre-snapshot
+          // RO (null) is only "stale" if the shop actually has a rate to apply.
+          const shopTax = resolveTaxSettings(me?.shop?.settings);
+          const roBps = ro.taxRateBps;
+          const roApplies = ro.taxAppliesTo ?? "parts";
+          const exempt = ro.customer?.taxExempt === true;
+          const taxed = (roBps ?? 0) > 0 && roApplies !== "none";
+          const stale =
+            roBps === null
+              ? shopTax.taxRateBps > 0
+              : roBps !== shopTax.taxRateBps || roApplies !== shopTax.taxAppliesTo;
+          const shopTaxLabel =
+            shopTax.taxRateBps > 0 && shopTax.taxAppliesTo !== "none"
+              ? `${formatTaxRate(shopTax.taxRateBps)} · ${TAX_APPLIES_TO_LABELS[shopTax.taxAppliesTo].toLowerCase()}`
+              : "no tax";
+          return (
+            <>
+              {(taxed || exempt || ro.taxTotal > 0) && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {exempt
+                      ? "Tax · customer is tax-exempt"
+                      : `${taxLineLabel(roApplies)} · ${formatTaxRate(roBps ?? 0)}`}
+                  </Text>
+                  <Text>{formatMoney(ro.taxTotal)}</Text>
+                </Group>
+              )}
+              {stale && !exempt && (
+                <Group justify="flex-end">
+                  <Button
+                    variant="subtle"
+                    size="compact-xs"
+                    onClick={() => applyTax.mutate()}
+                    loading={applyTax.isPending}
+                  >
+                    Apply current tax rate ({shopTaxLabel})
+                  </Button>
+                </Group>
+              )}
+            </>
+          );
+        })()}
         <Group justify="space-between">
           <Text fw={700}>Total</Text>
           <Text fw={700}>{formatMoney(ro.total)}</Text>
@@ -744,11 +834,16 @@ export function RoDetailRoute() {
       <Group>
         <Button
           leftSection={<IconSend size={16} />}
+          color={estimateChanged ? "orange" : undefined}
           onClick={openSendEstimate}
           loading={estimateLoading}
           disabled={ro.lineItems.length === 0 || !ro.customer}
         >
-          {ro.estimate?.sentAt ? "Re-send estimate" : "Send estimate"}
+          {estimateChanged
+            ? "Re-send for approval"
+            : ro.estimate?.sentAt
+            ? "Re-send estimate"
+            : "Send estimate"}
         </Button>
         <Button
           variant="default"
@@ -759,33 +854,38 @@ export function RoDetailRoute() {
         >
           Text pay link
         </Button>
-        {!isPaid ? (
+        {balanceCents > 0 && (
+          // Undo / refund live per row in the Payments card below.
           <Button
             variant="default"
             leftSection={<IconCash size={16} />}
             onClick={() => setMarkPaidOpen(true)}
             disabled={ro.total === 0}
           >
-            Mark paid
+            {isPartial ? `Mark paid · ${formatMoney(balanceCents)} due` : "Mark paid"}
           </Button>
-        ) : (
-          !paidViaStripe && (
-            <Button
-              variant="subtle"
-              color="gray"
-              size="compact-sm"
-              onClick={() => markUnpaid.mutate()}
-              loading={markUnpaid.isPending}
-            >
-              Undo mark paid
-            </Button>
-          )
         )}
       </Group>
       {estimateTimeline && (
         <Text size="xs" c="dimmed" mt={-8}>
           Estimate {estimateTimeline}
         </Text>
+      )}
+
+      {ro.payment && (
+        <PaymentsCard
+          repairOrderId={id!}
+          roNumber={ro.number}
+          totalCents={ro.total}
+          payment={ro.payment}
+          payments={ro.payments ?? []}
+          tz={tz}
+          customer={ro.customer ? { id: ro.customer.id, firstName: ro.customer.firstName } : null}
+          vehicleSummary={vehicleSummary}
+          shopName={me?.shop?.name ?? "the shop"}
+          onChanged={invalidatePaymentViews}
+          onTexted={() => qc.invalidateQueries({ queryKey: ["conversation"] })}
+        />
       )}
 
       <Card withBorder>
@@ -1044,11 +1144,9 @@ export function RoDetailRoute() {
         onClose={() => setMarkPaidOpen(false)}
         repairOrderId={id!}
         balanceCents={balanceCents}
+        totalCents={ro.total}
         onPaid={() => {
-          qc.invalidateQueries({ queryKey: ["ro", id] });
-          qc.invalidateQueries({ queryKey: ["ros"] });
-          qc.invalidateQueries({ queryKey: ["customer-history"] });
-          qc.invalidateQueries({ queryKey: ["vehicle-history"] });
+          invalidatePaymentViews();
           // Marking paid from the pickup warning finishes the pickup too.
           if (unpaidPickupOpen) {
             setUnpaidPickupOpen(false);

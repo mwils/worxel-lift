@@ -6,6 +6,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   RO_STATUSES,
+  TAX_APPLIES_TO,
 } from "../constants.js";
 
 const LineItemSchema = new Schema(
@@ -58,6 +59,11 @@ const RepairOrderSchema = new Schema(
     partsTotal: { type: Number, default: 0 },
     taxTotal: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
+    // Shop tax settings frozen at RO creation, so a rate change in Settings
+    // doesn't rewrite history. Absent on pre-snapshot ROs — `applyRoTotals`
+    // stamps the shop's current setting the next time line items change.
+    taxRateBps: { type: Number, min: 0 },
+    taxAppliesTo: { type: String, enum: TAX_APPLIES_TO },
 
     photos: { type: [PhotoSchema], default: [] },
 
@@ -75,14 +81,20 @@ const RepairOrderSchema = new Schema(
       publicToken: String,
       // Snapshot taken when the customer approves, so later line-item edits
       // can be flagged as "changed since approval" against the number the
-      // customer actually agreed to. Cleared when the estimate is re-sent.
+      // customer actually agreed to, and so the public estimate page keeps
+      // showing what they agreed to. Cleared when the estimate is re-sent.
       approvedTotal: Number, // cents
+      approvedTaxTotal: Number, // cents; tax included in approvedTotal
       approvedLineItems: {
         type: [
           new Schema(
             {
               kind: { type: String, enum: LINE_ITEM_KINDS, required: true },
               description: { type: String, required: true },
+              hours: Number,
+              rate: Number, // cents per hour
+              qty: Number,
+              unitPrice: Number, // cents
               total: { type: Number, required: true }, // cents
             },
             { _id: false }
@@ -90,7 +102,15 @@ const RepairOrderSchema = new Schema(
         ],
         default: undefined,
       },
+      // Set when the snapshot was reconstructed from the live lines for an
+      // approval that predates snapshotting (lazy on read, or the backfill
+      // script) — best available truth, not what the customer literally saw.
+      approvedSnapshotBackfilledAt: Date,
     },
+
+    // Last time a line item was added / edited / removed. Drives the
+    // "changed <time>" marker next to an approval that no longer matches.
+    lineItemsChangedAt: Date,
 
     inspection: {
       status: { type: String, enum: INSPECTION_STATUSES, default: "draft" },
@@ -100,20 +120,26 @@ const RepairOrderSchema = new Schema(
       viewedAt: Date,
     },
 
+    // Derived from this RO's Payment rows (apps/api repairOrders/_payments.ts
+    // recomputes on every payment write). `method/amountCents/note/paidAt`
+    // mirror the LATEST counted payment as a display convenience. ROs written
+    // before the payments backfill have `status: "paid"` and no
+    // `collectedCents`; readers treat that as collected = amountCents ?? total.
     payment: {
       status: { type: String, enum: PAYMENT_STATUSES, default: "unpaid" },
       stripePaymentIntentId: String,
       paidAt: Date,
-      // Set by POST /repair-orders/:id/mark-paid (cash / in-person card /
-      // check / other) or "stripe" by the pay-link + card-on-file paths.
-      method: { type: String, enum: PAYMENT_METHODS },
-      // What was actually collected, in cents. Defaults to `total` at mark-paid
-      // time; may be lower if the owner knocked something off at the counter.
+      method: { type: String, enum: [...PAYMENT_METHODS, "card"] }, // "card" = legacy in-person
       amountCents: Number,
       note: { type: String, maxlength: 200 },
+      // Sum of succeeded Payment rows, in cents.
+      collectedCents: Number,
     },
 
     publicToken: { type: String, index: true }, // for pay/estimate links
+    // Customer-side token for the public receipt page. Minted on first
+    // "Text receipt"; separate from publicToken (which also opens the estimate).
+    receiptToken: { type: String, index: true, sparse: true },
 
     // Where this RO came from. `manual` = the owner created it in the app;
     // `booking` = a customer self-booked via the public URL.

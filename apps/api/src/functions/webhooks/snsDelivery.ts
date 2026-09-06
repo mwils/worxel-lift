@@ -1,6 +1,6 @@
 import type { SNSHandler } from "aws-lambda";
 import { connectDb } from "@lift/shared/db";
-import { Message } from "@lift/shared";
+import { Conversation, Message } from "@lift/shared";
 
 /**
  * Subscriber for the SNS topic that AWS End User Messaging publishes
@@ -82,6 +82,27 @@ export const handler: SNSHandler = async (event) => {
         matched: res.matchedCount,
         modified: res.modifiedCount,
       });
+
+      // A bounced text is something Mike has to act on, so surface the
+      // thread again — and if it was an auto-reply, the customer is still
+      // waiting on an answer.
+      if (status === "failed" && res.matchedCount > 0) {
+        const failed = await Message.findOne(
+          { awsMessageId, direction: "out" },
+          { shopId: 1, customerId: 1, autoReplied: 1 }
+        ).lean();
+        if (failed) {
+          await Conversation.updateOne(
+            { shopId: failed.shopId, customerId: failed.customerId },
+            {
+              $set: {
+                bumpedAt: new Date(),
+                ...(failed.autoReplied ? { needsReply: true } : {}),
+              },
+            }
+          );
+        }
+      }
     } catch (err) {
       console.error("[snsDelivery] failed", err);
     }

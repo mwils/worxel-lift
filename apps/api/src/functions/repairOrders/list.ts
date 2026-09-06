@@ -4,6 +4,7 @@ import { Customer, RepairOrder, RoStatusEnum, Vehicle } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok } from "../../lib/response.js";
 import { isEstimateDeclined } from "./_estimate.js";
+import { roPaymentSnapshot } from "./_payments.js";
 
 const ListQuery = z.object({
   // Single status or comma-separated list ("picked_up,voided") — the board's
@@ -63,6 +64,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     let board = ros.map((r) => {
       const c = customerById.get(String(r.customerId));
       const v = vehicleById.get(String(r.vehicleId));
+      const pay = roPaymentSnapshot(r);
       return {
         id: String(r._id),
         number: r.number,
@@ -70,7 +72,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         customerName: customerName(c),
         vehicleSummary: vehicleSummary(v),
         total: r.total,
-        paymentStatus: r.payment?.status ?? "unpaid",
+        paymentStatus: pay.status,
+        collectedCents: pay.collectedCents,
+        balanceCents: pay.balanceCents,
         updatedAt: r.updatedAt,
         // Board cards show the visit date for scheduled ROs.
         scheduledFor: r.scheduledFor ?? null,
