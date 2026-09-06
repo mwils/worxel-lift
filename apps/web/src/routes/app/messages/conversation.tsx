@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActionIcon,
   Box,
@@ -13,7 +13,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconChevronLeft } from "@tabler/icons-react";
+import { IconArchiveOff, IconCheck, IconChevronLeft } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
 import { formatPhone } from "../../../lib/format";
 import {
@@ -26,6 +26,10 @@ interface ConversationResponse {
   messages: ConversationMessage[];
   hasMore: boolean;
   nextCursor: string | null;
+}
+
+interface ThreadState {
+  thread: { archived: boolean; needsReply: boolean; unreadCount: number } | null;
 }
 
 interface CustomerLite {
@@ -41,6 +45,8 @@ interface CustomerLite {
 export function ConversationRoute() {
   const { customerId } = useParams<{ customerId: string }>();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
   // Older pages fetched by clicking "Load older messages". The conversation
   // endpoint returns oldest→newest within a page, so we prepend.
@@ -99,6 +105,31 @@ export function ConversationRoute() {
     el.scrollTop = el.scrollHeight;
   }, [newestCount]);
 
+  // Opening the thread marks it read; so does a new text arriving while
+  // it's open (newestCount changes on the 15s poll).
+  const readM = useMutation({
+    mutationFn: () => api.post<ThreadState>(`/messages/threads/${customerId}/read`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["inbox"] }),
+  });
+  const markRead = readM.mutate;
+  const loaded = !!convoQ.data;
+  useEffect(() => {
+    if (customerId && loaded) markRead();
+  }, [customerId, newestCount, loaded, markRead]);
+
+  const thread = readM.data?.thread ?? null;
+  const doneM = useMutation({
+    mutationFn: (archived: boolean) =>
+      api.post<ThreadState>(
+        `/messages/threads/${customerId}/${archived ? "unarchive" : "archive"}`
+      ),
+    onSuccess: (_res, archived) => {
+      qc.invalidateQueries({ queryKey: ["inbox"] });
+      if (!archived) navigate("/messages");
+      else markRead();
+    },
+  });
+
   if (!customerId) {
     return <Text c="dimmed">Missing customer id.</Text>;
   }
@@ -110,19 +141,37 @@ export function ConversationRoute() {
 
   return (
     <Stack gap="sm" style={{ height: "calc(100vh - 100px)" }}>
-      <Group wrap="nowrap">
-        <ActionIcon component={Link} to="/messages" variant="subtle" aria-label="Back to messages">
-          <IconChevronLeft size={20} />
-        </ActionIcon>
-        <Stack gap={0}>
-          <Title order={4}>{fullName}</Title>
-          {customer && (
-            <Text size="xs" c="dimmed">
-              {formatPhone(customer.phone)}
-              {customer.email ? ` · ${customer.email}` : ""}
-            </Text>
-          )}
-        </Stack>
+      <Group wrap="nowrap" justify="space-between">
+        <Group wrap="nowrap" style={{ minWidth: 0 }}>
+          <ActionIcon component={Link} to="/messages" variant="subtle" aria-label="Back to messages">
+            <IconChevronLeft size={20} />
+          </ActionIcon>
+          <Stack gap={0} style={{ minWidth: 0 }}>
+            <Title order={4} lineClamp={1}>
+              {fullName}
+            </Title>
+            {customer && (
+              <Text size="xs" c="dimmed" truncate>
+                {formatPhone(customer.phone)}
+                {customer.email ? ` · ${customer.email}` : ""}
+              </Text>
+            )}
+          </Stack>
+        </Group>
+        {thread && (
+          <Button
+            size="xs"
+            variant={thread.archived ? "subtle" : "default"}
+            leftSection={
+              thread.archived ? <IconArchiveOff size={14} /> : <IconCheck size={14} />
+            }
+            loading={doneM.isPending}
+            onClick={() => doneM.mutate(thread.archived)}
+            style={{ flex: "0 0 auto" }}
+          >
+            {thread.archived ? "Reopen" : "Mark done"}
+          </Button>
+        )}
       </Group>
 
       <Card withBorder p="sm" style={{ flex: 1, overflow: "hidden" }}>
@@ -159,7 +208,10 @@ export function ConversationRoute() {
 
       <MessageComposer
         customerId={customerId}
-        onSent={() => convoQ.refetch()}
+        onSent={() => {
+          convoQ.refetch();
+          qc.invalidateQueries({ queryKey: ["inbox"] });
+        }}
       />
     </Stack>
   );

@@ -1,5 +1,6 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 import { MESSAGE_CLASSIFICATIONS } from "../constants.js";
+import { applyMessageToConversation, type ConversationMessageInput } from "./conversation.js";
 
 const MessageSchema = new Schema(
   {
@@ -41,6 +42,24 @@ const MessageSchema = new Schema(
 );
 
 MessageSchema.index({ shopId: 1, customerId: 1, sentAt: -1 });
+
+// Keep the per-customer Conversation row current for every write site
+// (18 of them at last count) without each having to remember. Only the
+// first save counts — snsInbound re-saves the inbound doc to attach the
+// classification, and that must not double-count.
+MessageSchema.pre("save", function () {
+  this.$locals.wasNew = this.isNew;
+});
+MessageSchema.post("save", async function () {
+  if (!this.$locals.wasNew) return;
+  try {
+    await applyMessageToConversation(this as unknown as ConversationMessageInput);
+  } catch (err) {
+    // The text already went out; a stale inbox row is repairable
+    // (scripts/backfillConversations.ts) — a failed send is not.
+    console.error("[Message] conversation update failed", err);
+  }
+});
 
 export type MessageDoc = InferSchemaType<typeof MessageSchema> & { _id: mongoose.Types.ObjectId };
 

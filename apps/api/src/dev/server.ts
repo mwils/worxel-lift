@@ -65,6 +65,12 @@ import { handler as roSendEstimate } from "../functions/repairOrders/sendEstimat
 import { handler as messagesConversation } from "../functions/messages/conversation.js";
 import { handler as messagesDraft } from "../functions/messages/draft.js";
 import { handler as messagesSend } from "../functions/messages/send.js";
+import { handler as messagesInbox } from "../functions/messages/inbox.js";
+import {
+  read as threadRead,
+  archive as threadArchive,
+  unarchive as threadUnarchive,
+} from "../functions/messages/thread.js";
 
 import { handler as voicePresign } from "../functions/voice/presign.js";
 import { handler as voiceTranscribe } from "../functions/voice/transcribe.js";
@@ -156,6 +162,10 @@ app.post("/repair-orders/:id/send-estimate", toExpress(roSendEstimate));
 app.get("/messages/conversation/:customerId", toExpress(messagesConversation));
 app.post("/messages/draft", toExpress(messagesDraft));
 app.post("/messages/send", toExpress(messagesSend));
+app.get("/messages/inbox", toExpress(messagesInbox));
+app.post("/messages/threads/:customerId/read", toExpress(threadRead));
+app.post("/messages/threads/:customerId/archive", toExpress(threadArchive));
+app.post("/messages/threads/:customerId/unarchive", toExpress(threadUnarchive));
 
 // voice (shop-scoped)
 app.post("/voice/presign", toExpress(voicePresign));
