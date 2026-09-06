@@ -4,6 +4,7 @@ export * from "./customer.js";
 export * from "./vehicle.js";
 export * from "./repairOrder.js";
 export * from "./message.js";
+export * from "./conversation.js";
 export * from "./payment.js";
 export * from "./aiInteraction.js";
 export * from "./subscriptionEvent.js";
