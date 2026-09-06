@@ -43,6 +43,7 @@ interface CustomerHistory {
     phone: string;
     email: string | null;
     notes: string | null;
+    taxExempt?: boolean;
     smsOptInAt: string | null;
     smsOptOutAt: string | null;
     createdAt: string;
@@ -214,6 +215,11 @@ export function CustomerDetailRoute() {
             {customer.smsOptOutAt && (
               <Badge size="xs" color="red" variant="light">
                 SMS opted out
+              </Badge>
+            )}
+            {customer.taxExempt && (
+              <Badge size="xs" color="gray" variant="light">
+                Tax exempt
               </Badge>
             )}
           </Stack>
@@ -404,6 +410,7 @@ export function CustomerDetailRoute() {
             phone: formatPhone(customer.phone),
             email: customer.email ?? undefined,
             notes: customer.notes ?? undefined,
+            taxExempt: customer.taxExempt ?? false,
           }}
           loading={updateCustomer.isPending}
           onCancel={editModalCtl.close}

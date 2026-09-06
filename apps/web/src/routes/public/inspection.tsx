@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatTaxRate, taxLineLabel } from "@lift/shared/constants";
 import {
   Badge,
   Box,
@@ -45,6 +46,9 @@ interface PublicInspection {
   items: InspectionItem[];
   estimate: {
     lineItems: Array<{ description: string; kind: string; total: number }>;
+    taxTotal?: number;
+    taxRateBps?: number;
+    taxAppliesTo?: string;
     total: number;
     status: "draft" | "sent" | "approved" | "declined";
     publicToken: string | null;
@@ -205,6 +209,18 @@ export function PublicInspectionRoute() {
                 </Group>
               ))}
               <Divider />
+              {((data.estimate.taxTotal ?? 0) > 0 ||
+                ((data.estimate.taxRateBps ?? 0) > 0 && data.estimate.taxAppliesTo !== "none")) && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {taxLineLabel(data.estimate.taxAppliesTo)}
+                    {(data.estimate.taxRateBps ?? 0) > 0
+                      ? ` · ${formatTaxRate(data.estimate.taxRateBps ?? 0)}`
+                      : ""}
+                  </Text>
+                  <Text size="sm">{formatMoney(data.estimate.taxTotal ?? 0)}</Text>
+                </Group>
+              )}
               <Group justify="space-between">
                 <Text fw={600}>Total</Text>
                 <Text fw={600}>{formatMoney(data.estimate.total)}</Text>

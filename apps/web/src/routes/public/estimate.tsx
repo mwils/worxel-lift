@@ -13,6 +13,7 @@ import {
   Center,
   Anchor,
 } from "@mantine/core";
+import { formatTaxRate, taxLineLabel } from "@lift/shared/constants";
 import { api, ApiError } from "../../lib/api";
 import { formatMoney, formatPhone } from "../../lib/format";
 import { notifyError } from "../../lib/notify";
@@ -36,6 +37,9 @@ interface PublicEstimate {
     laborTotal?: number;
     partsTotal?: number;
     taxTotal?: number;
+    /** Snapshotted rate (bps) — 0 for untaxed shops and tax-exempt customers. */
+    taxRateBps?: number;
+    taxAppliesTo?: string;
     total: number;
     estimate?: {
       sentAt?: string | null;
@@ -180,7 +184,11 @@ export function PublicEstimateRoute() {
   const taxTotal = ro.taxTotal ?? 0;
   const laborTotal = ro.laborTotal ?? 0;
   const partsTotal = ro.partsTotal ?? 0;
-  const showBreakdown = taxTotal > 0 || (laborTotal > 0 && partsTotal > 0);
+  // Taxed shop → always show the tax line, even at $0.00 (labor-only job in a
+  // parts-only state), so the customer sees tax was considered, not skipped.
+  const taxRateBps = ro.taxRateBps ?? 0;
+  const showTax = taxTotal > 0 || (taxRateBps > 0 && ro.taxAppliesTo !== "none");
+  const showBreakdown = showTax || (laborTotal > 0 && partsTotal > 0);
 
   const shop = data.shop;
   const addr = shop?.address;
@@ -260,10 +268,11 @@ export function PublicEstimateRoute() {
                     <Text size="sm">{formatMoney(partsTotal)}</Text>
                   </Group>
                 )}
-                {taxTotal > 0 && (
+                {showTax && (
                   <Group justify="space-between">
                     <Text size="sm" c="dimmed">
-                      Tax
+                      {taxLineLabel(ro.taxAppliesTo)}
+                      {taxRateBps > 0 ? ` · ${formatTaxRate(taxRateBps)}` : ""}
                     </Text>
                     <Text size="sm">{formatMoney(taxTotal)}</Text>
                   </Group>

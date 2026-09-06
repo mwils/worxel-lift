@@ -33,6 +33,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       phone: dto.phone,
       email: dto.email,
       notes: dto.notes,
+      taxExempt: dto.taxExempt === true,
       // Customer opts in at the moment of creation (TCPA opt-in language is
       // included in the shop onboarding script / first outbound).
       smsOptInAt: new Date(),
@@ -54,6 +55,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         phone: customer.phone,
         email: customer.email ?? null,
         notes: customer.notes ?? null,
+        taxExempt: customer.taxExempt === true,
         smsOptInAt: customer.smsOptInAt ?? null,
       },
     });

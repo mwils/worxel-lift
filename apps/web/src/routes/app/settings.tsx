@@ -25,11 +25,17 @@ import {
   SERVICE_CATEGORIES,
   SERVICE_INTERVALS,
   SHOP_SLUG_REGEX,
+  TAX_APPLIES_TO,
+  TAX_APPLIES_TO_LABELS,
   US_STATE_CODES,
   US_STATE_NAMES,
   US_TIMEZONES,
+  bpsToPct,
   isValidTimezone,
+  pctToBps,
+  resolveTaxSettings,
   slugifyShopName,
+  type TaxAppliesTo,
 } from "@lift/shared/constants";
 import {
   useAuth,
@@ -39,6 +45,12 @@ import {
 } from "../../lib/auth";
 import { api } from "../../lib/api";
 import { notifyError } from "../../lib/notify";
+import {
+  TimezoneChangeModal,
+  type AppointmentMode,
+  type AppointmentShift,
+  type TimezoneChangeRequest,
+} from "../../features/settings/TimezoneChangeModal";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL ?? "https://lift.worxel.com";
@@ -113,16 +125,17 @@ export function SettingsRoute() {
       address?: ShopAddress;
       phone?: string | null;
       timezone?: string;
+      appointmentMode?: AppointmentMode;
       settings?: {
         aiTone?: "plain" | "friendly";
         autoReplyEnabled?: boolean;
         defaultLaborRate?: number;
         serviceRemindersEnabled?: boolean;
-        taxRatePct?: number;
-        taxLabor?: boolean;
+        taxRateBps?: number;
+        taxAppliesTo?: TaxAppliesTo;
         booking?: BookingSettings;
       };
-    }) => api.patch("/shop", patch),
+    }) => api.patch<{ appointments?: AppointmentShift | null }>("/shop", patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
       notifications.show({ color: "green", message: "Settings saved." });
@@ -134,11 +147,14 @@ export function SettingsRoute() {
   const [laborRateDollars, setLaborRateDollars] = useState<number | undefined>(
     initialRate != null ? initialRate / 100 : undefined
   );
-  // Sales tax: a percent (8.25 = 8.25%), applied to parts on every RO as line
-  // items change. Labor is untaxed unless the shop's state says otherwise.
-  const [taxRatePct, setTaxRatePct] = useState<number | string>(
-    me?.shop?.settings.taxRatePct ?? 0
-  );
+  // Sales tax: edited as a percent with 2 decimals, stored as basis points.
+  // Snapshotted onto each RO at creation, so changing it here only affects
+  // new ROs (the RO page offers "Apply current tax rate" for old ones).
+  const savedTax = resolveTaxSettings(me?.shop?.settings);
+  const [taxRatePct, setTaxRatePct] = useState<number | string>(bpsToPct(savedTax.taxRateBps));
+  const [taxAppliesTo, setTaxAppliesTo] = useState<TaxAppliesTo>(savedTax.taxAppliesTo);
+  const draftTaxBps = pctToBps(Number(taxRatePct || 0));
+  const taxDirty = draftTaxBps !== savedTax.taxRateBps || taxAppliesTo !== savedTax.taxAppliesTo;
 
   // ── Shop profile (name, address, phone, timezone) ──────────────
   // Drafts are seeded from `me` and re-seeded whenever the server copy
@@ -182,7 +198,33 @@ export function SettingsRoute() {
   ]);
   const tzIsCurated = US_TIMEZONES.some((z) => z.value === profile.timezone);
 
-  function saveProfile() {
+  // Timezone change guard (QA round-2 M1): a zone switch with visits on the
+  // books first asks keep-clock vs keep-instant, then (keep_instant only)
+  // offers to text the affected customers. See TimezoneChangeModal.
+  const [tzRequest, setTzRequest] = useState<
+    (TimezoneChangeRequest & { payload: Parameters<typeof patchShop.mutate>[0] }) | null
+  >(null);
+  const [tzShift, setTzShift] = useState<AppointmentShift | null>(null);
+  const [tzChecking, setTzChecking] = useState(false);
+
+  async function confirmTimezoneChange(mode: AppointmentMode) {
+    if (!tzRequest) return;
+    try {
+      const res = await patchShop.mutateAsync({ ...tzRequest.payload, appointmentMode: mode });
+      setTzRequest(null);
+      if (res.appointments && res.appointments.mode === "keep_instant") {
+        setTzShift(res.appointments);
+      }
+      // keep_clock: the board moves with the customers' texts; the RO cache is
+      // stale until refetched.
+      qc.invalidateQueries({ queryKey: ["ros"] });
+      qc.invalidateQueries({ queryKey: ["ro"] });
+    } catch {
+      // patchShop.onError already showed the toast; keep the dialog open.
+    }
+  }
+
+  async function saveProfile() {
     const name = profile.name.replace(/\s+/g, " ").trim();
     if (name.length < 2) {
       setProfileError("Shop name needs at least 2 characters.");
@@ -199,7 +241,7 @@ export function SettingsRoute() {
       return;
     }
     setProfileError(null);
-    patchShop.mutate({
+    const payload = {
       name,
       address: {
         line1: profile.line1,
@@ -210,7 +252,32 @@ export function SettingsRoute() {
       },
       phone,
       timezone,
-    });
+    };
+
+    const currentTz = shop?.timezone ?? "America/Chicago";
+    if (timezone !== currentTz) {
+      // Count upcoming scheduled visits before committing the zone change.
+      setTzChecking(true);
+      try {
+        const { ros } = await api.get<{ ros: Array<{ scheduledFor: string | null }> }>(
+          "/repair-orders?status=scheduled&limit=200"
+        );
+        const now = Date.now();
+        const count = ros.filter(
+          (r) => r.scheduledFor && new Date(r.scheduledFor).getTime() > now
+        ).length;
+        if (count > 0) {
+          setTzRequest({ count, fromTz: currentTz, toTz: timezone, payload });
+          return;
+        }
+      } catch (err) {
+        notifyError(err, { title: "Couldn't check upcoming appointments" });
+        return;
+      } finally {
+        setTzChecking(false);
+      }
+    }
+    patchShop.mutate(payload);
   }
 
   const openBillingPortal = useMutation({
@@ -437,10 +504,18 @@ export function SettingsRoute() {
         </Text>
       )}
       <Group>
-        <Button onClick={saveProfile} loading={patchShop.isPending}>
+        <Button onClick={saveProfile} loading={patchShop.isPending || tzChecking}>
           Save shop profile
         </Button>
       </Group>
+      <TimezoneChangeModal
+        request={tzRequest}
+        saving={patchShop.isPending}
+        onCancel={() => setTzRequest(null)}
+        onConfirm={confirmTimezoneChange}
+        shift={tzShift}
+        onShiftDone={() => setTzShift(null)}
+      />
 
       <Divider label="AI" />
       <Select
@@ -675,32 +750,41 @@ export function SettingsRoute() {
       </Group>
 
       <Divider label="Sales tax" />
-      <Group align="end">
+      <Group align="end" wrap="wrap">
         <NumberInput
           label="Tax rate (%)"
-          description="Applied to parts on each RO. 0 turns tax off."
+          description="Shows as its own line on estimates, texts and receipts."
           min={0}
           max={30}
-          decimalScale={3}
+          decimalScale={2}
           suffix="%"
           value={taxRatePct}
           onChange={setTaxRatePct}
-          w={240}
+          w={200}
+        />
+        <Select
+          label="Applies to"
+          description="Most states tax parts, not labor."
+          data={TAX_APPLIES_TO.map((v) => ({ value: v, label: TAX_APPLIES_TO_LABELS[v] }))}
+          value={taxAppliesTo}
+          onChange={(v) => v && setTaxAppliesTo(v as TaxAppliesTo)}
+          allowDeselect={false}
+          w={200}
         />
         <Button
           variant="default"
-          onClick={() => patchShop.mutate({ settings: { taxRatePct: Number(taxRatePct || 0) } })}
-          disabled={Number(taxRatePct || 0) === (me?.shop?.settings.taxRatePct ?? 0)}
+          onClick={() =>
+            patchShop.mutate({ settings: { taxRateBps: draftTaxBps, taxAppliesTo } })
+          }
+          disabled={!taxDirty}
         >
-          Save tax rate
+          Save tax
         </Button>
       </Group>
-      <Switch
-        label="Also tax labor"
-        description="Most states don't. Turn on if yours does."
-        checked={me?.shop?.settings.taxLabor ?? false}
-        onChange={(e) => patchShop.mutate({ settings: { taxLabor: e.currentTarget.checked } })}
-      />
+      <Text size="xs" c="dimmed">
+        Changing this only affects new repair orders. Open an RO and tap “Apply current tax
+        rate” to update an existing one.
+      </Text>
 
       <Divider label="Team" />
       <Text size="sm" c="dimmed">

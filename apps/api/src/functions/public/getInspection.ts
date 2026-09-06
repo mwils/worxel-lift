@@ -92,6 +92,9 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
         kind: li.kind,
         total: li.total,
       })),
+      taxTotal: approvedEstimate?.taxTotal ?? ro.taxTotal ?? 0,
+      taxRateBps: customer?.taxExempt ? 0 : ro.taxRateBps ?? 0,
+      taxAppliesTo: ro.taxAppliesTo ?? "parts",
       total: approvedEstimate?.total ?? ro.total ?? 0,
       approvedAt: ro.estimate?.approvedAt ?? null,
       status: ro.estimate?.approvedAt

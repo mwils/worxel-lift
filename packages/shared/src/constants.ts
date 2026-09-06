@@ -39,6 +39,101 @@ export const RO_OPEN_STATUSES: RoStatus[] = [
 export const LINE_ITEM_KINDS = ["labor", "part", "fee"] as const;
 export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
 
+// ── Sales tax ─────────────────────────────────────────────────
+// Rate is stored in BASIS POINTS (825 = 8.25%) so it's an integer like every
+// other money-ish field. `taxAppliesTo` says what the rate hits: `parts` (the
+// default — most states, SC included, tax parts and not labor), `parts_labor`,
+// or `none`. Fees are never taxed. The shop's current setting is SNAPSHOTTED
+// onto each RO at creation (`taxRateBps` / `taxAppliesTo`) so a later rate
+// change leaves historical ROs alone.
+export const TAX_APPLIES_TO = ["parts", "parts_labor", "none"] as const;
+export type TaxAppliesTo = (typeof TAX_APPLIES_TO)[number];
+export const TAX_APPLIES_TO_LABELS: Record<TaxAppliesTo, string> = {
+  parts: "Parts only",
+  parts_labor: "Parts + labor",
+  none: "No sales tax",
+};
+export const MAX_TAX_RATE_BPS = 3000; // 30%
+
+export interface TaxSettings {
+  taxRateBps: number;
+  taxAppliesTo: TaxAppliesTo;
+}
+
+/**
+ * Read a shop's tax settings, tolerating the round-1 shape (`taxRatePct`
+ * percent + `taxLabor` boolean) until the next tax save converts it. Absent
+ * everything → 0 bps / parts.
+ */
+export function resolveTaxSettings(
+  settings:
+    | {
+        taxRateBps?: number | null;
+        taxAppliesTo?: string | null;
+        taxRatePct?: number | null;
+        taxLabor?: boolean | null;
+      }
+    | null
+    | undefined
+): TaxSettings {
+  if (!settings) return { taxRateBps: 0, taxAppliesTo: "parts" };
+  if (typeof settings.taxRateBps === "number") {
+    const appliesTo = (TAX_APPLIES_TO as readonly string[]).includes(settings.taxAppliesTo ?? "")
+      ? (settings.taxAppliesTo as TaxAppliesTo)
+      : "parts";
+    return { taxRateBps: clampBps(settings.taxRateBps), taxAppliesTo: appliesTo };
+  }
+  // Legacy: percent with up to 3 decimals → whole basis points.
+  const pct = typeof settings.taxRatePct === "number" ? settings.taxRatePct : 0;
+  return {
+    taxRateBps: clampBps(pctToBps(pct)),
+    taxAppliesTo: settings.taxLabor === true ? "parts_labor" : "parts",
+  };
+}
+
+function clampBps(bps: number): number {
+  if (!Number.isFinite(bps) || bps < 0) return 0;
+  return Math.min(Math.round(bps), MAX_TAX_RATE_BPS);
+}
+
+export function pctToBps(pct: number): number {
+  return Math.round(pct * 100);
+}
+
+export function bpsToPct(bps: number): number {
+  return bps / 100;
+}
+
+/** "8.25%" — trims trailing zeros so 700 bps reads "7%", 825 → "8.25%". */
+export function formatTaxRate(bps: number): string {
+  const s = bpsToPct(bps)
+    .toFixed(2)
+    .replace(/\.?0+$/, "");
+  return `${s}%`;
+}
+
+/** Customer-facing line label: "Tax (parts)" when labor is untaxed, else "Tax". */
+export function taxLineLabel(appliesTo: string | null | undefined): string {
+  return appliesTo === "parts_labor" ? "Tax" : "Tax (parts)";
+}
+
+/**
+ * Tax in cents for a set of line items under the given settings. Fees never
+ * count; labor counts only for `parts_labor`. Rounded to the cent.
+ */
+export function computeTaxCents(
+  items: Array<{ kind: string; total: number }>,
+  tax: TaxSettings | null | undefined
+): number {
+  if (!tax || tax.taxRateBps <= 0 || tax.taxAppliesTo === "none") return 0;
+  let taxable = 0;
+  for (const it of items) {
+    if (it.kind === "part") taxable += it.total;
+    else if (it.kind === "labor" && tax.taxAppliesTo === "parts_labor") taxable += it.total;
+  }
+  return Math.round((taxable * tax.taxRateBps) / 10_000);
+}
+
 // RO-level settlement state, derived from the RO's Payment rows:
 //   unpaid     nothing collected
 //   authorized Stripe intent in flight (card-on-file charge not yet settled)

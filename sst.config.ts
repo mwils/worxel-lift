@@ -232,6 +232,11 @@ export default $config({
 
     api.route("GET /shop", fn("apps/api/src/functions/shop/get.handler"));
     api.route("PATCH /shop", fn("apps/api/src/functions/shop/patch.handler"));
+    // Owner-tapped follow-up to a timezone change: text corrected visit times.
+    api.route(
+      "POST /shop/appointment-notices",
+      fn("apps/api/src/functions/shop/appointmentNotices.handler")
+    );
 
     // billing portal
     api.route(
@@ -315,6 +320,10 @@ export default $config({
     api.route(
       "POST /repair-orders/{id}/receipt-link",
       fn("apps/api/src/functions/repairOrders/receiptLink.handler")
+    );
+    api.route(
+      "POST /repair-orders/{id}/apply-tax",
+      fn("apps/api/src/functions/repairOrders/applyTax.handler")
     );
     api.route(
       "POST /repair-orders/{id}/send-estimate",
@@ -505,6 +514,19 @@ export default $config({
       domain: domains.web,
       build: { command: "pnpm build", output: "dist" },
       environment: { VITE_API_URL: urls.api, VITE_MARKETING_URL: urls.marketing },
+      // SST's default is `**` immutable + `*.html` no-cache, which left the
+      // PWA shell files (sw.js, manifest) cached for a year. Hashed bundles
+      // stay immutable; anything the browser re-reads by a fixed name must
+      // revalidate so a deploy reaches an open tablet (QA round-2 H3).
+      assets: {
+        fileOptions: [
+          { files: "**", cacheControl: "max-age=31536000,public,immutable" },
+          {
+            files: ["**/*.html", "sw.js", "registerSW.js", "*.webmanifest"],
+            cacheControl: "max-age=0,no-cache,no-store,must-revalidate",
+          },
+        ],
+      },
     });
 
     // ── Marketing site + blog router ────────────────────────────

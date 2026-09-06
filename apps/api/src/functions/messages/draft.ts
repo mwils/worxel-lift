@@ -211,6 +211,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           total: li.total,
         })),
         totalCents: ro.total ?? 0,
+        taxCents: ro.taxTotal ?? 0,
         approveLinkUrl: publicEstimateUrl(ro.publicToken ?? "PENDING"),
         aiTone,
         concern: ro.concern ?? undefined,

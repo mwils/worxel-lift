@@ -54,6 +54,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         description: WRITE_OFF_DESCRIPTION,
         total: -shortBy,
       } as (typeof ro.lineItems)[number]);
+      ro.lineItemsChangedAt = new Date();
       await applyRoTotals(ro, user.shopId);
     }
 

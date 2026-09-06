@@ -14,14 +14,13 @@ import { App } from "./App";
 import { theme } from "./theme";
 import { queryClient } from "./lib/query";
 import { AuthProvider } from "./lib/auth";
-import { registerSW } from "virtual:pwa-register";
-
-registerSW({ immediate: true });
+import { UpdatePrompt } from "./features/pwa/UpdatePrompt";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <MantineProvider theme={theme} defaultColorScheme="light">
       <Notifications position="top-center" />
+      <UpdatePrompt />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>

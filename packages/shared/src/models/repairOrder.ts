@@ -6,6 +6,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   RO_STATUSES,
+  TAX_APPLIES_TO,
 } from "../constants.js";
 
 const LineItemSchema = new Schema(
@@ -58,6 +59,11 @@ const RepairOrderSchema = new Schema(
     partsTotal: { type: Number, default: 0 },
     taxTotal: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
+    // Shop tax settings frozen at RO creation, so a rate change in Settings
+    // doesn't rewrite history. Absent on pre-snapshot ROs — `applyRoTotals`
+    // stamps the shop's current setting the next time line items change.
+    taxRateBps: { type: Number, min: 0 },
+    taxAppliesTo: { type: String, enum: TAX_APPLIES_TO },
 
     photos: { type: [PhotoSchema], default: [] },
 
