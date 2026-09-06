@@ -4,5 +4,5 @@
     "noEmit": true,
     "types": ["node", "aws-lambda"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "scripts/**/*"]
 }
