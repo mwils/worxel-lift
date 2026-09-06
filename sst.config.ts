@@ -309,6 +309,14 @@ export default $config({
       fn("apps/api/src/functions/repairOrders/markPaid.handler")
     );
     api.route(
+      "POST /repair-orders/{id}/payments/{paymentId}/void",
+      fn("apps/api/src/functions/repairOrders/voidPayment.handler")
+    );
+    api.route(
+      "POST /repair-orders/{id}/receipt-link",
+      fn("apps/api/src/functions/repairOrders/receiptLink.handler")
+    );
+    api.route(
       "POST /repair-orders/{id}/send-estimate",
       fn("apps/api/src/functions/repairOrders/sendEstimate.handler")
     );
@@ -423,6 +431,7 @@ export default $config({
       "POST /public/estimate/{token}/decline",
       fn("apps/api/src/functions/public/declineEstimate.handler")
     );
+    api.route("GET /public/receipt/{token}", fn("apps/api/src/functions/public/getReceipt.handler"));
     api.route("GET /public/pay/{token}", fn("apps/api/src/functions/public/getPay.handler"));
     api.route("POST /public/pay/{token}", fn("apps/api/src/functions/public/pay.handler"));
     api.route(

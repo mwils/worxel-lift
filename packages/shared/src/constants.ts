@@ -39,20 +39,58 @@ export const RO_OPEN_STATUSES: RoStatus[] = [
 export const LINE_ITEM_KINDS = ["labor", "part", "fee"] as const;
 export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
 
+// RO-level settlement state, derived from the RO's Payment rows:
+//   unpaid     nothing collected
+//   authorized Stripe intent in flight (card-on-file charge not yet settled)
+//   partial    something collected, balance still open
+//   paid       collected >= total
+//   refunded   money was collected and then all of it was given back
 export const PAYMENT_STATUSES = [
   "unpaid",
   "authorized",
+  "partial",
   "paid",
   "refunded",
 ] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-// How an RO was settled. `stripe` is set by the pay-link / card-on-file
+// How a payment was taken. `stripe` is set by the pay-link / card-on-file
 // paths; the rest are recorded by the owner via "Mark paid" for shops that
 // take cash or run their own card terminal.
-export const PAYMENT_METHODS = ["cash", "card", "check", "other", "stripe"] as const;
+export const PAYMENT_METHODS = ["cash", "card_in_person", "check", "other", "stripe"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-export const MANUAL_PAYMENT_METHODS = ["cash", "card", "check", "other"] as const;
+export const MANUAL_PAYMENT_METHODS = ["cash", "card_in_person", "check", "other"] as const;
+export type ManualPaymentMethod = (typeof MANUAL_PAYMENT_METHODS)[number];
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  card_in_person: "Card",
+  check: "Check",
+  other: "Other",
+  stripe: "Card (online)",
+};
+// Round-1 stored in-person card as "card"; Stripe Payment rows also used
+// "card". Normalize on read so old data renders and sums correctly.
+export function normalizePaymentMethod(
+  method: string | null | undefined,
+  opts?: { stripe?: boolean }
+): PaymentMethod | null {
+  if (!method) return opts?.stripe ? "stripe" : null;
+  if (method === "card") return opts?.stripe ? "stripe" : "card_in_person";
+  return (PAYMENT_METHODS as readonly string[]).includes(method) ? (method as PaymentMethod) : null;
+}
+// Payment-row lifecycle. Stripe rows walk the intent statuses; manual rows are
+// created `succeeded` and only ever move to `voided` (mis-entry, never counted)
+// or `refunded` (money went back to the customer).
+export const PAYMENT_ROW_STATUSES = [
+  "requires_payment_method",
+  "requires_action",
+  "processing",
+  "succeeded",
+  "canceled",
+  "voided",
+  "refunded",
+] as const;
+export type PaymentRowStatus = (typeof PAYMENT_ROW_STATUSES)[number];
 
 export const MESSAGE_CLASSIFICATIONS = [
   "status_check",

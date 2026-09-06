@@ -1,9 +1,10 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import mongoose from "mongoose";
 import { z } from "zod";
-import { Customer, RepairOrder, Vehicle } from "@lift/shared";
+import { Customer, Payment, RepairOrder, Vehicle } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { roPaymentSnapshot } from "../repairOrders/_payments.js";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -31,11 +32,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const customerOid = new mongoose.Types.ObjectId(String(vehicle.customerId));
 
     // Stats aggregate is small (one vehicle) — runs in parallel with the page query.
-    const [customer, [statsAgg], rows] = await Promise.all([
+    const [customer, [statsAgg], [paidAgg], rows] = await Promise.all([
       Customer.findOne({ _id: vehicle.customerId, shopId: user.shopId }).lean(),
       RepairOrder.aggregate<{
         roCount: number;
-        lifetimeSpendCents: number;
+        legacySpendCents: number;
         lastServicedAt: Date | null;
       }>([
         { $match: { shopId: shopOid, vehicleId: vehicleOid } },
@@ -43,15 +44,32 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           $group: {
             _id: null,
             roCount: { $sum: 1 },
-            lifetimeSpendCents: {
+            // Round-1 "paid" ROs with no Payment row yet (pre-backfill) — see
+            // repairOrders/_payments.ts. Zero once collectedCents exists.
+            legacySpendCents: {
               $sum: {
-                $cond: [{ $eq: ["$payment.status", "paid"] }, "$total", 0],
+                $cond: [
+                  { $isNumber: "$payment.collectedCents" },
+                  0,
+                  {
+                    $cond: [
+                      { $eq: ["$payment.status", "paid"] },
+                      { $ifNull: ["$payment.amountCents", "$total"] },
+                      0,
+                    ],
+                  },
+                ],
               },
             },
             lastServicedAt: { $max: "$createdAt" },
           },
         },
         { $project: { _id: 0 } },
+      ]),
+      // "$ spent" = what was actually collected on this vehicle's ROs.
+      Payment.aggregate<{ cents: number }>([
+        { $match: { shopId: shopOid, vehicleId: vehicleOid, status: "succeeded" } },
+        { $group: { _id: null, cents: { $sum: "$amountCents" } } },
       ]),
       RepairOrder.find({
         shopId: shopOid,
@@ -68,7 +86,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const lastRow = page[page.length - 1];
     const nextCursor = hasMore && lastRow ? String(lastRow._id) : null;
 
-    const stats = statsAgg ?? { roCount: 0, lifetimeSpendCents: 0, lastServicedAt: null };
+    const stats = statsAgg ?? { roCount: 0, legacySpendCents: 0, lastServicedAt: null };
+    const lifetimeSpendCents = (paidAgg?.cents ?? 0) + stats.legacySpendCents;
 
     return ok({
       vehicle: {
@@ -96,7 +115,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         : null,
       stats: {
         roCount: stats.roCount,
-        lifetimeSpendCents: stats.lifetimeSpendCents,
+        lifetimeSpendCents,
         lastServicedAt: stats.lastServicedAt,
       },
       repairOrders: page.map((r) => ({
@@ -109,7 +128,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         partsTotal: r.partsTotal ?? 0,
         taxTotal: r.taxTotal ?? 0,
         total: r.total ?? 0,
-        paymentStatus: r.payment?.status ?? "unpaid",
+        paymentStatus: roPaymentSnapshot(r).status,
+        collectedCents: roPaymentSnapshot(r).collectedCents,
+        balanceCents: roPaymentSnapshot(r).balanceCents,
         completedAt: r.completedAt ?? null,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,

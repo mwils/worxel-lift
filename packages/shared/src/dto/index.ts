@@ -233,16 +233,29 @@ export const UpdateRepairOrderDto = z.object({
   scheduledFor: z.string().datetime().nullable().optional(),
 });
 
-// Owner records a non-Stripe payment (or reverses one they entered by
-// mistake). `paid: false` only unwinds a manual payment — Stripe-settled ROs
-// are refunded through Stripe, not here.
+// Owner records a non-Stripe payment. Each call appends a Payment row; the
+// RO's paid / partial state is derived from the rows, so a short amount leaves
+// the RO PARTIAL with the difference still due. `writeOffRemainder` adds a
+// negative "Discount" fee line for exactly that difference so total and
+// collected agree — never inferred from a short amount alone.
 export const MarkPaidDto = z.object({
-  paid: z.boolean().default(true),
-  method: z.enum(MANUAL_PAYMENT_METHODS).optional(),
-  amountCents: money.optional(), // defaults to the RO total server-side
+  method: z.enum(MANUAL_PAYMENT_METHODS),
+  amountCents: money.optional(), // defaults to the open balance server-side
   note: z.string().max(200).optional(),
+  paidAt: z.string().datetime().optional(), // defaults to now
+  writeOffRemainder: z.boolean().default(false),
 });
 export type MarkPaidInput = z.infer<typeof MarkPaidDto>;
+
+// Undo a mis-entered manual payment (`kind: "void"`, never counted again) or
+// record that money went back to the customer (`kind: "refund"`). Neither
+// touches Stripe — a Stripe refund is issued from the Stripe dashboard and
+// recorded here for the books.
+export const VoidPaymentDto = z.object({
+  kind: z.enum(["void", "refund"]).default("void"),
+  note: z.string().max(200).optional(),
+});
+export type VoidPaymentInput = z.infer<typeof VoidPaymentDto>;
 
 export const PresignPhotoDto = z.object({
   contentType: z.string().regex(/^image\//),

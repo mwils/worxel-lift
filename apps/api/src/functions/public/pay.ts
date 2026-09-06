@@ -4,6 +4,7 @@ import { Payment, RepairOrder, Shop } from "@lift/shared";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { ok, notFound, badRequest } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
+import { syncRoPayment } from "../repairOrders/_payments.js";
 
 const ConfirmDto = z.object({ paymentIntentId: z.string().min(8) });
 
@@ -41,35 +42,29 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
   }
 
   if (intent.status === "succeeded") {
-    if (ro.payment?.status !== "paid") {
-      ro.payment = {
-        ...(ro.payment ?? {}),
-        stripePaymentIntentId: intent.id,
-        status: "paid",
-        paidAt: new Date(),
-        method: "stripe",
-        amountCents: intent.amount,
-      };
-      await ro.save();
-
-      // Best-effort Payment doc upsert so RO history shows the payment even
-      // before the webhook lands.
-      await Payment.updateOne(
-        { stripePaymentIntentId: intent.id },
-        {
-          $setOnInsert: {
-            shopId: ro.shopId,
-            repairOrderId: ro._id,
-            customerId: ro.customerId,
-            stripePaymentIntentId: intent.id,
-            amountCents: intent.amount,
-            method: "card",
-          },
-          $set: { status: "succeeded", completedAt: new Date() },
+    // Best-effort Payment row upsert so the RO reads paid even before the
+    // webhook lands. The RO's status is derived from the rows.
+    const now = new Date();
+    await Payment.updateOne(
+      { stripePaymentIntentId: intent.id },
+      {
+        $setOnInsert: {
+          shopId: ro.shopId,
+          repairOrderId: ro._id,
+          customerId: ro.customerId,
+          vehicleId: ro.vehicleId,
+          stripePaymentIntentId: intent.id,
+          amountCents: intent.amount,
+          method: "stripe",
+          paidAt: now,
         },
-        { upsert: true }
-      );
-    }
+        $set: { status: "succeeded", completedAt: now },
+      },
+      { upsert: true }
+    );
+    ro.set("payment.stripePaymentIntentId", intent.id);
+    await syncRoPayment(ro);
+    await ro.save();
     return ok({ status: "paid" });
   }
 

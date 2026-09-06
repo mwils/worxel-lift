@@ -4,6 +4,7 @@ import { Payment, RepairOrder, Shop, SubscriptionEvent } from "@lift/shared";
 import { withErrorBoundary } from "../../lib/middleware.js";
 import { ok, badRequest } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
+import { syncRoPayment } from "../repairOrders/_payments.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event) => {
   const sig = event.headers?.["stripe-signature"];
@@ -87,23 +88,12 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
     return;
   }
 
-  if (ro.payment?.status !== "paid") {
-    ro.payment = {
-      ...(ro.payment ?? {}),
-      stripePaymentIntentId: pi.id,
-      status: "paid",
-      paidAt: new Date(),
-      method: "stripe",
-      amountCents: pi.amount,
-    };
-    await ro.save();
-  }
-
-  // Upsert / update Payment doc.
+  // Upsert / update Payment doc — the source of truth; the RO is derived from it.
   let last4: string | undefined;
   if (pi.latest_charge && typeof pi.latest_charge !== "string") {
     last4 = pi.latest_charge.payment_method_details?.card?.last4 ?? undefined;
   }
+  const now = new Date();
   await Payment.updateOne(
     { stripePaymentIntentId: pi.id },
     {
@@ -111,18 +101,24 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
         shopId: ro.shopId,
         repairOrderId: ro._id,
         customerId: ro.customerId,
+        vehicleId: ro.vehicleId,
         stripePaymentIntentId: pi.id,
         amountCents: pi.amount,
-        method: "card",
+        method: "stripe",
+        paidAt: now,
       },
       $set: {
         status: "succeeded",
         last4,
-        completedAt: new Date(),
+        completedAt: now,
       },
     },
     { upsert: true }
   );
+
+  ro.set("payment.stripePaymentIntentId", pi.id);
+  await syncRoPayment(ro);
+  await ro.save();
 }
 
 async function applySubscriptionToShop(sub: Stripe.Subscription) {

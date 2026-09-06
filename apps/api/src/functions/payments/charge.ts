@@ -4,6 +4,7 @@ import { Customer, Payment, RepairOrder, Shop, objectId } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { ok, badRequest, notFound } from "../../lib/response.js";
 import { stripe } from "../../lib/stripe.js";
+import { roPaymentSnapshot, syncRoPayment } from "../repairOrders/_payments.js";
 
 const ChargeDto = z.object({ repairOrderId: objectId });
 
@@ -40,6 +41,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const ro = await RepairOrder.findOne({ _id: repairOrderId, shopId: user.shopId });
     if (!ro) return notFound("Repair order not found");
     if (!ro.total || ro.total <= 0) return badRequest("Repair order has no total");
+    // Charge what's still owed — a cash partial at the counter comes off first.
+    const chargeCents = roPaymentSnapshot(ro).balanceCents;
+    if (chargeCents <= 0) return badRequest("This RO is already paid in full");
 
     const [customer, shop] = await Promise.all([
       Customer.findOne({ _id: ro.customerId, shopId: user.shopId }),
@@ -78,7 +82,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const roIdStr = String(ro._id);
     const intent = await s.paymentIntents.create(
       {
-        amount: ro.total,
+        amount: chargeCents,
         currency: "usd",
         customer: customer.stripeCustomerId,
         payment_method: defaultPmId,
@@ -91,20 +95,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           customerId: String(ro.customerId),
         },
       },
-      { idempotencyKey: `ro-charge-${roIdStr}-${ro.total}` }
+      { idempotencyKey: `ro-charge-${roIdStr}-${chargeCents}` }
     );
 
     const succeeded = intent.status === "succeeded";
-
-    ro.payment = {
-      ...(ro.payment ?? {}),
-      stripePaymentIntentId: intent.id,
-      status: succeeded ? "paid" : "authorized",
-      paidAt: succeeded ? new Date() : ro.payment?.paidAt,
-      method: "stripe",
-      amountCents: ro.total,
-    };
-    await ro.save();
 
     // Upsert Payment doc keyed by stripePaymentIntentId. Resolve last4 from
     // the latest charge when expanded (Stripe v17 removed the `charges` field).
@@ -119,18 +113,27 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           shopId: ro.shopId,
           repairOrderId: ro._id,
           customerId: ro.customerId,
+          vehicleId: ro.vehicleId,
           stripePaymentIntentId: intent.id,
-          amountCents: ro.total,
-          method: "card",
+          amountCents: chargeCents,
+          method: "stripe",
         },
         $set: {
           status: mapIntentStatus(intent.status),
           last4,
           completedAt: succeeded ? new Date() : undefined,
+          paidAt: succeeded ? new Date() : undefined,
         },
       },
       { upsert: true }
     );
+
+    // RO state is derived from the rows; an in-flight intent with nothing
+    // collected yet reads as `authorized`.
+    ro.set("payment.stripePaymentIntentId", intent.id);
+    if (!succeeded) ro.set("payment.status", "authorized");
+    await syncRoPayment(ro);
+    await ro.save();
 
     return ok({ paymentIntentId: intent.id, status: intent.status });
   } catch (err) {

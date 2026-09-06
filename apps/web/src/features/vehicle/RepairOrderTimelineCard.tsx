@@ -24,6 +24,7 @@ interface RepairOrder {
   diagnosis: string | null;
   total: number;
   paymentStatus: string;
+  balanceCents?: number;
   completedAt: string | Date | null;
   createdAt: string | Date;
   lineItems: LineItem[];
@@ -80,6 +81,11 @@ export function RepairOrderTimelineCard({ ro }: { ro: RepairOrder }) {
             {ro.paymentStatus === "paid" && (
               <Badge variant="light" color="green" size="sm">
                 paid
+              </Badge>
+            )}
+            {ro.paymentStatus === "partial" && (
+              <Badge variant="light" color="orange" size="sm">
+                partial{ro.balanceCents ? ` · ${formatMoney(ro.balanceCents)} due` : ""}
               </Badge>
             )}
           </Group>

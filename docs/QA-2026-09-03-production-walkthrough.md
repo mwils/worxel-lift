@@ -55,7 +55,21 @@ problem; step 4 is a chargeback.
 
 ## High
 
-### H1. A short payment is recorded as payment in full
+### H1. A short payment is recorded as payment in full — FIXED (branch qa/round-2-2026-09-03)
+**Root cause:** `POST /repair-orders/{id}/mark-paid` wrote only `ro.payment.{status:"paid",
+amountCents}` and never a `Payment` row (the model required a unique
+`stripePaymentIntentId`), so "paid" was a flag, not a sum, and any amount flipped it.
+**Fix:** `Payment` rows are the source of truth (manual rows: `method`, `note`,
+`recordedByUserId`, `paidAt`; `stripePaymentIntentId` now optional, sparse unique). The RO's
+`payment.{status,collectedCents}` is derived from the rows; `balanceCents = total − collected`;
+`PAYMENT_STATUSES` gains `partial`. RO-0001 reads `PARTIAL · CASH · $200.00 of $294.50 /
+$94.50 due`; a second Mark paid settles it. The dialog's "Write off the rest ($94.50)"
+checkbox adds a negative `fee` line "Discount" — never inferred. Undo/refund are per payment
+row (`POST /repair-orders/{id}/payments/{paymentId}/void`, `kind: void | refund`). Backfill
+for round-1 ROs (dry run, then `--apply`):
+`MONGODB_URI=… pnpm --filter @lift/api exec tsx scripts/backfillPayments.ts`. Read paths
+tolerate un-backfilled ROs (collected = `amountCents ?? total`).
+
 The Mark paid dialog accepts an amount less than the balance, warns
 *"$94.50 less than the total — fine if you knocked something off. The RO still closes as
 paid,"* and then sets the RO to `PAID · CASH`.
@@ -77,7 +91,14 @@ forgives $94.50. A 1–3 bay shop carrying a couple of these a month has no way 
   "Write off $94.50" control. Do not infer a discount from a short amount.
 - Keep the current copy's honesty ("Recording this here doesn't move any money") — it's good.
 
-### H2. Lifetime spend and vehicle spend sum RO totals, not payments
+### H2. Lifetime spend and vehicle spend sum RO totals, not payments — FIXED (branch qa/round-2-2026-09-03)
+**Root cause:** `customers/history.ts` and `vehicles/history.ts` aggregated
+`$cond[payment.status == "paid", $total, 0]` over repair orders — the RO total, gated by the
+H1 flag. **Fix:** both sum `payments` rows (`status: "succeeded"`, per customer / per
+`vehicleId`, which is now denormalized onto the row), plus a legacy fallback for round-1 ROs
+until the backfill runs. `GET /repair-orders/{id}` and the list endpoint expose
+`collectedCents` / `balanceCents` / `payments[]` for the RO history page.
+
 After collecting $200.00 against a $294.50 RO, the customer header reads **Lifetime spend
 $294.50** and the vehicle card reads **$294.50 spent**.
 
@@ -112,7 +133,14 @@ that corrects a wrong default hits this on all open scheduled ROs at once.
 or the same instant?" Keep-clock-time is what a shop means. Whichever is chosen, offer to
 text affected customers the corrected time.
 
-### M2. The PAID pill shows method but not amount collected
+### M2. The PAID pill shows method but not amount collected — FIXED (branch qa/round-2-2026-09-03)
+**Root cause:** the badge rendered only `payment.method`; `amountCents` and `note` were
+saved but never read back. **Fix:** pill reads `PAID · CASH · $294.50` /
+`PARTIAL · CASH · $200.00 of $294.50` (+ "$94.50 due"), latest note under it, and a new
+Payments card on the RO lists every row (method, amount, date, note, undone/refunded) with
+Collected / Balance. Board `PaidMark` shows `Partial · $X due`. Public receipt page
+`/public/receipt/:token` + "Text receipt" button (via `POST /messages/send`).
+
 Reads `PAID · CASH`. With H1 fixed this should read `PAID · CASH · $294.50`, or
 `PARTIAL · CASH · $200.00 of $294.50`. The payment note ("Check #1042…") is captured but
 isn't visible anywhere on the RO after saving — surface it near the pill or in the payment row.

@@ -58,9 +58,10 @@ import type { InspectionState } from "../../../features/inspection/types";
 import {
   MarkPaidModal,
   PAYMENT_METHOD_LABELS,
-  roBalanceCents,
+  type PaymentRow,
   type RoPayment,
 } from "../../../features/payments/MarkPaidModal";
+import { PaymentsCard } from "../../../features/payments/PaymentsCard";
 import { StatusTextPrompt, type PromptableStatus } from "../../../features/ro/StatusTextPrompt";
 
 interface RoDetail {
@@ -77,7 +78,12 @@ interface RoDetail {
     total: number;
     photos: GalleryPhoto[];
     publicToken: string | null;
-    payment: RoPayment | null;
+    receiptToken: string | null;
+    // Derived from Payment rows server-side (see api repairOrders/_payments.ts).
+    payment: RoPayment;
+    payments: PaymentRow[];
+    collectedCents: number;
+    balanceCents: number;
     scheduledFor: string | null;
     estimate: {
       sentAt?: string | null;
@@ -164,17 +170,14 @@ export function RoDetailRoute() {
     onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
   });
 
-  const markUnpaid = useMutation({
-    mutationFn: () => api.post(`/repair-orders/${id}/mark-paid`, { paid: false }),
-    onSuccess: () => {
-      notifications.show({ color: "green", message: "Marked unpaid." });
-      qc.invalidateQueries({ queryKey: ["ro", id] });
-      qc.invalidateQueries({ queryKey: ["ros"] });
-      qc.invalidateQueries({ queryKey: ["customer-history"] });
-      qc.invalidateQueries({ queryKey: ["vehicle-history"] });
-    },
-    onError: (err) => notifyError(err, { title: "Couldn't mark unpaid" }),
-  });
+  // Any payment write (mark paid / undo / refund) touches the RO, the board
+  // pill, and both spend figures.
+  const invalidatePaymentViews = () => {
+    qc.invalidateQueries({ queryKey: ["ro", id] });
+    qc.invalidateQueries({ queryKey: ["ros"] });
+    qc.invalidateQueries({ queryKey: ["customer-history"] });
+    qc.invalidateQueries({ queryKey: ["vehicle-history"] });
+  };
 
   const createLine = useMutation({
     mutationFn: (draft: LineItemDraft) =>
@@ -484,9 +487,12 @@ export function RoDetailRoute() {
         .join(" · ")
     : null;
 
-  const balanceCents = roBalanceCents(ro.total, ro.payment);
-  const isPaid = ro.payment?.status === "paid";
-  const paidViaStripe = ro.payment?.method === "stripe" || !!ro.payment?.stripePaymentIntentId;
+  const balanceCents = ro.balanceCents ?? ro.payment?.balanceCents ?? ro.total;
+  const collectedCents = ro.collectedCents ?? ro.payment?.collectedCents ?? 0;
+  const payStatus = ro.payment?.status ?? "unpaid";
+  const isPaid = payStatus === "paid";
+  const isPartial = payStatus === "partial";
+  const payMethodLabel = ro.payment?.method ? PAYMENT_METHOD_LABELS[ro.payment.method] : null;
   const closedStatus = ["picked_up", "voided", "cancelled_by_customer"].includes(ro.status);
 
   const changeStatus = (next: RoStatus) => {
@@ -571,15 +577,35 @@ export function RoDetailRoute() {
           />
           {ro.total > 0 &&
             (isPaid ? (
+              // PAID · CASH · $294.50
               <Badge variant="light" color="teal">
-                Paid
-                {ro.payment?.method ? ` · ${PAYMENT_METHOD_LABELS[ro.payment.method]}` : ""}
+                Paid{payMethodLabel ? ` · ${payMethodLabel}` : ""} · {formatMoney(collectedCents)}
+              </Badge>
+            ) : isPartial ? (
+              // PARTIAL · CASH · $200.00 of $294.50, with what's left underneath
+              <Stack gap={2} align="flex-end">
+                <Badge variant="light" color="orange">
+                  Partial{payMethodLabel ? ` · ${payMethodLabel}` : ""} · {formatMoney(collectedCents)} of{" "}
+                  {formatMoney(ro.total)}
+                </Badge>
+                <Text size="xs" c="orange.7" fw={600}>
+                  {formatMoney(balanceCents)} due
+                </Text>
+              </Stack>
+            ) : payStatus === "refunded" ? (
+              <Badge variant="light" color="red">
+                Refunded
               </Badge>
             ) : (
               <Badge variant="light" color={ro.status === "ready" || closedStatus ? "orange" : "gray"}>
                 Unpaid · {formatMoney(balanceCents)}
               </Badge>
             ))}
+          {(isPaid || isPartial) && ro.payment?.note && (
+            <Text size="xs" c="dimmed" ta="right" style={{ maxWidth: 240 }}>
+              {ro.payment.note}
+            </Text>
+          )}
           {estimateChanged ? (
             <Badge variant="light" color="orange">
               Changed since approval · {formatMoney(ro.estimate?.approvedTotal ?? 0)} approved
@@ -712,33 +738,38 @@ export function RoDetailRoute() {
         >
           Text pay link
         </Button>
-        {!isPaid ? (
+        {balanceCents > 0 && (
+          // Undo / refund live per row in the Payments card below.
           <Button
             variant="default"
             leftSection={<IconCash size={16} />}
             onClick={() => setMarkPaidOpen(true)}
             disabled={ro.total === 0}
           >
-            Mark paid
+            {isPartial ? `Mark paid · ${formatMoney(balanceCents)} due` : "Mark paid"}
           </Button>
-        ) : (
-          !paidViaStripe && (
-            <Button
-              variant="subtle"
-              color="gray"
-              size="compact-sm"
-              onClick={() => markUnpaid.mutate()}
-              loading={markUnpaid.isPending}
-            >
-              Undo mark paid
-            </Button>
-          )
         )}
       </Group>
       {estimateTimeline && (
         <Text size="xs" c="dimmed" mt={-8}>
           Estimate {estimateTimeline}
         </Text>
+      )}
+
+      {ro.payment && (
+        <PaymentsCard
+          repairOrderId={id!}
+          roNumber={ro.number}
+          totalCents={ro.total}
+          payment={ro.payment}
+          payments={ro.payments ?? []}
+          tz={tz}
+          customer={ro.customer ? { id: ro.customer.id, firstName: ro.customer.firstName } : null}
+          vehicleSummary={vehicleSummary}
+          shopName={me?.shop?.name ?? "the shop"}
+          onChanged={invalidatePaymentViews}
+          onTexted={() => qc.invalidateQueries({ queryKey: ["conversation"] })}
+        />
       )}
 
       <Card withBorder>
@@ -997,11 +1028,9 @@ export function RoDetailRoute() {
         onClose={() => setMarkPaidOpen(false)}
         repairOrderId={id!}
         balanceCents={balanceCents}
+        totalCents={ro.total}
         onPaid={() => {
-          qc.invalidateQueries({ queryKey: ["ro", id] });
-          qc.invalidateQueries({ queryKey: ["ros"] });
-          qc.invalidateQueries({ queryKey: ["customer-history"] });
-          qc.invalidateQueries({ queryKey: ["vehicle-history"] });
+          invalidatePaymentViews();
           // Marking paid from the pickup warning finishes the pickup too.
           if (unpaidPickupOpen) {
             setUnpaidPickupOpen(false);

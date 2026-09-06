@@ -94,20 +94,26 @@ const RepairOrderSchema = new Schema(
       viewedAt: Date,
     },
 
+    // Derived from this RO's Payment rows (apps/api repairOrders/_payments.ts
+    // recomputes on every payment write). `method/amountCents/note/paidAt`
+    // mirror the LATEST counted payment as a display convenience. ROs written
+    // before the payments backfill have `status: "paid"` and no
+    // `collectedCents`; readers treat that as collected = amountCents ?? total.
     payment: {
       status: { type: String, enum: PAYMENT_STATUSES, default: "unpaid" },
       stripePaymentIntentId: String,
       paidAt: Date,
-      // Set by POST /repair-orders/:id/mark-paid (cash / in-person card /
-      // check / other) or "stripe" by the pay-link + card-on-file paths.
-      method: { type: String, enum: PAYMENT_METHODS },
-      // What was actually collected, in cents. Defaults to `total` at mark-paid
-      // time; may be lower if the owner knocked something off at the counter.
+      method: { type: String, enum: [...PAYMENT_METHODS, "card"] }, // "card" = legacy in-person
       amountCents: Number,
       note: { type: String, maxlength: 200 },
+      // Sum of succeeded Payment rows, in cents.
+      collectedCents: Number,
     },
 
     publicToken: { type: String, index: true }, // for pay/estimate links
+    // Customer-side token for the public receipt page. Minted on first
+    // "Text receipt"; separate from publicToken (which also opens the estimate).
+    receiptToken: { type: String, index: true, sparse: true },
 
     // Where this RO came from. `manual` = the owner created it in the app;
     // `booking` = a customer self-booked via the public URL.

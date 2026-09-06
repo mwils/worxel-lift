@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Button,
+  Checkbox,
   Group,
   Modal,
   NumberInput,
@@ -10,14 +11,25 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import type { PaymentMethod, PaymentStatus } from "@lift/shared/constants";
+import {
+  MANUAL_PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  type ManualPaymentMethod,
+  type PaymentMethod,
+  type PaymentStatus,
+} from "@lift/shared/constants";
 import { api } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
 import { notifyError, notifySuccess } from "../../lib/notify";
 
-/** `payment` subdoc as returned by GET /repair-orders/:id. */
+export { PAYMENT_METHOD_LABELS };
+
+/** `payment` block as returned by GET /repair-orders/:id — derived from Payment rows. */
 export interface RoPayment {
   status: PaymentStatus;
+  collectedCents: number;
+  balanceCents: number;
+  /** Latest counted payment, for the pill. */
   method?: PaymentMethod | null;
   amountCents?: number | null;
   note?: string | null;
@@ -25,38 +37,48 @@ export interface RoPayment {
   stripePaymentIntentId?: string | null;
 }
 
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  cash: "Cash",
-  card: "Card",
-  check: "Check",
-  other: "Other",
-  stripe: "Stripe",
-};
-
-/** Cents still owed. A paid RO owes nothing regardless of what was collected. */
-export function roBalanceCents(total: number, payment: RoPayment | null | undefined): number {
-  return payment?.status === "paid" ? 0 : total;
+/** One Payment row as returned in `payments[]`. */
+export interface PaymentRow {
+  id: string;
+  amountCents: number;
+  status: string; // succeeded | voided | refunded | (stripe intent states)
+  method: PaymentMethod | null;
+  last4: string | null;
+  paidAt: string | null;
+  note: string | null;
+  voidedAt: string | null;
+  voidNote: string | null;
+  stripe: boolean;
 }
-
-type ManualMethod = Exclude<PaymentMethod, "stripe">;
 
 export interface MarkPaidModalProps {
   opened: boolean;
   onClose: () => void;
   repairOrderId: string;
-  /** Cents owed; prefilled as the amount collected. */
+  /** Cents still owed; prefilled as the amount collected. */
   balanceCents: number;
+  /** RO total, for the "of $X" copy. */
+  totalCents: number;
   onPaid: () => void;
 }
 
 /**
- * "Mark paid" for cash / in-person card / check shops. Records the method and
- * what was collected on the RO so lifetime spend and the board read right.
+ * "Mark paid" for cash / in-person card / check shops. Appends a payment row;
+ * a short amount leaves the RO PARTIAL with the rest due unless the owner
+ * explicitly writes the difference off (which adds a negative Discount line).
  */
-export function MarkPaidModal({ opened, onClose, repairOrderId, balanceCents, onPaid }: MarkPaidModalProps) {
-  const [method, setMethod] = useState<ManualMethod>("cash");
+export function MarkPaidModal({
+  opened,
+  onClose,
+  repairOrderId,
+  balanceCents,
+  totalCents,
+  onPaid,
+}: MarkPaidModalProps) {
+  const [method, setMethod] = useState<ManualPaymentMethod>("cash");
   const [amountDollars, setAmountDollars] = useState<number | string>(balanceCents / 100);
   const [note, setNote] = useState("");
+  const [writeOff, setWriteOff] = useState(false);
 
   // Re-seed each time it opens so a stale draft never carries across ROs.
   useEffect(() => {
@@ -64,44 +86,51 @@ export function MarkPaidModal({ opened, onClose, repairOrderId, balanceCents, on
       setMethod("cash");
       setAmountDollars(balanceCents / 100);
       setNote("");
+      setWriteOff(false);
     }
   }, [opened, balanceCents]);
+
+  const amountCents = Math.round(Number(amountDollars || 0) * 100);
+  const shortBy = Math.max(0, balanceCents - amountCents);
+  const isShort = amountCents > 0 && shortBy > 0;
+  const overBy = Math.max(0, amountCents - balanceCents);
 
   const markPaid = useMutation({
     mutationFn: () =>
       api.post(`/repair-orders/${repairOrderId}/mark-paid`, {
-        paid: true,
         method,
-        amountCents: Math.round(Number(amountDollars || 0) * 100),
+        amountCents,
         note: note.trim() || undefined,
+        writeOffRemainder: isShort && writeOff,
       }),
     onSuccess: () => {
-      notifySuccess(`Marked paid — ${PAYMENT_METHOD_LABELS[method].toLowerCase()}.`);
+      const label = PAYMENT_METHOD_LABELS[method].toLowerCase();
+      if (isShort && !writeOff) {
+        notifySuccess(`Recorded ${formatMoney(amountCents)} ${label} — ${formatMoney(shortBy)} still due.`);
+      } else {
+        notifySuccess(`Paid — ${formatMoney(amountCents)} ${label}.`);
+      }
       onPaid();
       onClose();
     },
-    onError: (err) => notifyError(err, { title: "Couldn't mark paid" }),
+    onError: (err) => notifyError(err, { title: "Couldn't record payment" }),
   });
 
-  const amountCents = Math.round(Number(amountDollars || 0) * 100);
+  const partialPaid = balanceCents < totalCents;
 
   return (
     <Modal opened={opened} onClose={onClose} title="Mark paid" centered>
       <Stack>
         <Text size="sm" c="dimmed">
-          Balance due {formatMoney(balanceCents)}. Recording this here doesn't move any money —
-          it just closes the books on this RO.
+          Balance due {formatMoney(balanceCents)}
+          {partialPaid ? ` of ${formatMoney(totalCents)}` : ""}. Recording this here doesn't move any
+          money — it just keeps the books straight on this RO.
         </Text>
         <SegmentedControl
           fullWidth
           value={method}
-          onChange={(v) => setMethod(v as ManualMethod)}
-          data={[
-            { value: "cash", label: "Cash" },
-            { value: "card", label: "Card" },
-            { value: "check", label: "Check" },
-            { value: "other", label: "Other" },
-          ]}
+          onChange={(v) => setMethod(v as ManualPaymentMethod)}
+          data={MANUAL_PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] }))}
         />
         <NumberInput
           label="Amount collected"
@@ -113,15 +142,27 @@ export function MarkPaidModal({ opened, onClose, repairOrderId, balanceCents, on
           value={amountDollars}
           onChange={setAmountDollars}
         />
-        {amountCents < balanceCents && amountCents > 0 && (
-          <Text size="xs" c="orange.7">
-            {formatMoney(balanceCents - amountCents)} less than the total — fine if you knocked
-            something off. The RO still closes as paid.
+        {isShort && (
+          <Stack gap={6}>
+            <Text size="xs" c="orange.7">
+              {formatMoney(shortBy)} short. The RO stays <b>partial</b> with {formatMoney(shortBy)}{" "}
+              due until you record the rest — unless you're knocking it off.
+            </Text>
+            <Checkbox
+              checked={writeOff}
+              onChange={(e) => setWriteOff(e.currentTarget.checked)}
+              label={`Write off the rest (${formatMoney(shortBy)}) — adds a Discount line so the RO closes as paid`}
+            />
+          </Stack>
+        )}
+        {overBy > 0 && (
+          <Text size="xs" c="red.7">
+            That's {formatMoney(overBy)} more than what's owed. Enter up to {formatMoney(balanceCents)}.
           </Text>
         )}
         <TextInput
           label="Note"
-          placeholder="Check #1042, paid by wife, etc."
+          placeholder="Check #1042, paid by wife, balance Friday…"
           maxLength={200}
           value={note}
           onChange={(e) => setNote(e.currentTarget.value)}
@@ -133,9 +174,9 @@ export function MarkPaidModal({ opened, onClose, repairOrderId, balanceCents, on
           <Button
             onClick={() => markPaid.mutate()}
             loading={markPaid.isPending}
-            disabled={amountCents <= 0 && balanceCents > 0}
+            disabled={amountCents <= 0 || overBy > 0}
           >
-            Mark paid
+            {isShort && !writeOff ? "Record partial payment" : "Mark paid"}
           </Button>
         </Group>
       </Stack>

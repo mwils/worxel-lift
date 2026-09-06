@@ -80,6 +80,7 @@ interface CustomerHistory {
     total: number;
     vehicleId: string;
     paymentStatus: string;
+    balanceCents?: number;
     createdAt: string;
     updatedAt: string;
     completedAt: string | null;
@@ -295,6 +296,11 @@ export function CustomerDetailRoute() {
                   {r.paymentStatus === "paid" && (
                     <Badge variant="light" color="green" size="sm">
                       paid
+                    </Badge>
+                  )}
+                  {r.paymentStatus === "partial" && (
+                    <Badge variant="light" color="orange" size="sm">
+                      partial{r.balanceCents ? ` · ${formatMoney(r.balanceCents)} due` : ""}
                     </Badge>
                   )}
                 </Group>
