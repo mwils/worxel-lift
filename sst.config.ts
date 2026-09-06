@@ -309,6 +309,10 @@ export default $config({
       fn("apps/api/src/functions/repairOrders/markPaid.handler")
     );
     api.route(
+      "POST /repair-orders/{id}/apply-tax",
+      fn("apps/api/src/functions/repairOrders/applyTax.handler")
+    );
+    api.route(
       "POST /repair-orders/{id}/send-estimate",
       fn("apps/api/src/functions/repairOrders/sendEstimate.handler")
     );

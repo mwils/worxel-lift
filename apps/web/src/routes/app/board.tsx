@@ -1,4 +1,4 @@
-import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader, Skeleton } from "@mantine/core";
+import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader, Skeleton, Alert, Anchor } from "@mantine/core";
 import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp, IconCash } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { readSnapshot, writeSnapshot } from "../../lib/snapshot";
 import { formatMoney, formatRoNumber, formatVisit, relativeTime, shopTimezone } from "../../lib/format";
-import { RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
+import { RO_STATUS_LABELS, resolveTaxSettings, type RoStatus } from "@lift/shared/constants";
 import { useAuth } from "../../lib/auth";
 import { StarterLibraryPrompt } from "../../features/jobTemplates/StarterLibraryPrompt";
 
@@ -38,6 +38,14 @@ const STATUS_BUCKETS: Array<{ status: RoStatus; label: string; color: string }> 
   { status: "in_repair", label: RO_STATUS_LABELS.in_repair, color: "cyan" },
   { status: "ready", label: RO_STATUS_LABELS.ready, color: "green" },
 ];
+
+function readDismissed(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function BoardRoute() {
   const { me } = useAuth();
@@ -72,6 +80,28 @@ export function BoardRoute() {
   });
   const closed = closedQ.data?.ros ?? [];
 
+  // One-time nudge to set a tax rate, once there's at least one RO to be wrong
+  // about. Dismissal is per shop, per browser — nothing to store server-side.
+  // Shops that chose "No sales tax" on purpose never see it.
+  const taxBannerKey = `taxBanner:dismissed:${me?.shop?.id ?? "none"}`;
+  const [taxBannerHidden, setTaxBannerHidden] = useState(false);
+  const shopTax = resolveTaxSettings(me?.shop?.settings);
+  const showTaxBanner =
+    !taxBannerHidden &&
+    !!me?.shop &&
+    shopTax.taxRateBps === 0 &&
+    shopTax.taxAppliesTo !== "none" &&
+    (data?.ros?.length ?? 0) > 0 &&
+    !readDismissed(taxBannerKey);
+  function dismissTaxBanner() {
+    try {
+      localStorage.setItem(taxBannerKey, "1");
+    } catch {
+      // private mode / storage blocked — hide for this visit anyway
+    }
+    setTaxBannerHidden(true);
+  }
+
   const grouped = new Map<RoStatus, BoardRO[]>();
   for (const bucket of STATUS_BUCKETS) grouped.set(bucket.status, []);
   for (const ro of data?.ros ?? []) {
@@ -97,6 +127,21 @@ export function BoardRoute() {
       </Group>
 
       <StarterLibraryPrompt />
+
+      {showTaxBanner && (
+        <Alert
+          color="yellow"
+          variant="light"
+          withCloseButton
+          onClose={dismissTaxBanner}
+          title="Add your sales tax rate so estimates are right"
+        >
+          Estimates, texts and receipts are pre-tax until you set it.{" "}
+          <Anchor component={Link} to="/settings" size="sm">
+            Set it in Settings
+          </Anchor>
+        </Alert>
+      )}
 
       {isPending ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md" aria-busy="true" aria-label="Loading board">

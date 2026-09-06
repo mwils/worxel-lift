@@ -19,6 +19,14 @@ export interface EstimatePromptInput {
   vehicle: { year?: number; make?: string; model?: string };
   lineItems: Array<{ kind: "labor" | "part" | "fee"; description: string; total: number }>;
   totalCents: number;
+  /**
+   * Sales tax already included in `totalCents`. When > 0 the assembled SMS
+   * gets its own "Tax: $x" line between the items and the total, so the
+   * customer can see the items don't sum to the total because of tax — not a
+   * mistake. Omitted / 0 → no line (untaxed shop, or a labor-only job in a
+   * parts-only state).
+   */
+  taxCents?: number;
   approveLinkUrl: string;
   aiTone: "plain" | "friendly";
   /** The customer's stated concern on the RO, if any. Never inferred. */
@@ -35,16 +43,23 @@ function vehicleLabel(input: EstimatePromptInput): string {
 
 /**
  * The deterministic tail of every estimate SMS: itemized lines with prices,
- * the total, and the approve link. Shared by the template and the AI path so
- * the customer sees the exact same numbers either way.
+ * the tax line (when any), the total, and the approve link. Shared by the
+ * template and the AI path so the customer sees the exact same numbers
+ * either way.
  */
 function estimateBody(input: EstimatePromptInput): string {
   const lines = input.lineItems
     .map((li) => `• ${li.description} — ${money(li.total)}`)
     .join("\n");
-  return [lines, "", `Total: ${money(input.totalCents)}`, "", `Approve: ${input.approveLinkUrl}`].join(
-    "\n"
-  );
+  const tax = input.taxCents && input.taxCents > 0 ? [`Tax: ${money(input.taxCents)}`] : [];
+  return [
+    lines,
+    "",
+    ...tax,
+    `Total: ${money(input.totalCents)}`,
+    "",
+    `Approve: ${input.approveLinkUrl}`,
+  ].join("\n");
 }
 
 export function buildEstimatePrompt(input: EstimatePromptInput): string {
@@ -137,7 +152,7 @@ export function assemblePolishedEstimate(
     .filter((l) => !/^[•\-*]\s/.test(l))
     .filter((l) => !/\$\d/.test(l))
     .filter((l) => !/https?:\/\//i.test(l))
-    .filter((l) => !/^(total|approve)\b/i.test(l))
+    .filter((l) => !/^(total|tax|approve)\b/i.test(l))
     .join(" ")
     .replace(/^["'“”]+|["'“”]+$/g, "")
     .replace(/\s{2,}/g, " ")

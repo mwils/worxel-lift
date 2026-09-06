@@ -25,11 +25,17 @@ import {
   SERVICE_CATEGORIES,
   SERVICE_INTERVALS,
   SHOP_SLUG_REGEX,
+  TAX_APPLIES_TO,
+  TAX_APPLIES_TO_LABELS,
   US_STATE_CODES,
   US_STATE_NAMES,
   US_TIMEZONES,
+  bpsToPct,
   isValidTimezone,
+  pctToBps,
+  resolveTaxSettings,
   slugifyShopName,
+  type TaxAppliesTo,
 } from "@lift/shared/constants";
 import {
   useAuth,
@@ -118,8 +124,8 @@ export function SettingsRoute() {
         autoReplyEnabled?: boolean;
         defaultLaborRate?: number;
         serviceRemindersEnabled?: boolean;
-        taxRatePct?: number;
-        taxLabor?: boolean;
+        taxRateBps?: number;
+        taxAppliesTo?: TaxAppliesTo;
         booking?: BookingSettings;
       };
     }) => api.patch("/shop", patch),
@@ -134,11 +140,14 @@ export function SettingsRoute() {
   const [laborRateDollars, setLaborRateDollars] = useState<number | undefined>(
     initialRate != null ? initialRate / 100 : undefined
   );
-  // Sales tax: a percent (8.25 = 8.25%), applied to parts on every RO as line
-  // items change. Labor is untaxed unless the shop's state says otherwise.
-  const [taxRatePct, setTaxRatePct] = useState<number | string>(
-    me?.shop?.settings.taxRatePct ?? 0
-  );
+  // Sales tax: edited as a percent with 2 decimals, stored as basis points.
+  // Snapshotted onto each RO at creation, so changing it here only affects
+  // new ROs (the RO page offers "Apply current tax rate" for old ones).
+  const savedTax = resolveTaxSettings(me?.shop?.settings);
+  const [taxRatePct, setTaxRatePct] = useState<number | string>(bpsToPct(savedTax.taxRateBps));
+  const [taxAppliesTo, setTaxAppliesTo] = useState<TaxAppliesTo>(savedTax.taxAppliesTo);
+  const draftTaxBps = pctToBps(Number(taxRatePct || 0));
+  const taxDirty = draftTaxBps !== savedTax.taxRateBps || taxAppliesTo !== savedTax.taxAppliesTo;
 
   // ── Shop profile (name, address, phone, timezone) ──────────────
   // Drafts are seeded from `me` and re-seeded whenever the server copy
@@ -675,32 +684,41 @@ export function SettingsRoute() {
       </Group>
 
       <Divider label="Sales tax" />
-      <Group align="end">
+      <Group align="end" wrap="wrap">
         <NumberInput
           label="Tax rate (%)"
-          description="Applied to parts on each RO. 0 turns tax off."
+          description="Shows as its own line on estimates, texts and receipts."
           min={0}
           max={30}
-          decimalScale={3}
+          decimalScale={2}
           suffix="%"
           value={taxRatePct}
           onChange={setTaxRatePct}
-          w={240}
+          w={200}
+        />
+        <Select
+          label="Applies to"
+          description="Most states tax parts, not labor."
+          data={TAX_APPLIES_TO.map((v) => ({ value: v, label: TAX_APPLIES_TO_LABELS[v] }))}
+          value={taxAppliesTo}
+          onChange={(v) => v && setTaxAppliesTo(v as TaxAppliesTo)}
+          allowDeselect={false}
+          w={200}
         />
         <Button
           variant="default"
-          onClick={() => patchShop.mutate({ settings: { taxRatePct: Number(taxRatePct || 0) } })}
-          disabled={Number(taxRatePct || 0) === (me?.shop?.settings.taxRatePct ?? 0)}
+          onClick={() =>
+            patchShop.mutate({ settings: { taxRateBps: draftTaxBps, taxAppliesTo } })
+          }
+          disabled={!taxDirty}
         >
-          Save tax rate
+          Save tax
         </Button>
       </Group>
-      <Switch
-        label="Also tax labor"
-        description="Most states don't. Turn on if yours does."
-        checked={me?.shop?.settings.taxLabor ?? false}
-        onChange={(e) => patchShop.mutate({ settings: { taxLabor: e.currentTarget.checked } })}
-      />
+      <Text size="xs" c="dimmed">
+        Changing this only affects new repair orders. Open an RO and tap “Apply current tax
+        rate” to update an existing one.
+      </Text>
 
       <Divider label="Team" />
       <Text size="sm" c="dimmed">

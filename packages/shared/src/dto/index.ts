@@ -4,11 +4,13 @@ import {
   INSPECTION_SEVERITIES,
   LINE_ITEM_KINDS,
   MANUAL_PAYMENT_METHODS,
+  MAX_TAX_RATE_BPS,
   MESSAGE_CLASSIFICATIONS,
   PAYMENT_STATUSES,
   RO_STATUSES,
   SERVICE_CATEGORIES,
   SHOP_SLUG_REGEX,
+  TAX_APPLIES_TO,
   USER_ROLES,
   US_STATE_CODES,
   isValidTimezone,
@@ -161,9 +163,9 @@ export const UpdateShopDto = z.object({
       autoReplyEnabled: z.boolean().optional(),
       defaultLaborRate: money.optional(),
       serviceRemindersEnabled: z.boolean().optional(),
-      // Percent, e.g. 8.25. See Shop model comment.
-      taxRatePct: z.number().min(0).max(30).optional(),
-      taxLabor: z.boolean().optional(),
+      // Basis points (825 = 8.25%) + what it applies to. See Shop model comment.
+      taxRateBps: z.number().int().min(0).max(MAX_TAX_RATE_BPS).optional(),
+      taxAppliesTo: z.enum(TAX_APPLIES_TO).optional(),
       booking: BookingSettingsDto.optional(),
     })
     .optional(),
@@ -179,6 +181,7 @@ export const CreateCustomerDto = z.object({
   phone: e164,
   email: z.string().email().optional(),
   notes: z.string().trim().optional(),
+  taxExempt: z.boolean().optional(),
 });
 // PATCH semantics: undefined leaves a field alone, null clears it.
 export const UpdateCustomerDto = CreateCustomerDto.partial().extend({

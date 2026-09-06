@@ -28,7 +28,16 @@ import {
   IconCalendarEvent,
   IconCash,
 } from "@tabler/icons-react";
-import { RO_STATUSES, RO_STATUS_LABELS, type RoStatus } from "@lift/shared/constants";
+import {
+  RO_STATUSES,
+  RO_STATUS_LABELS,
+  TAX_APPLIES_TO_LABELS,
+  formatTaxRate,
+  resolveTaxSettings,
+  taxLineLabel,
+  type RoStatus,
+  type TaxAppliesTo,
+} from "@lift/shared/constants";
 import { api, ApiError } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import {
@@ -75,6 +84,9 @@ interface RoDetail {
     partsTotal: number;
     taxTotal: number;
     total: number;
+    /** Tax snapshot taken at creation; null = pre-snapshot RO. */
+    taxRateBps: number | null;
+    taxAppliesTo: TaxAppliesTo | null;
     photos: GalleryPhoto[];
     publicToken: string | null;
     payment: RoPayment | null;
@@ -86,6 +98,7 @@ interface RoDetail {
       declinedAt?: string | null;
       approvedTotal?: number | null;
       changedSinceApproval?: boolean;
+      changedAt?: string | null;
     } | null;
     inspection: InspectionState;
     customer: {
@@ -94,6 +107,7 @@ interface RoDetail {
       lastName: string | null;
       phone: string;
       email: string | null;
+      taxExempt?: boolean;
     } | null;
     vehicle: {
       id: string;
@@ -194,6 +208,18 @@ export function RoDetailRoute() {
     mutationFn: (lineId: string) => api.del(`/repair-orders/${id}/line-items/${lineId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ro", id] }),
     onError: (err) => notifyError(err, { title: "Couldn't delete line" }),
+  });
+
+  // Re-stamp the shop's current tax setting onto this RO (its snapshot is
+  // from creation time, so a Settings change doesn't touch it otherwise).
+  const applyTax = useMutation({
+    mutationFn: () => api.post(`/repair-orders/${id}/apply-tax`),
+    onSuccess: () => {
+      notifications.show({ color: "green", message: "Tax updated on this RO." });
+      qc.invalidateQueries({ queryKey: ["ro", id] });
+      qc.invalidateQueries({ queryKey: ["ros"] });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't update tax" }),
   });
 
   // ── Saved-job template apply ────────────────────────────────────────────
@@ -479,6 +505,9 @@ export function RoDetailRoute() {
         !ro.estimate.approvedAt && ro.estimate.declinedAt
           ? `declined ${formatVisit(ro.estimate.declinedAt, tz)}`
           : null,
+        estimateChanged && ro.estimate.changedAt
+          ? `changed ${formatVisit(ro.estimate.changedAt, tz)}`
+          : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -661,14 +690,49 @@ export function RoDetailRoute() {
           </Text>
           <Text>{formatMoney(ro.partsTotal)}</Text>
         </Group>
-        {ro.taxTotal > 0 && (
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Tax
-            </Text>
-            <Text>{formatMoney(ro.taxTotal)}</Text>
-          </Group>
-        )}
+        {(() => {
+          // The RO's own snapshot vs. what Settings says now. A pre-snapshot
+          // RO (null) is only "stale" if the shop actually has a rate to apply.
+          const shopTax = resolveTaxSettings(me?.shop?.settings);
+          const roBps = ro.taxRateBps;
+          const roApplies = ro.taxAppliesTo ?? "parts";
+          const exempt = ro.customer?.taxExempt === true;
+          const taxed = (roBps ?? 0) > 0 && roApplies !== "none";
+          const stale =
+            roBps === null
+              ? shopTax.taxRateBps > 0
+              : roBps !== shopTax.taxRateBps || roApplies !== shopTax.taxAppliesTo;
+          const shopTaxLabel =
+            shopTax.taxRateBps > 0 && shopTax.taxAppliesTo !== "none"
+              ? `${formatTaxRate(shopTax.taxRateBps)} · ${TAX_APPLIES_TO_LABELS[shopTax.taxAppliesTo].toLowerCase()}`
+              : "no tax";
+          return (
+            <>
+              {(taxed || exempt || ro.taxTotal > 0) && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {exempt
+                      ? "Tax · customer is tax-exempt"
+                      : `${taxLineLabel(roApplies)} · ${formatTaxRate(roBps ?? 0)}`}
+                  </Text>
+                  <Text>{formatMoney(ro.taxTotal)}</Text>
+                </Group>
+              )}
+              {stale && !exempt && (
+                <Group justify="flex-end">
+                  <Button
+                    variant="subtle"
+                    size="compact-xs"
+                    onClick={() => applyTax.mutate()}
+                    loading={applyTax.isPending}
+                  >
+                    Apply current tax rate ({shopTaxLabel})
+                  </Button>
+                </Group>
+              )}
+            </>
+          );
+        })()}
         <Group justify="space-between">
           <Text fw={700}>Total</Text>
           <Text fw={700}>{formatMoney(ro.total)}</Text>
@@ -697,11 +761,16 @@ export function RoDetailRoute() {
       <Group>
         <Button
           leftSection={<IconSend size={16} />}
+          color={estimateChanged ? "orange" : undefined}
           onClick={openSendEstimate}
           loading={estimateLoading}
           disabled={ro.lineItems.length === 0 || !ro.customer}
         >
-          {ro.estimate?.sentAt ? "Re-send estimate" : "Send estimate"}
+          {estimateChanged
+            ? "Re-send for approval"
+            : ro.estimate?.sentAt
+            ? "Re-send estimate"
+            : "Send estimate"}
         </Button>
         <Button
           variant="default"

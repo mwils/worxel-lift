@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { TaxAppliesTo } from "@lift/shared/constants";
 import { api, ApiError } from "./api";
 import { clearSessionHint, hasSessionHint, markSessionHint } from "./session";
 
@@ -26,9 +27,9 @@ export interface Me {
       autoReplyEnabled: boolean;
       defaultLaborRate?: number | null;
       serviceRemindersEnabled?: boolean;
-      /** Sales tax percent (8.25 = 8.25%). Parts only unless `taxLabor`. */
-      taxRatePct?: number | null;
-      taxLabor?: boolean;
+      /** Sales tax in basis points (825 = 8.25%); the API always resolves the legacy shape to this. */
+      taxRateBps?: number | null;
+      taxAppliesTo?: TaxAppliesTo | null;
       booking?: BookingSettings;
       businessHours?: BookingHour[];
     };
