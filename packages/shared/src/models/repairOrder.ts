@@ -69,14 +69,20 @@ const RepairOrderSchema = new Schema(
       publicToken: String,
       // Snapshot taken when the customer approves, so later line-item edits
       // can be flagged as "changed since approval" against the number the
-      // customer actually agreed to. Cleared when the estimate is re-sent.
+      // customer actually agreed to, and so the public estimate page keeps
+      // showing what they agreed to. Cleared when the estimate is re-sent.
       approvedTotal: Number, // cents
+      approvedTaxTotal: Number, // cents; tax included in approvedTotal
       approvedLineItems: {
         type: [
           new Schema(
             {
               kind: { type: String, enum: LINE_ITEM_KINDS, required: true },
               description: { type: String, required: true },
+              hours: Number,
+              rate: Number, // cents per hour
+              qty: Number,
+              unitPrice: Number, // cents
               total: { type: Number, required: true }, // cents
             },
             { _id: false }
@@ -84,7 +90,15 @@ const RepairOrderSchema = new Schema(
         ],
         default: undefined,
       },
+      // Set when the snapshot was reconstructed from the live lines for an
+      // approval that predates snapshotting (lazy on read, or the backfill
+      // script) — best available truth, not what the customer literally saw.
+      approvedSnapshotBackfilledAt: Date,
     },
+
+    // Last time a line item was added / edited / removed. Drives the
+    // "changed <time>" marker next to an approval that no longer matches.
+    lineItemsChangedAt: Date,
 
     inspection: {
       status: { type: String, enum: INSPECTION_STATUSES, default: "draft" },

@@ -357,6 +357,7 @@ export const handler: SNSHandler = async (event) => {
         openRo.estimate = openRo.estimate ?? {};
         openRo.estimate.approvedAt = stamp.approvedAt;
         openRo.estimate.approvedTotal = stamp.approvedTotal;
+        openRo.estimate.approvedTaxTotal = stamp.approvedTaxTotal;
         openRo.estimate.approvedLineItems = stamp.approvedLineItems as any;
         openRo.status = "in_repair";
         await openRo.save();

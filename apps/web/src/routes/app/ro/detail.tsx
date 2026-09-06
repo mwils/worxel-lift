@@ -92,6 +92,7 @@ interface RoDetail {
       declinedAt?: string | null;
       approvedTotal?: number | null;
       changedSinceApproval?: boolean;
+      changedAt?: string | null;
     } | null;
     inspection: InspectionState;
     customer: {
@@ -482,6 +483,9 @@ export function RoDetailRoute() {
         !ro.estimate.approvedAt && ro.estimate.declinedAt
           ? `declined ${formatVisit(ro.estimate.declinedAt, tz)}`
           : null,
+        estimateChanged && ro.estimate.changedAt
+          ? `changed ${formatVisit(ro.estimate.changedAt, tz)}`
+          : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -723,11 +727,16 @@ export function RoDetailRoute() {
       <Group>
         <Button
           leftSection={<IconSend size={16} />}
+          color={estimateChanged ? "orange" : undefined}
           onClick={openSendEstimate}
           loading={estimateLoading}
           disabled={ro.lineItems.length === 0 || !ro.customer}
         >
-          {ro.estimate?.sentAt ? "Re-send estimate" : "Send estimate"}
+          {estimateChanged
+            ? "Re-send for approval"
+            : ro.estimate?.sentAt
+            ? "Re-send estimate"
+            : "Send estimate"}
         </Button>
         <Button
           variant="default"
