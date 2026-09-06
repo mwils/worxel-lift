@@ -45,6 +45,12 @@ import {
 } from "../../lib/auth";
 import { api } from "../../lib/api";
 import { notifyError } from "../../lib/notify";
+import {
+  TimezoneChangeModal,
+  type AppointmentMode,
+  type AppointmentShift,
+  type TimezoneChangeRequest,
+} from "../../features/settings/TimezoneChangeModal";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL ?? "https://lift.worxel.com";
@@ -119,6 +125,7 @@ export function SettingsRoute() {
       address?: ShopAddress;
       phone?: string | null;
       timezone?: string;
+      appointmentMode?: AppointmentMode;
       settings?: {
         aiTone?: "plain" | "friendly";
         autoReplyEnabled?: boolean;
@@ -128,7 +135,7 @@ export function SettingsRoute() {
         taxAppliesTo?: TaxAppliesTo;
         booking?: BookingSettings;
       };
-    }) => api.patch("/shop", patch),
+    }) => api.patch<{ appointments?: AppointmentShift | null }>("/shop", patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
       notifications.show({ color: "green", message: "Settings saved." });
@@ -191,7 +198,33 @@ export function SettingsRoute() {
   ]);
   const tzIsCurated = US_TIMEZONES.some((z) => z.value === profile.timezone);
 
-  function saveProfile() {
+  // Timezone change guard (QA round-2 M1): a zone switch with visits on the
+  // books first asks keep-clock vs keep-instant, then (keep_instant only)
+  // offers to text the affected customers. See TimezoneChangeModal.
+  const [tzRequest, setTzRequest] = useState<
+    (TimezoneChangeRequest & { payload: Parameters<typeof patchShop.mutate>[0] }) | null
+  >(null);
+  const [tzShift, setTzShift] = useState<AppointmentShift | null>(null);
+  const [tzChecking, setTzChecking] = useState(false);
+
+  async function confirmTimezoneChange(mode: AppointmentMode) {
+    if (!tzRequest) return;
+    try {
+      const res = await patchShop.mutateAsync({ ...tzRequest.payload, appointmentMode: mode });
+      setTzRequest(null);
+      if (res.appointments && res.appointments.mode === "keep_instant") {
+        setTzShift(res.appointments);
+      }
+      // keep_clock: the board moves with the customers' texts; the RO cache is
+      // stale until refetched.
+      qc.invalidateQueries({ queryKey: ["ros"] });
+      qc.invalidateQueries({ queryKey: ["ro"] });
+    } catch {
+      // patchShop.onError already showed the toast; keep the dialog open.
+    }
+  }
+
+  async function saveProfile() {
     const name = profile.name.replace(/\s+/g, " ").trim();
     if (name.length < 2) {
       setProfileError("Shop name needs at least 2 characters.");
@@ -208,7 +241,7 @@ export function SettingsRoute() {
       return;
     }
     setProfileError(null);
-    patchShop.mutate({
+    const payload = {
       name,
       address: {
         line1: profile.line1,
@@ -219,7 +252,32 @@ export function SettingsRoute() {
       },
       phone,
       timezone,
-    });
+    };
+
+    const currentTz = shop?.timezone ?? "America/Chicago";
+    if (timezone !== currentTz) {
+      // Count upcoming scheduled visits before committing the zone change.
+      setTzChecking(true);
+      try {
+        const { ros } = await api.get<{ ros: Array<{ scheduledFor: string | null }> }>(
+          "/repair-orders?status=scheduled&limit=200"
+        );
+        const now = Date.now();
+        const count = ros.filter(
+          (r) => r.scheduledFor && new Date(r.scheduledFor).getTime() > now
+        ).length;
+        if (count > 0) {
+          setTzRequest({ count, fromTz: currentTz, toTz: timezone, payload });
+          return;
+        }
+      } catch (err) {
+        notifyError(err, { title: "Couldn't check upcoming appointments" });
+        return;
+      } finally {
+        setTzChecking(false);
+      }
+    }
+    patchShop.mutate(payload);
   }
 
   const openBillingPortal = useMutation({
@@ -446,10 +504,18 @@ export function SettingsRoute() {
         </Text>
       )}
       <Group>
-        <Button onClick={saveProfile} loading={patchShop.isPending}>
+        <Button onClick={saveProfile} loading={patchShop.isPending || tzChecking}>
           Save shop profile
         </Button>
       </Group>
+      <TimezoneChangeModal
+        request={tzRequest}
+        saving={patchShop.isPending}
+        onCancel={() => setTzRequest(null)}
+        onConfirm={confirmTimezoneChange}
+        shift={tzShift}
+        onShiftDone={() => setTzShift(null)}
+      />
 
       <Divider label="AI" />
       <Select

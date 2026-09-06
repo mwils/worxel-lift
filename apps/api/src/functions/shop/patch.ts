@@ -1,8 +1,9 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { Shop, UpdateShopDto } from "@lift/shared";
-import { buildOptInScript, resolveTaxSettings } from "@lift/shared/constants";
+import { RepairOrder, Shop, UpdateShopDto } from "@lift/shared";
+import { DEFAULT_SHOP_TIMEZONE, buildOptInScript, resolveTaxSettings } from "@lift/shared/constants";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, conflict, notFound, ok } from "../../lib/response.js";
+import { shiftWallClock } from "../../lib/visitTime.js";
 
 const MAX_OLD_SLUGS = 5;
 
@@ -59,11 +60,40 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       }
     }
 
-    // Slug change needs an extra round-trip: uniqueness check, oldSlugs push.
-    if (dto.slug !== undefined) {
-      const current = await Shop.findById(user.shopId).lean();
-      if (!current) return notFound("Shop not found");
+    // Slug and timezone changes both need the stored doc first (slug:
+    // uniqueness check + oldSlugs push; timezone: the old zone to re-anchor
+    // upcoming visits against).
+    const needsCurrent = dto.slug !== undefined || dto.timezone !== undefined;
+    const current = needsCurrent ? await Shop.findById(user.shopId).lean() : null;
+    if (needsCurrent && !current) return notFound("Shop not found");
 
+    // Timezone change (QA round-2 M1): `scheduledFor` is an instant, so every
+    // upcoming visit would silently re-label in the new zone while the
+    // customer's confirmation text still says the old wall-clock. Default is
+    // keep_clock — re-anchor each visit so 9:00 AM stays 9:00 AM. The shift
+    // runs after the shop write succeeds; the response tells Settings what
+    // happened so it can offer to text customers (keep_instant only).
+    const previousTimezone = current?.timezone || DEFAULT_SHOP_TIMEZONE;
+    const nextTimezone =
+      dto.timezone !== undefined && dto.timezone !== previousTimezone ? dto.timezone : null;
+    const upcoming = nextTimezone
+      ? await RepairOrder.find(
+          { shopId: user.shopId, status: "scheduled", scheduledFor: { $gt: new Date() } },
+          { scheduledFor: 1 }
+        ).lean()
+      : [];
+    const appointments = nextTimezone
+      ? {
+          mode: dto.appointmentMode ?? ("keep_clock" as const),
+          affected: upcoming.length,
+          roIds: upcoming.map((r) => String(r._id)),
+          previousTimezone,
+          timezone: nextTimezone,
+        }
+      : null;
+
+    // Slug change needs an extra round-trip: uniqueness check, oldSlugs push.
+    if (dto.slug !== undefined && current) {
       if (dto.slug !== current.slug) {
         const taken = await Shop.findOne({ slug: dto.slug, _id: { $ne: user.shopId } }).lean();
         if (taken) return conflict("That URL is taken — try another.", { slug: dto.slug });
@@ -86,7 +116,29 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     ).lean();
     if (!shop) return notFound("Shop not found");
 
+    if (appointments?.mode === "keep_clock" && upcoming.length > 0) {
+      await RepairOrder.bulkWrite(
+        upcoming
+          .filter((r) => r.scheduledFor)
+          .map((r) => ({
+            updateOne: {
+              filter: { _id: r._id, shopId: user.shopId },
+              update: {
+                $set: {
+                  scheduledFor: shiftWallClock(
+                    r.scheduledFor as Date,
+                    previousTimezone,
+                    appointments.timezone
+                  ),
+                },
+              },
+            },
+          }))
+      );
+    }
+
     return ok({
+      appointments,
       shop: {
         id: String(shop._id),
         name: shop.name,

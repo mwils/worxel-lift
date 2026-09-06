@@ -157,6 +157,11 @@ export const UpdateShopDto = z.object({
   // Front-desk number shown to customers. null clears it.
   phone: e164.nullable().optional(),
   timezone: ianaTimezone.optional(),
+  // Only read when `timezone` actually changes and the shop has upcoming
+  // scheduled ROs. keep_clock (default) re-anchors each visit so 9:00 AM stays
+  // 9:00 AM in the new zone; keep_instant leaves the stored instants alone and
+  // the labels move instead (QA round-2 M1).
+  appointmentMode: z.enum(["keep_clock", "keep_instant"]).optional(),
   settings: z
     .object({
       aiTone: z.enum(AI_TONES).optional(),
@@ -169,6 +174,14 @@ export const UpdateShopDto = z.object({
       booking: BookingSettingsDto.optional(),
     })
     .optional(),
+});
+
+// POST /shop/appointment-notices — after a keep_instant timezone change, text
+// the affected customers their corrected visit time. `previousTimezone` lets
+// the copy say "(not 9:00 AM)" so the customer knows which text to trust.
+export const AppointmentNoticesDto = z.object({
+  roIds: z.array(objectId).min(1).max(200),
+  previousTimezone: ianaTimezone,
 });
 
 export type BookingHoursInput = z.infer<typeof BookingHoursDto>;
