@@ -53,9 +53,24 @@ export async function inferServiceReminders(args: {
   }
 
   const completedAt = new Date(ro.completedAt);
+  // Odometer at the time of service, for the reminder row / text. Pickup
+  // reading wins; fall back to drop-off.
+  const mileageAtService =
+    typeof ro.mileageOut === "number"
+      ? ro.mileageOut
+      : typeof ro.mileageIn === "number"
+        ? ro.mileageIn
+        : null;
   const matchedCategories = new Set<ServiceCategory>();
 
   for (const li of ro.lineItems ?? []) {
+    // A line applied from a saved job tagged with a reminder category is
+    // authoritative — no keyword guessing needed for it.
+    const tagged = (li as { reminderCategory?: string | null }).reminderCategory;
+    if (tagged && (SERVICE_CATEGORIES as readonly string[]).includes(tagged)) {
+      matchedCategories.add(tagged as ServiceCategory);
+      continue;
+    }
     const desc = (li.description ?? "").toLowerCase();
     if (!desc) continue;
     for (const cat of SERVICE_CATEGORIES) {
@@ -92,7 +107,11 @@ export async function inferServiceReminders(args: {
         $set: {
           dueAt,
           sourceRepairOrderId: ro._id,
+          servicedAt: completedAt,
+          ...(mileageAtService !== null ? { mileageAtService } : {}),
         },
+        // No reading on this RO → don't leave an older RO's mileage behind.
+        ...(mileageAtService === null ? { $unset: { mileageAtService: "" } } : {}),
         $setOnInsert: {
           shopId: ro.shopId,
           customerId: ro.customerId,

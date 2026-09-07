@@ -15,6 +15,7 @@ export interface JobTemplateLike {
   shopId?: unknown;
   name: string;
   category?: string | null;
+  reminderCategory?: string | null;
   notes?: string | null;
   lineItems: JobTemplateLineItemLike[];
   source?: string;
@@ -53,6 +54,7 @@ export function serializeJobTemplate(t: JobTemplateLike) {
     id: String(t._id),
     name: t.name,
     category: t.category ?? null,
+    reminderCategory: t.reminderCategory ?? null,
     notes: t.notes ?? null,
     lineItems: items,
     itemCount: items.length,

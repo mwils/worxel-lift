@@ -13,6 +13,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       shopId: user.shopId,
       name: dto.name,
       category: dto.category,
+      reminderCategory: dto.reminderCategory,
       notes: dto.notes,
       lineItems: dto.lineItems,
       source: "custom",

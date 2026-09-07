@@ -131,6 +131,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         paymentStatus: roPaymentSnapshot(r).status,
         collectedCents: roPaymentSnapshot(r).collectedCents,
         balanceCents: roPaymentSnapshot(r).balanceCents,
+        mileageIn: r.mileageIn ?? null,
+        mileageOut: r.mileageOut ?? null,
         completedAt: r.completedAt ?? null,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,

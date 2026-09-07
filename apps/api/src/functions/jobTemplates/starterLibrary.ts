@@ -28,6 +28,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ user }) => {
         starterKey: s.starterKey,
         name: s.name,
         category: s.category,
+        reminderCategory: s.reminderCategory ?? null,
         lineItems: items,
         itemCount: items.length,
         priceTotal: items.reduce((acc, it) => acc + it.total, 0),

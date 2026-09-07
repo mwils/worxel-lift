@@ -4,6 +4,7 @@ import { CreateRepairOrderDto, Customer, RepairOrder, Shop, Vehicle } from "@lif
 import { resolveTaxSettings } from "@lift/shared/constants";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, created, notFound } from "../../lib/response.js";
+import { bumpVehicleMileage } from "./_vehicleMileage.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
@@ -53,7 +54,18 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       taxRateBps: tax.taxRateBps,
       taxAppliesTo: tax.taxAppliesTo,
       publicToken,
+      mileageIn: dto.mileageIn,
     });
+
+    // The odometer at drop-off is the car's newest known mileage.
+    if (dto.mileageIn !== undefined) {
+      await bumpVehicleMileage(user.shopId, vehicle._id, dto.mileageIn).catch((err) => {
+        console.error("[ro.create] bumpVehicleMileage failed", {
+          repairOrderId: String(ro._id),
+          error: (err as Error).message,
+        });
+      });
+    }
 
     return created({
       repairOrder: {
@@ -70,6 +82,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         total: 0,
         publicToken: ro.publicToken,
         scheduledFor: ro.scheduledFor ?? null,
+        mileageIn: ro.mileageIn ?? null,
+        mileageOut: null,
         createdAt: ro.createdAt,
         updatedAt: ro.updatedAt,
       },
