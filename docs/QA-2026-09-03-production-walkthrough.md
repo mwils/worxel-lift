@@ -18,9 +18,50 @@ When an item is done, append "— FIXED (branch qa/...)" to its heading.
 
 ---
 
+## Status — round 2 complete (2026-09-03, later same day)
+
+All six open items (C1, H1–H3, M1–M3) are resolved on `qa/round-2-2026-09-03`, along with every
+capability gap in `FEATURE-GAPS-2026-09-03.md`. `pnpm -r typecheck`, `@lift/web build` and
+`@lift/marketing build` are clean on the merged tree. Not yet deployed — retest as a whole after
+`pnpm deploy:dev`.
+
+### Run these backfills once against the target stage before retesting
+Dry run first (no `--apply`), then repeat with `--apply`:
+```
+MONGODB_URI="<MongodbUri secret>" pnpm --filter @lift/api exec tsx scripts/backfillPayments.ts
+MONGODB_URI="…" pnpm --filter @lift/api exec tsx scripts/backfillEstimateSnapshots.ts
+MONGODB_URI="…" pnpm --filter @lift/api exec tsx scripts/backfillConversations.ts
+MONGODB_URI="…" pnpm --filter @lift/api exec tsx scripts/backfillVehicleSearchFields.ts   # from round 1, if not yet run
+```
+- `backfillPayments` creates a `Payment` row from each RO's existing `payment` block. **RO-0001 will
+  correctly become `PARTIAL · $94.50 due`.**
+- `backfillEstimateSnapshots` snapshots approved ROs that predate the snapshot code. RO-0001's
+  snapshot will be its current $294.50 lines, which is what Dale actually approved.
+- `backfillConversations` builds the new inbox thread rows; without it the inbox looks empty.
+  Existing history is treated as read, but "needs reply" is computed honestly.
+
+### Behavior changes to expect during retest
+- Board gains a "This month" strip (closed / collected / outstanding) and a "History" nav entry
+  (`/ros`). "Recently closed" is capped at 10 with "See all →".
+- The inbox defaults to a **Needs reply** filter, so a quiet shop's inbox can look empty at first —
+  switch to All. Auto-replied status checks no longer bump threads.
+- A short payment now reads `PARTIAL · CASH · $200.00 of $294.50` with "$94.50 due". Writing off the
+  remainder is an explicit checkbox that adds a negative "Discount" line.
+- Ready texts still prompt by default; "Don't ask again" in the dialog is the only path to auto-send.
+- A day-before appointment reminder now goes out around 5 PM shop-local.
+- First load after the deploy may still show the old bundle once; from then on the update toast handles it.
+
+### Known follow-ups (not blockers)
+- Line-locking on approved estimates awaits Matthew's decision (see C1).
+- Inbound SMS has no "no"/decline classification, so a texted decline isn't recognised.
+- Editing a negative "Discount" line fails DTO validation; deleting it works.
+- Ready/pickup copy uses an em-dash, which forces UCS-2 SMS encoding and shortens segments. Dropping
+  it repo-wide is a house-style call.
+- CSV export has no date/status filters (deliberately skipped — the export is an all-collections zip).
+
 ## Critical
 
-### C1. Approved estimates are still editable, and the customer's own approval record is rewritten
+### C1. Approved estimates are still editable, and the customer's own approval record is rewritten — FIXED (branch qa/round-2-2026-09-03)
 *(carried over from round 1 as C2 — the fix did not land, and the defect is worse than first reported)*
 
 **Repro**
@@ -50,6 +91,8 @@ problem; step 4 is a chargeback.
   work to go on as new lines needing their own approval. That's the ShopMonkey/Tekmetric
   behavior and it's what a shop owner expects, but it's a bigger change — flag it and let
   Matthew decide.
+
+**Resolution.** Root cause was two-part. The round-1 snapshot code shipped, but `estimateChangedSinceApproval` returned false whenever the snapshot was absent, so RO-0001 (approved before that deploy) could never flip to amber; separately `GET /public/estimate/{token}` returned live line items regardless of `approvedAt`, and the page rendered them. Now: the approval snapshot stores per-line hours/rate/qty/unit price plus `approvedTaxTotal`; the public estimate and inspection pages substitute the snapshot for live numbers once approved and show "Approved Sep 3 at 3:55 PM" in shop time, plus "The shop has since updated this estimate — they'll send a new one to approve." when it has changed. Legacy approvals are healed on first read (`ensureApprovalSnapshot`) and in bulk by `scripts/backfillEstimateSnapshots.ts`. The RO badge goes amber "Changed since approval · $294.50 approved" with "Re-send for approval" as the primary action, and the trail gains "· changed <time>" from a new `lineItemsChangedAt`. **Line-locking was not built** — the doc asked for a decision first. Proposal for Matthew: reject PATCH/DELETE on line ids present in `approvedLineItems` (409), allow new lines but mark them `pendingApproval` and exclude them from the approved total, turn the action into "Send added work for approval", and grey locked rows with an "Unlock & re-send" escape hatch. Roughly a day's work.
 
 ---
 
@@ -107,7 +150,7 @@ vehicle. This is the same underlying model change as H1 — do them together. An
 figure surfaced later (the RO history totals row in the feature-gaps doc) must use payments
 too, or the shop's monthly number will overstate every time a payment is short.
 
-### H3. Deployed fixes don't reach a shop until their second visit
+### H3. Deployed fixes don't reach a shop until their second visit — FIXED (branch qa/round-2-2026-09-03)
 First load after the deploy ran the previous bundle (`index-biQe5qse.js`) while the server
 was already serving `index-B2TQ1R_s.js`; one reload picked up the new one. Standard Workbox
 precache behavior, but there's no "update available" prompt, so a shop that leaves the PWA
@@ -118,11 +161,13 @@ something they just reported.
 show a small "New version — tap to refresh" toast. Also worth confirming `index.html` is
 served `no-cache` so the shell revalidates.
 
+**Resolution.** Root cause: `registerType: "autoUpdate"` plus a single `registerSW({ immediate: true })` call at load meant the app only ever checked for a new worker on startup, while Workbox served the precached old shell; SST also served `sw.js` and the manifest as immutable for a year. Now the app registers in `prompt` mode with a persistent "New version available — Refresh" toast (`features/pwa/UpdatePrompt.tsx`), re-checks hourly and whenever the tab becomes visible, and `sst.config.ts` sets `assets.fileOptions` so HTML, `sw.js`, `registerSW.js` and the manifest are `no-cache` while hashed assets stay immutable. Takes effect on the next deploy.
+
 ---
 
 ## Medium
 
-### M1. Changing the shop timezone silently desyncs already-texted appointments
+### M1. Changing the shop timezone silently desyncs already-texted appointments — FIXED (branch qa/round-2-2026-09-03)
 Switching the shop from `America/Chicago` to `America/New_York` re-rendered RO-0002's
 booking as **10:00 AM** (stored instant unchanged, label moved) while the confirmation text
 already sent to the customer said **9:00 AM**. Correct behavior in isolation, but every shop
@@ -132,6 +177,8 @@ that corrects a wrong default hits this on all open scheduled ROs at once.
 "You have 3 upcoming appointments. Keep them at the same clock time (9:00 AM stays 9:00 AM)
 or the same instant?" Keep-clock-time is what a shop means. Whichever is chosen, offer to
 text affected customers the corrected time.
+
+**Resolution.** Root cause: `PATCH /shop` set the timezone blindly, and every label derives wall-clock from `shop.timezone` at render time, so all upcoming visits re-labelled while the customer's sent text kept the old clock. Now a timezone change with future scheduled ROs opens a modal asking to keep the same clock time (default) or the same instant; keep-clock re-anchors each `scheduledFor` via luxon `keepLocalTime`. When the instant did change, a single confirmation sends corrected times through `POST /shop/appointment-notices` (never automatically): "Correction from Mike's Auto: your visit is Thu Sep 10 at 10:00 AM (not 9:00 AM). Need to change it? <manage link>".
 
 ### M2. The PAID pill shows method but not amount collected — FIXED (branch qa/round-2-2026-09-03)
 **Root cause:** the badge rendered only `payment.method`; `amountCents` and `note` were
@@ -145,12 +192,14 @@ Reads `PAID · CASH`. With H1 fixed this should read `PAID · CASH · $294.50`, 
 `PARTIAL · CASH · $200.00 of $294.50`. The payment note ("Check #1042…") is captured but
 isn't visible anywhere on the RO after saving — surface it near the pill or in the payment row.
 
-### M3. Public estimate page still missing shop contact and tax
+### M3. Public estimate page still missing shop contact and tax — FIXED (branch qa/round-2-2026-09-03)
 Round 1 added labor hours detail and the shop's city/state (good). Still absent: shop phone
 number, any tax line, and an expiry. The phone number is the first thing a customer wants
 when they have a question about a quote — right now their only channel is replying to the
 text. Depends on the tax work in `FEATURE-GAPS-2026-09-03.md` item 2 for the tax line;
 the phone number is available now via the shop profile and can ship immediately.
+
+**Resolution.** Shop phone was being read from `shop.sms.phoneNumber` (the texting number, unset for this shop) rather than the front-desk `shop.phone` added in round 1. The public estimate now shows "Questions? Call <shop> at (864) …" as a `tel:` link, with an `sms:` fallback. The tax line always renders when the shop's rate is above zero, labelled "Tax (parts)" or "Tax" per the applies-to setting, and the estimate SMS carries a "Tax:" line. **No expiry was added** — there is no `estimate.expiresAt` concept and the doc said not to invent one.
 
 ---
 

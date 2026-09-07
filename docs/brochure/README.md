@@ -1,5 +1,7 @@
 # Lift walk-in brochure
 
+For unattended parts-store placement, use the [parts-store counter card](parts-store/README.md), which includes a compact print PDF and a two-up Letter proof.
+
 Two-sided 8.5×11 handout for shop walk-ins. Copy: [`../BROCHURE_COPY.md`](../BROCHURE_COPY.md).
 
 | File | What it is |
