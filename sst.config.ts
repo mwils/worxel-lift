@@ -279,6 +279,11 @@ export default $config({
 
     // repair orders
     api.route("GET /repair-orders", fn("apps/api/src/functions/repairOrders/list.handler"));
+    // Must be registered before the {id} route so "history" isn't read as an id.
+    api.route(
+      "GET /repair-orders/history",
+      fn("apps/api/src/functions/repairOrders/history.handler")
+    );
     api.route("POST /repair-orders", fn("apps/api/src/functions/repairOrders/create.handler"));
     api.route("GET /repair-orders/{id}", fn("apps/api/src/functions/repairOrders/get.handler"));
     api.route("PATCH /repair-orders/{id}", fn("apps/api/src/functions/repairOrders/patch.handler"));

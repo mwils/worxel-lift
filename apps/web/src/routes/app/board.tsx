@@ -1,5 +1,5 @@
-import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Divider, Loader, Skeleton, Alert, Anchor } from "@mantine/core";
-import { IconPlus, IconCalendarEvent, IconChevronDown, IconChevronUp, IconCash, IconMessageCircle } from "@tabler/icons-react";
+import { Group, Stack, Title, Button, Text, Card, Badge, SimpleGrid, Center, Skeleton, Alert, Anchor } from "@mantine/core";
+import { IconPlus, IconCalendarEvent, IconCash, IconMessageCircle } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +9,8 @@ import { formatMoney, formatRoNumber, formatVisit, relativeTime, shopTimezone } 
 import { RO_STATUS_LABELS, resolveTaxSettings, type RoStatus } from "@lift/shared/constants";
 import { useAuth } from "../../lib/auth";
 import { StarterLibraryPrompt } from "../../features/jobTemplates/StarterLibraryPrompt";
+import { MonthStrip } from "../../features/history/MonthStrip";
+import { RecentlyClosed } from "../../features/history/RecentlyClosed";
 
 interface BoardRO {
   id: string;
@@ -26,14 +28,6 @@ interface BoardRO {
   estimateDeclinedAt?: string | null;
   estimateDeclineFollowedUpAt?: string | null;
 }
-
-// Closed = off the board but not out of the books. Muted colors on purpose —
-// this strip is a record, not a to-do list.
-const CLOSED_STATUSES: Array<{ status: RoStatus; label: string; color: string }> = [
-  { status: "picked_up", label: RO_STATUS_LABELS.picked_up, color: "teal" },
-  { status: "voided", label: RO_STATUS_LABELS.voided, color: "gray" },
-  { status: "cancelled_by_customer", label: RO_STATUS_LABELS.cancelled_by_customer, color: "red" },
-];
 
 const STATUS_BUCKETS: Array<{ status: RoStatus; label: string; color: string }> = [
   { status: "scheduled", label: RO_STATUS_LABELS.scheduled, color: "gray" },
@@ -71,19 +65,6 @@ export function BoardRoute() {
   useEffect(() => {
     if (data && !isPlaceholderData) writeSnapshot(snapshotKey, data);
   }, [data, isPlaceholderData, snapshotKey]);
-
-  // Closed jobs, fetched only when the strip is opened. Collapsed by default:
-  // the board is for today's work, history stays one tap away.
-  const [showClosed, setShowClosed] = useState(false);
-  const closedQ = useQuery({
-    queryKey: ["ros", "closed"],
-    queryFn: () =>
-      api.get<{ ros: BoardRO[] }>(
-        `/repair-orders?status=${CLOSED_STATUSES.map((c) => c.status).join(",")}&limit=30`
-      ),
-    enabled: showClosed,
-  });
-  const closed = closedQ.data?.ros ?? [];
 
   // One-time nudge to set a tax rate, once there's at least one RO to be wrong
   // about. Dismissal is per shop, per browser — nothing to store server-side.
@@ -176,6 +157,8 @@ export function BoardRoute() {
         </Alert>
       )}
 
+      <MonthStrip />
+
       {isPending ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md" aria-busy="true" aria-label="Loading board">
           {STATUS_BUCKETS.map((bucket) => (
@@ -239,63 +222,7 @@ export function BoardRoute() {
         </SimpleGrid>
       )}
 
-      {!isPending && (
-        <>
-          <Divider mt="sm" />
-          <Group justify="center">
-            <Button
-              variant="subtle"
-              color="gray"
-              size="sm"
-              onClick={() => setShowClosed((v) => !v)}
-              rightSection={showClosed ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
-            >
-              Recently closed{showClosed && closedQ.data ? ` · ${closed.length}` : ""}
-            </Button>
-          </Group>
-          {showClosed &&
-            (closedQ.isPending ? (
-              <Center py="sm">
-                <Loader size="sm" />
-              </Center>
-            ) : closed.length === 0 ? (
-              <Text size="sm" c="dimmed" ta="center">
-                Nothing closed yet.
-              </Text>
-            ) : (
-              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-                {closed.map((ro) => {
-                  const meta = CLOSED_STATUSES.find((c) => c.status === ro.status);
-                  return (
-                    <Card
-                      key={ro.id}
-                      component={Link as any}
-                      to={`/ro/${ro.id}`}
-                      style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}
-                    >
-                      <Group justify="space-between">
-                        <Text fw={600}>{formatRoNumber(ro.number)}</Text>
-                        <Group gap={6} wrap="nowrap">
-                          <PaidMark ro={ro} />
-                          <Text size="sm">{formatMoney(ro.total)}</Text>
-                        </Group>
-                      </Group>
-                      <Text size="sm">{ro.customerName}</Text>
-                      <Group justify="space-between" mt={2}>
-                        <Text size="xs" c="dimmed">
-                          {ro.vehicleSummary} · {relativeTime(ro.updatedAt)}
-                        </Text>
-                        <Badge size="sm" variant="light" color={meta?.color ?? "gray"}>
-                          {meta?.label ?? RO_STATUS_LABELS[ro.status] ?? ro.status}
-                        </Badge>
-                      </Group>
-                    </Card>
-                  );
-                })}
-              </SimpleGrid>
-            ))}
-        </>
-      )}
+      {!isPending && <RecentlyClosed />}
     </Stack>
   );
 }

@@ -5,6 +5,7 @@ import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js
 import { badRequest, ok } from "../../lib/response.js";
 import { isEstimateDeclined } from "./_estimate.js";
 import { roPaymentSnapshot } from "./_payments.js";
+import { customerName, vehicleSummary } from "./_rows.js";
 
 const ListQuery = z.object({
   // Single status or comma-separated list ("picked_up,voided") — the board's
@@ -20,19 +21,6 @@ const ListQuery = z.object({
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function customerName(c: { firstName?: string; lastName?: string | null } | undefined): string {
-  if (!c) return "Unknown";
-  const last = c.lastName ?? "";
-  return [c.firstName ?? "", last].filter(Boolean).join(" ").trim() || "Unknown";
-}
-
-function vehicleSummary(
-  v: { year?: number | null; make?: string | null; model?: string | null } | undefined
-): string {
-  if (!v) return "—";
-  return [v.year, v.make, v.model].filter(Boolean).join(" ").trim() || "—";
 }
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
