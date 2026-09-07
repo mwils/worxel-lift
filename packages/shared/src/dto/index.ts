@@ -240,11 +240,15 @@ export const LineItemDto = z.object({
 });
 export const UpdateLineItemDto = LineItemDto.partial();
 
+// Odometer reading. Seven digits covers anything short of a moon shot.
+export const odometer = z.number().int().nonnegative().max(9_999_999);
+
 export const CreateRepairOrderDto = z.object({
   customerId: objectId,
   vehicleId: objectId,
   concern: z.string().optional(),
   scheduledFor: z.string().datetime().optional(),
+  mileageIn: odometer.optional(),
 });
 
 export const UpdateRepairOrderDto = z.object({
@@ -252,6 +256,9 @@ export const UpdateRepairOrderDto = z.object({
   concern: z.string().optional(),
   diagnosis: z.string().optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
+  // null clears a mistyped reading.
+  mileageIn: odometer.nullable().optional(),
+  mileageOut: odometer.nullable().optional(),
 });
 
 // Owner records a non-Stripe payment. Each call appends a Payment row; the
@@ -336,6 +343,7 @@ export const JobTemplateLineItemDto = z.object({
 export const CreateJobTemplateDto = z.object({
   name: z.string().min(1),
   category: z.string().optional(),
+  reminderCategory: z.enum(SERVICE_CATEGORIES).optional(),
   notes: z.string().optional(),
   lineItems: z.array(JobTemplateLineItemDto).default([]),
 });
@@ -343,6 +351,7 @@ export const CreateJobTemplateDto = z.object({
 export const UpdateJobTemplateDto = z.object({
   name: z.string().min(1).optional(),
   category: z.string().nullable().optional(),
+  reminderCategory: z.enum(SERVICE_CATEGORIES).nullable().optional(),
   notes: z.string().nullable().optional(),
   lineItems: z.array(JobTemplateLineItemDto).optional(),
 });

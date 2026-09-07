@@ -7,6 +7,7 @@ import {
   Card,
   Group,
   NumberInput,
+  Select,
   Stack,
   Table,
   Text,
@@ -28,7 +29,18 @@ import { formatMoney } from "../../lib/format";
 import { api } from "../../lib/api";
 import { notifyError } from "../../lib/notify";
 import { useAuth } from "../../lib/auth";
+import { SERVICE_CATEGORIES } from "@lift/shared/constants";
+import { CATEGORY_LABELS } from "../reminders/types";
 import type { JobTemplate, JobTemplateLineItem } from "./types";
+import type { ServiceCategory } from "@lift/shared/constants";
+
+// Which reminder this saved job should schedule once it's on a picked-up RO.
+// Without a tag we fall back to matching the line-item wording, which misses
+// shop shorthand like "LOF".
+const REMINDER_OPTIONS = SERVICE_CATEGORIES.map((c) => ({
+  value: c,
+  label: CATEGORY_LABELS[c],
+}));
 
 export interface TemplateFormProps {
   template: JobTemplate | null;
@@ -92,6 +104,9 @@ export function TemplateForm({ template, onSaved, onCancel }: TemplateFormProps)
   const qc = useQueryClient();
   const [name, setName] = useState(template?.name ?? "");
   const [category, setCategory] = useState(template?.category ?? "");
+  const [reminderCategory, setReminderCategory] = useState<ServiceCategory | null>(
+    template?.reminderCategory ?? null
+  );
   const [notes, setNotes] = useState(template?.notes ?? "");
   const [items, setItems] = useState<DraftItem[]>(
     (template?.lineItems ?? []).map(itemFromTemplate)
@@ -166,6 +181,7 @@ export function TemplateForm({ template, onSaved, onCancel }: TemplateFormProps)
     mutationFn: async (payload: {
       name: string;
       category: string | null;
+      reminderCategory: ServiceCategory | null;
       notes: string | null;
       lineItems: Omit<DraftItem, "key" | "total">[];
     }) => {
@@ -194,6 +210,7 @@ export function TemplateForm({ template, onSaved, onCancel }: TemplateFormProps)
     upsert.mutate({
       name: name.trim(),
       category: category.trim() || null,
+      reminderCategory,
       notes: notes.trim() || null,
       lineItems: items.map(({ key: _k, total: _t, ...rest }) => ({
         kind: rest.kind,
@@ -260,6 +277,15 @@ export function TemplateForm({ template, onSaved, onCancel }: TemplateFormProps)
         value={category}
         onChange={setCategory}
         placeholder="Brakes, Maintenance, HVAC…"
+      />
+      <Select
+        label="Schedules a reminder (optional)"
+        description="We'll remind the customer when this service comes due again."
+        data={REMINDER_OPTIONS}
+        value={reminderCategory}
+        onChange={(v) => setReminderCategory((v as ServiceCategory) || null)}
+        placeholder="No reminder"
+        clearable
       />
       <Textarea
         label="Notes (optional, internal)"

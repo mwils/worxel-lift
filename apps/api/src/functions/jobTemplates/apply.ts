@@ -12,6 +12,7 @@ interface AppliedItem {
   qty?: number;
   unitPrice?: number;
   total: number;
+  reminderCategory?: string;
 }
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
@@ -52,6 +53,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       if (merged.rate !== undefined) item.rate = merged.rate;
       if (merged.qty !== undefined) item.qty = merged.qty;
       if (merged.unitPrice !== undefined) item.unitPrice = merged.unitPrice;
+      // Carry the template's reminder tag onto the RO line so pickup can
+      // schedule the right reminder without keyword-matching the description.
+      if (template.reminderCategory) item.reminderCategory = template.reminderCategory;
       return item;
     });
 

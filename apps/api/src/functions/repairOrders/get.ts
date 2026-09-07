@@ -93,6 +93,8 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       publicToken: ro.publicToken ?? null,
       scheduledFor: ro.scheduledFor ?? null,
       completedAt: ro.completedAt ?? null,
+      mileageIn: ro.mileageIn ?? null,
+      mileageOut: ro.mileageOut ?? null,
       createdAt: ro.createdAt,
       updatedAt: ro.updatedAt,
       customer: customer

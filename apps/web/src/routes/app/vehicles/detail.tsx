@@ -29,6 +29,10 @@ interface RepairOrderDto {
   taxTotal: number;
   total: number;
   paymentStatus: string;
+  collectedCents: number;
+  balanceCents: number;
+  mileageIn: number | null;
+  mileageOut: number | null;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -109,6 +113,10 @@ export function VehicleDetailRoute() {
     {
       label: "Last service",
       value: stats.lastServicedAt ? relativeTime(stats.lastServicedAt) : "—",
+    },
+    {
+      label: "Mileage",
+      value: vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "—",
     },
   ];
 

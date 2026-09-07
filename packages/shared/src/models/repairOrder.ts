@@ -6,6 +6,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   RO_STATUSES,
+  SERVICE_CATEGORIES,
   TAX_APPLIES_TO,
 } from "../constants.js";
 
@@ -18,6 +19,11 @@ const LineItemSchema = new Schema(
     qty: Number,
     unitPrice: Number, // cents
     total: { type: Number, required: true }, // cents
+    // Stamped when the line came from a saved job tagged with a reminder
+    // category (JobTemplate.reminderCategory). _inferReminders reads this
+    // ahead of keyword matching, so "LOF" vs "Lube, oil & filter" stops
+    // mattering once the shop uses its templates.
+    reminderCategory: { type: String, enum: SERVICE_CATEGORIES },
   },
   { _id: true }
 );
@@ -150,6 +156,13 @@ const RepairOrderSchema = new Schema(
 
     scheduledFor: Date,
     completedAt: Date,
+
+    // Odometer at drop-off / pickup. Optional — Mike often skips it. The
+    // latest value is mirrored onto `vehicles.mileage` by repairOrders/
+    // create.ts + patch.ts (only ever moves forward), and onto the service
+    // reminders this RO spawns (`mileageAtService`).
+    mileageIn: Number,
+    mileageOut: Number,
   },
   { timestamps: true }
 );

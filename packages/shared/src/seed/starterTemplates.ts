@@ -1,4 +1,4 @@
-import { LINE_ITEM_KINDS } from "../constants.js";
+import { LINE_ITEM_KINDS, type ServiceCategory } from "../constants.js";
 
 export const STARTER_DEFAULT_LABOR_RATE_CENTS = 13500; // $135/hr placeholder
 
@@ -15,6 +15,8 @@ export interface StarterTemplate {
   starterKey: string;
   name: string;
   category: string;
+  /** Service reminder this job schedules once it's on a picked-up RO. */
+  reminderCategory?: ServiceCategory;
   lineItems: StarterTemplateLineItem[];
 }
 
@@ -23,6 +25,7 @@ const r = STARTER_DEFAULT_LABOR_RATE_CENTS;
 export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   {
     starterKey: "oil_change_synthetic",
+    reminderCategory: "oil_change",
     name: "Oil change — full synthetic",
     category: "Maintenance",
     lineItems: [
@@ -34,6 +37,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   },
   {
     starterKey: "oil_change_conventional",
+    reminderCategory: "oil_change",
     name: "Oil change — conventional",
     category: "Maintenance",
     lineItems: [
@@ -45,6 +49,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   },
   {
     starterKey: "brake_pads_front",
+    reminderCategory: "brake_inspection",
     name: "Front brake pads",
     category: "Brakes",
     lineItems: [
@@ -55,6 +60,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   },
   {
     starterKey: "brake_pads_rear",
+    reminderCategory: "brake_inspection",
     name: "Rear brake pads",
     category: "Brakes",
     lineItems: [
@@ -65,6 +71,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   },
   {
     starterKey: "brake_rotors_pads_front",
+    reminderCategory: "brake_inspection",
     name: "Front rotors & pads",
     category: "Brakes",
     lineItems: [
@@ -106,6 +113,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   },
   {
     starterKey: "tire_rotation_balance",
+    reminderCategory: "tire_rotation",
     name: "Tire rotation & balance",
     category: "Tires",
     lineItems: [
@@ -115,6 +123,7 @@ export const STARTER_TEMPLATES: readonly StarterTemplate[] = [
   },
   {
     starterKey: "coolant_flush",
+    reminderCategory: "coolant_service",
     name: "Coolant flush",
     category: "Maintenance",
     lineItems: [
