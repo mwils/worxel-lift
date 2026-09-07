@@ -209,6 +209,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       const subParts: string[] = [];
       if (v.plate) subParts.push(`Plate ${v.plate}`);
       if (v.vin) subParts.push(`VIN ${v.vin.slice(-6)}`);
+      // Sold / totalled cars stay searchable — the plate is how you find the
+      // history — but say so, since they're hidden from pickers and reminders.
+      if (v.archivedAt) subParts.push("Archived");
       vehicleResults.push({
         kind: "vehicle",
         id,
