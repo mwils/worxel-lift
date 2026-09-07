@@ -85,7 +85,7 @@ export function MileageModal({
             allowNegative={false}
             value={inDraft}
             onChange={setInDraft}
-            data-autofocus={fields !== "out" ? true : undefined}
+            data-autofocus
           />
         )}
         {showOut && (
@@ -99,7 +99,7 @@ export function MileageModal({
             allowNegative={false}
             value={outDraft}
             onChange={setOutDraft}
-            data-autofocus={fields === "out" ? true : undefined}
+            data-autofocus={!showIn}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}

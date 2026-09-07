@@ -175,6 +175,9 @@ export function RemindersList() {
                     <IconCar size={14} style={{ flexShrink: 0 }} />
                     <Text size="sm" truncate>
                       {vehicleLabel(r.vehicle)} — {CATEGORY_LABELS[r.category]}
+                      {r.mileageAtService != null
+                        ? ` at ${r.mileageAtService.toLocaleString()} mi`
+                        : ""}
                     </Text>
                   </Group>
                   <Group gap="xs">

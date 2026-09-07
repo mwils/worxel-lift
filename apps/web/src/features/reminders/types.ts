@@ -10,6 +10,9 @@ export interface ServiceReminderRow {
   category: ServiceCategory;
   status: ServiceReminderStatus;
   dueAt: string;
+  /** When / at what odometer the source RO did this service. Display only. */
+  servicedAt: string | null;
+  mileageAtService: number | null;
   sentAt: string | null;
   sentMessageId: string | null;
   dismissedAt: string | null;

@@ -25,6 +25,8 @@ interface RepairOrder {
   total: number;
   paymentStatus: string;
   balanceCents?: number;
+  mileageIn?: number | null;
+  mileageOut?: number | null;
   completedAt: string | Date | null;
   createdAt: string | Date;
   lineItems: LineItem[];
@@ -61,6 +63,14 @@ export function RepairOrderTimelineCard({ ro }: { ro: RepairOrder }) {
   const [opened, { toggle }] = useDisclosure(false);
   const hasLines = ro.lineItems.length > 0;
   const visitDate = ro.completedAt ?? ro.createdAt;
+  // Odometer at the visit — pickup reading if we got one, else drop-off.
+  const mileage = ro.mileageOut ?? ro.mileageIn ?? null;
+  // What was actually done, readable without expanding the card. This is the
+  // "I think the last guy did the plugs" answer.
+  const workSummary = ro.lineItems
+    .filter((li) => li.kind !== "fee")
+    .map((li) => li.description)
+    .join(", ");
 
   return (
     <Card withBorder padding="sm">
@@ -94,9 +104,16 @@ export function RepairOrderTimelineCard({ ro }: { ro: RepairOrder }) {
 
         <Text size="xs" c="dimmed">
           {relativeTime(visitDate)}
+          {mileage != null ? ` · ${mileage.toLocaleString()} mi` : ""}
         </Text>
 
         {ro.concern && <Text size="sm">"{ro.concern}"</Text>}
+
+        {workSummary && !opened && (
+          <Text size="sm" c="dimmed" lineClamp={2}>
+            {workSummary}
+          </Text>
+        )}
 
         {hasLines && (
           <>
