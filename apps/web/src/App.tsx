@@ -14,6 +14,7 @@ const NewRoRoute = lazy(() => import("./routes/app/ro/new").then((m) => ({ defau
 const RoDetailRoute = lazy(() =>
   import("./routes/app/ro/detail").then((m) => ({ default: m.RoDetailRoute }))
 );
+const RosRoute = lazy(() => import("./routes/app/ros").then((m) => ({ default: m.RosRoute })));
 const CustomersRoute = lazy(() =>
   import("./routes/app/customers").then((m) => ({ default: m.CustomersRoute }))
 );
@@ -53,6 +54,9 @@ const PublicInspectionRoute = lazy(() =>
 const PublicReceiptRoute = lazy(() =>
   import("./routes/public/receipt").then((m) => ({ default: m.PublicReceiptRoute }))
 );
+const PublicAccountRoute = lazy(() =>
+  import("./routes/public/account").then((m) => ({ default: m.PublicAccountRoute }))
+);
 
 function RouteFallback() {
   return (
@@ -81,6 +85,7 @@ export function App() {
         <Route path="/public/pay/:token" element={<PublicPayRoute />} />
         <Route path="/public/inspection/:token" element={<PublicInspectionRoute />} />
         <Route path="/public/receipt/:token" element={<PublicReceiptRoute />} />
+        <Route path="/public/account/:token" element={<PublicAccountRoute />} />
 
         {/* Auth flow */}
         <Route path="/login" element={me ? <Navigate to="/" replace /> : <LoginRoute />} />
@@ -116,6 +121,7 @@ export function App() {
           <Route index element={<BoardRoute />} />
           <Route path="ro/new" element={<NewRoRoute />} />
           <Route path="ro/:id" element={<RoDetailRoute />} />
+          <Route path="ros" element={<RosRoute />} />
           <Route path="customers" element={<CustomersRoute />} />
           <Route path="customers/:id" element={<CustomerDetailRoute />} />
           <Route path="vehicles/:id" element={<VehicleDetailRoute />} />

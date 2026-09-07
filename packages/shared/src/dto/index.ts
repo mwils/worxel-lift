@@ -196,6 +196,11 @@ export const CreateCustomerDto = z.object({
   notes: z.string().trim().optional(),
   taxExempt: z.boolean().optional(),
 });
+// POST /customers/:id/history-link. Body is optional; `rotate` mints a new
+// token and kills every history link already texted to this customer.
+export const CustomerHistoryLinkDto = z.object({
+  rotate: z.boolean().optional().default(false),
+});
 // PATCH semantics: undefined leaves a field alone, null clears it.
 export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
   // Blank after cleanup clears the field, same as an explicit null.
@@ -242,11 +247,15 @@ export const LineItemDto = z.object({
 });
 export const UpdateLineItemDto = LineItemDto.partial();
 
+// Odometer reading. Seven digits covers anything short of a moon shot.
+export const odometer = z.number().int().nonnegative().max(9_999_999);
+
 export const CreateRepairOrderDto = z.object({
   customerId: objectId,
   vehicleId: objectId,
   concern: z.string().optional(),
   scheduledFor: z.string().datetime().optional(),
+  mileageIn: odometer.optional(),
 });
 
 export const UpdateRepairOrderDto = z.object({
@@ -254,6 +263,9 @@ export const UpdateRepairOrderDto = z.object({
   concern: z.string().optional(),
   diagnosis: z.string().optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
+  // null clears a mistyped reading.
+  mileageIn: odometer.nullable().optional(),
+  mileageOut: odometer.nullable().optional(),
 });
 
 // Owner records a non-Stripe payment. Each call appends a Payment row; the
@@ -338,6 +350,7 @@ export const JobTemplateLineItemDto = z.object({
 export const CreateJobTemplateDto = z.object({
   name: z.string().min(1),
   category: z.string().optional(),
+  reminderCategory: z.enum(SERVICE_CATEGORIES).optional(),
   notes: z.string().optional(),
   lineItems: z.array(JobTemplateLineItemDto).default([]),
 });
@@ -345,6 +358,7 @@ export const CreateJobTemplateDto = z.object({
 export const UpdateJobTemplateDto = z.object({
   name: z.string().min(1).optional(),
   category: z.string().nullable().optional(),
+  reminderCategory: z.enum(SERVICE_CATEGORIES).nullable().optional(),
   notes: z.string().nullable().optional(),
   lineItems: z.array(JobTemplateLineItemDto).optional(),
 });
@@ -436,9 +450,10 @@ export const SaveCardDto = z.object({ customerId: objectId });
 
 // ── public (token-scoped) ───────────────────────────────────────
 export const ApproveEstimateDto = z.object({ token: z.string().min(8) });
+// Body of POST /public/estimate/{token}/decline — the token is a path param.
+// Body is optional on the wire; the customer's reason is optional too.
 export const DeclineEstimateDto = z.object({
-  token: z.string().min(8),
-  reason: z.string().optional(),
+  reason: z.string().trim().max(200).optional(),
 });
 
 // ── public booking ──────────────────────────────────────────────

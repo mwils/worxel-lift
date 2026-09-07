@@ -52,6 +52,21 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
       awsMessageId: smsResult.messageId,
     });
 
+    // The shop texting a customer who declined the estimate is the follow-up
+    // the board banner is waiting on — whatever they said. Stamp it once.
+    if (dto.repairOrderId) {
+      await RepairOrder.updateOne(
+        {
+          _id: dto.repairOrderId,
+          shopId: user.shopId,
+          "estimate.declinedAt": { $exists: true },
+          "estimate.approvedAt": { $exists: false },
+          "estimate.declineFollowedUpAt": { $exists: false },
+        },
+        { $set: { "estimate.declineFollowedUpAt": message.sentAt } }
+      ).catch((err) => console.error("[messages/send] decline follow-up stamp failed", err));
+    }
+
     return created({
       message: {
         id: String(message._id),

@@ -27,6 +27,7 @@ import {
   IconChecklist,
   IconCalendarEvent,
   IconCash,
+  IconGauge,
 } from "@tabler/icons-react";
 import {
   RO_STATUSES,
@@ -72,6 +73,8 @@ import {
 } from "../../../features/payments/MarkPaidModal";
 import { PaymentsCard } from "../../../features/payments/PaymentsCard";
 import { StatusTextPrompt, type PromptableStatus } from "../../../features/ro/StatusTextPrompt";
+import { DeclineFollowUpPrompt } from "../../../features/ro/DeclineFollowUpPrompt";
+import { MileageModal, type MileageValues } from "../../../features/ro/MileageModal";
 
 interface RoDetail {
   repairOrder: {
@@ -97,11 +100,15 @@ interface RoDetail {
     collectedCents: number;
     balanceCents: number;
     scheduledFor: string | null;
+    mileageIn: number | null;
+    mileageOut: number | null;
     estimate: {
       sentAt?: string | null;
       viewedAt?: string | null;
       approvedAt?: string | null;
       declinedAt?: string | null;
+      declineReason?: string | null;
+      declineFollowedUpAt?: string | null;
       approvedTotal?: number | null;
       changedSinceApproval?: boolean;
       changedAt?: string | null;
@@ -123,6 +130,8 @@ interface RoDetail {
       trim: string | null;
       vin: string | null;
       plate: string | null;
+      /** Last known odometer for the car — prefills the pickup prompt. */
+      mileage?: number | null;
     } | null;
   };
 }
@@ -160,6 +169,22 @@ export function RoDetailRoute() {
   const [unpaidPickupOpen, setUnpaidPickupOpen] = useState(false);
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
 
+  // ── Odometer ─────────────────────────────────────────────────────────────
+  // Pickup asks for mileage out once (skippable), then hands off to the
+  // status text prompt so the two never stack on top of each other. The
+  // header pencil opens the same modal with both readings.
+  const [mileageEditOpen, setMileageEditOpen] = useState(false);
+  const [mileagePickupOpen, setMileagePickupOpen] = useState(false);
+  const [pendingTextPrompt, setPendingTextPrompt] = useState<PromptableStatus | null>(null);
+
+  const closeMileagePickup = () => {
+    setMileagePickupOpen(false);
+    if (pendingTextPrompt) {
+      setTextPromptStatus(pendingTextPrompt);
+      setPendingTextPrompt(null);
+    }
+  };
+
   const patchRo = useMutation({
     mutationFn: (
       patch: Partial<{
@@ -167,6 +192,8 @@ export function RoDetailRoute() {
         scheduledFor: string | null;
         concern: string;
         diagnosis: string;
+        mileageIn: number | null;
+        mileageOut: number | null;
       }>
     ) =>
       api.patch(`/repair-orders/${id}`, patch),
@@ -176,7 +203,12 @@ export function RoDetailRoute() {
       if (patch.status) {
         const label = STATUS_OPTIONS.find((o) => o.value === patch.status)?.label ?? patch.status;
         notifications.show({ color: "green", message: `Moved to ${label}.` });
-        if (patch.status === "ready" || patch.status === "picked_up") {
+        if (patch.status === "picked_up" && data?.repairOrder.mileageOut == null) {
+          // Ask for the odometer first; the text prompt follows once that
+          // step is saved or skipped.
+          setPendingTextPrompt("picked_up");
+          setMileagePickupOpen(true);
+        } else if (patch.status === "ready" || patch.status === "picked_up") {
           setTextPromptStatus(patch.status);
         }
       }
@@ -319,6 +351,9 @@ export function RoDetailRoute() {
 
   // ── Send inspection ──────────────────────────────────────────────────────
   const [sendInspectionOpen, setSendInspectionOpen] = useState(false);
+
+  // ── Declined-estimate follow-up ─────────────────────────────────────────
+  const [declineFollowUpOpen, setDeclineFollowUpOpen] = useState(false);
 
   // ── Pay link ─────────────────────────────────────────────────────────────
   // Mirrors the Send Estimate flow: fetch a drafted SMS (containing the pay
@@ -500,13 +535,19 @@ export function RoDetailRoute() {
   // approval only counts against the numbers the customer actually saw — once
   // the lines drift from the snapshot, the API flips changedSinceApproval.
   const estimateChanged = !!ro.estimate?.approvedAt && !!ro.estimate?.changedSinceApproval;
+  // The API already nulls declinedAt once an approval lands, but keep the
+  // guard so a stale cache can't show both.
+  const estimateDeclined = !!ro.estimate?.declinedAt && !ro.estimate?.approvedAt;
   const estimateTimeline = ro.estimate?.sentAt
     ? [
         `sent ${formatVisit(ro.estimate.sentAt, tz)}`,
         ro.estimate.viewedAt ? `viewed ${formatVisit(ro.estimate.viewedAt, tz)}` : null,
         ro.estimate.approvedAt ? `approved ${formatVisit(ro.estimate.approvedAt, tz)}` : null,
-        !ro.estimate.approvedAt && ro.estimate.declinedAt
+        estimateDeclined && ro.estimate.declinedAt
           ? `declined ${formatVisit(ro.estimate.declinedAt, tz)}`
+          : null,
+        estimateDeclined && ro.estimate.declineFollowedUpAt
+          ? `you texted ${formatVisit(ro.estimate.declineFollowedUpAt, tz)}`
           : null,
         estimateChanged && ro.estimate.changedAt
           ? `changed ${formatVisit(ro.estimate.changedAt, tz)}`
@@ -523,6 +564,19 @@ export function RoDetailRoute() {
   const isPartial = payStatus === "partial";
   const payMethodLabel = ro.payment?.method ? PAYMENT_METHOD_LABELS[ro.payment.method] : null;
   const closedStatus = ["picked_up", "voided", "cancelled_by_customer"].includes(ro.status);
+
+  // "48,120 mi in · 48,135 mi out", collapsing to one reading when that's all
+  // there is. Null when the owner skipped it on both ends.
+  const mileageLabel = (() => {
+    const parts: string[] = [];
+    if (ro.mileageIn != null) parts.push(`${ro.mileageIn.toLocaleString()} mi in`);
+    if (ro.mileageOut != null) parts.push(`${ro.mileageOut.toLocaleString()} mi out`);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  })();
+
+  const saveMileage = (values: MileageValues, onDone: () => void) => {
+    patchRo.mutate(values, { onSuccess: onDone });
+  };
 
   const changeStatus = (next: RoStatus) => {
     if (next === ro.status) return;
@@ -570,6 +624,15 @@ export function RoDetailRoute() {
             {vehicleSummary}
             {ro.vehicle?.vin ? ` · VIN ${ro.vehicle.vin}` : ""}
           </Text>
+          <Group gap={4} wrap="nowrap">
+            <IconGauge size={14} />
+            <Text size="sm" c={mileageLabel ? undefined : "dimmed"}>
+              {mileageLabel ?? "No mileage"}
+            </Text>
+            <Button variant="subtle" size="compact-xs" onClick={() => setMileageEditOpen(true)}>
+              {mileageLabel ? "Edit" : "Add"}
+            </Button>
+          </Group>
           {ro.scheduledFor ? (
             <Group gap={4} wrap="nowrap">
               <IconCalendarEvent size={14} />
@@ -643,7 +706,7 @@ export function RoDetailRoute() {
             <Badge variant="light" color="green">
               Estimate approved
             </Badge>
-          ) : ro.estimate?.declinedAt ? (
+          ) : estimateDeclined ? (
             <Badge variant="light" color="red">
               Estimate declined
             </Badge>
@@ -782,6 +845,41 @@ export function RoDetailRoute() {
               Re-send for approval
             </Button>
           </Group>
+        </Alert>
+      )}
+      {estimateDeclined && (
+        <Alert
+          color={ro.estimate?.declineFollowedUpAt ? "gray" : "red"}
+          variant="light"
+          title={`${ro.customer?.firstName ?? "Customer"} declined the ${formatMoney(ro.total)} estimate${
+            ro.estimate?.declineFollowedUpAt ? "" : " — text them?"
+          }`}
+        >
+          <Stack gap="xs">
+            {ro.estimate?.declineReason && (
+              <Text size="sm" fs="italic">
+                “{ro.estimate.declineReason}”
+              </Text>
+            )}
+            <Group justify="space-between" wrap="wrap" gap="xs">
+              <Text size="sm">
+                {ro.estimate?.declineFollowedUpAt
+                  ? `You texted them ${formatVisit(ro.estimate.declineFollowedUpAt, tz)}. Edit the lines and re-send when you've landed on a plan.`
+                  : "A quick text usually saves the job. Edit the lines and re-send once you've agreed on a plan."}
+              </Text>
+              {ro.customer && (
+                <Button
+                  size="xs"
+                  color={ro.estimate?.declineFollowedUpAt ? "gray" : "red"}
+                  variant={ro.estimate?.declineFollowedUpAt ? "default" : "filled"}
+                  leftSection={<IconSend size={14} />}
+                  onClick={() => setDeclineFollowUpOpen(true)}
+                >
+                  {ro.estimate?.declineFollowedUpAt ? "Text again" : `Text ${ro.customer.firstName}`}
+                </Button>
+              )}
+            </Group>
+          </Stack>
         </Alert>
       )}
       <Group>
@@ -1141,6 +1239,34 @@ export function RoDetailRoute() {
         </Stack>
       </Modal>
 
+      {/* Odometer at pickup — one field, skippable. */}
+      <MileageModal
+        opened={mileagePickupOpen}
+        onClose={closeMileagePickup}
+        title="Mileage out?"
+        hint="Reading off the dash keeps this car's service history straight. Skip it if you didn't grab it."
+        fields="out"
+        mileageIn={ro.mileageIn}
+        mileageOut={ro.mileageOut}
+        suggestOut={ro.vehicle?.mileage ?? ro.mileageIn ?? null}
+        loading={patchRo.isPending}
+        submitLabel="Save mileage"
+        onSkip={closeMileagePickup}
+        onSubmit={(values) => saveMileage(values, closeMileagePickup)}
+      />
+
+      {/* Header pencil — correct either reading. */}
+      <MileageModal
+        opened={mileageEditOpen}
+        onClose={() => setMileageEditOpen(false)}
+        title="Mileage"
+        fields="both"
+        mileageIn={ro.mileageIn}
+        mileageOut={ro.mileageOut}
+        loading={patchRo.isPending}
+        onSubmit={(values) => saveMileage(values, () => setMileageEditOpen(false))}
+      />
+
       <StatusTextPrompt
         status={textPromptStatus}
         onClose={() => setTextPromptStatus(null)}
@@ -1151,6 +1277,19 @@ export function RoDetailRoute() {
         balanceCents={balanceCents}
         paymentsReady={paymentsReady}
         onSent={() => qc.invalidateQueries({ queryKey: ["conversation"] })}
+      />
+
+      <DeclineFollowUpPrompt
+        opened={declineFollowUpOpen}
+        onClose={() => setDeclineFollowUpOpen(false)}
+        repairOrderId={id!}
+        customer={ro.customer ? { id: ro.customer.id, firstName: ro.customer.firstName } : null}
+        lineItemCount={ro.lineItems.length}
+        onSent={() => {
+          qc.invalidateQueries({ queryKey: ["ro", id] });
+          qc.invalidateQueries({ queryKey: ["ros"] });
+          qc.invalidateQueries({ queryKey: ["conversation"] });
+        }}
       />
 
       <SendInspectionModal

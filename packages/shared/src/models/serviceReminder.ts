@@ -13,6 +13,10 @@ const ServiceReminderSchema = new Schema(
     },
     category: { type: String, enum: SERVICE_CATEGORIES, required: true },
     dueAt: { type: Date, required: true },
+    // When / at what odometer the source RO did this service. Display only —
+    // reminders are date-triggered (dueAt); mileage-based triggers are v2.
+    servicedAt: Date,
+    mileageAtService: Number,
     status: {
       type: String,
       enum: SERVICE_REMINDER_STATUSES,

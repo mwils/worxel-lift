@@ -3,7 +3,9 @@ import { z } from "zod";
 import { Customer, RepairOrder, RoStatusEnum, Vehicle } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok } from "../../lib/response.js";
+import { isEstimateDeclined } from "./_estimate.js";
 import { roPaymentSnapshot } from "./_payments.js";
+import { customerName, vehicleSummary } from "./_rows.js";
 
 const ListQuery = z.object({
   // Single status or comma-separated list ("picked_up,voided") — the board's
@@ -19,19 +21,6 @@ const ListQuery = z.object({
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function customerName(c: { firstName?: string; lastName?: string | null } | undefined): string {
-  if (!c) return "Unknown";
-  const last = c.lastName ?? "";
-  return [c.firstName ?? "", last].filter(Boolean).join(" ").trim() || "Unknown";
-}
-
-function vehicleSummary(
-  v: { year?: number | null; make?: string | null; model?: string | null } | undefined
-): string {
-  if (!v) return "—";
-  return [v.year, v.make, v.model].filter(Boolean).join(" ").trim() || "—";
 }
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
@@ -77,6 +66,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         updatedAt: r.updatedAt,
         // Board cards show the visit date for scheduled ROs.
         scheduledFor: r.scheduledFor ?? null,
+        // Declined-estimate marker + "needs a reply" banner. Null unless the
+        // customer declined and hasn't since approved.
+        estimateDeclinedAt: isEstimateDeclined(r.estimate) ? r.estimate?.declinedAt ?? null : null,
+        estimateDeclineFollowedUpAt: isEstimateDeclined(r.estimate)
+          ? r.estimate?.declineFollowedUpAt ?? null
+          : null,
       };
     });
 

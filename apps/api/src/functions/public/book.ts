@@ -16,6 +16,7 @@ import { handleKnownErrors, parseBody, withErrorBoundary } from "../../lib/middl
 import { badRequest, conflict, created, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
 import { bookingManageUrl, formatVisitTime } from "../../lib/visitTime.js";
+import { ensureCustomerHistoryUrl } from "../../lib/accountLink.js";
 import { validateSlot } from "./_slots.js";
 
 function shortCode() {
@@ -152,7 +153,18 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
 
     const whenHuman = formatVisitTime(validation.slotDate, shop.timezone);
     const manageUrl = bookingManageUrl(bookingToken);
-    const confirmBody = `Hi ${customer.firstName} — booked for ${whenHuman} at ${shop.name}. Confirmation ${confirmationCode}. Need to change it? ${manageUrl}`;
+    // Returning customers get their history link too; a first-timer's history
+    // page would be empty and the confirmation already carries a manage link,
+    // so we keep that text to one URL and one segment where we can.
+    const priorVisits = await RepairOrder.countDocuments({
+      shopId: shop._id,
+      customerId: customer._id,
+      _id: { $ne: ro._id },
+    });
+    const historyUrl = priorVisits > 0 ? await ensureCustomerHistoryUrl(customer._id) : null;
+    const confirmBody =
+      `Hi ${customer.firstName} — booked for ${whenHuman} at ${shop.name}. Confirmation ${confirmationCode}. Need to change it? ${manageUrl}` +
+      (historyUrl ? ` Your history: ${historyUrl}` : "");
 
     if (customer.smsOptOutAt) {
       // Customer has explicitly opted out of SMS. Don't text them; still notify

@@ -21,6 +21,9 @@ export function serializeServiceReminder(r: LeanReminder) {
     category: r.category,
     status: r.status,
     dueAt: r.dueAt instanceof Date ? r.dueAt.toISOString() : r.dueAt,
+    servicedAt:
+      r.servicedAt instanceof Date ? r.servicedAt.toISOString() : (r.servicedAt ?? null),
+    mileageAtService: r.mileageAtService ?? null,
     sentAt: r.sentAt instanceof Date ? r.sentAt.toISOString() : (r.sentAt ?? null),
     sentMessageId: r.sentMessageId ? String(r.sentMessageId) : null,
     dismissedAt:

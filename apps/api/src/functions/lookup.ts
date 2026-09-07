@@ -2,13 +2,17 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { z } from "zod";
 import {
   Customer,
+  RO_STATUS_LABELS,
+  RepairOrder,
   Vehicle,
   normalizePlate,
   type CustomerDoc,
+  type RoStatus,
   type VehicleDoc,
 } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../lib/middleware.js";
 import { badRequest, ok } from "../lib/response.js";
+import { customerName, parseRoNumber, vehicleSummary } from "./repairOrders/_rows.js";
 
 const LookupQuery = z.object({
   q: z.string().min(1, "q required").max(100),
@@ -40,7 +44,23 @@ interface VehicleResult {
   label: string;
   sublabel: string;
 }
-type LookupResult = CustomerResult | VehicleResult;
+interface RoResult {
+  kind: "ro";
+  id: string;
+  number: number;
+  status: RoStatus;
+  label: string; // "RO-0142"
+  sublabel: string; // "Dale Smith · 2013 Ford F-150 · Picked up"
+}
+type LookupResult = CustomerResult | VehicleResult | RoResult;
+
+interface RoLean {
+  _id: unknown;
+  number: number;
+  status: RoStatus;
+  customerId: unknown;
+  vehicleId: unknown;
+}
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
@@ -60,8 +80,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
 
     const noCustomers: CustomerDoc[] = [];
     const noVehicles: VehicleDoc[] = [];
+    // "0142", "142", "RO-0142" → the shop's RO with that number (exact, unique index).
+    const roNumber = parseRoNumber(raw);
 
-    const [byPhone, byName, byPlate, byVin] = (await Promise.all([
+    const [byPhone, byName, byPlate, byVin, roMatch] = (await Promise.all([
       isPhoneLike(raw) && phoneDigits.length >= 4
         ? Customer.find({
             shopId: user.shopId,
@@ -98,7 +120,34 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
             .limit(limit)
             .lean<VehicleDoc[]>()
         : Promise.resolve(noVehicles),
-    ])) as [CustomerDoc[], CustomerDoc[], VehicleDoc[], VehicleDoc[]];
+      roNumber !== null
+        ? RepairOrder.findOne({ shopId: user.shopId, number: roNumber })
+            .select("number status customerId vehicleId")
+            .lean()
+        : Promise.resolve(null),
+    ])) as [CustomerDoc[], CustomerDoc[], VehicleDoc[], VehicleDoc[], RoLean | null];
+
+    const roResults: RoResult[] = [];
+    if (roMatch) {
+      const [c, v] = await Promise.all([
+        Customer.findOne({ _id: roMatch.customerId, shopId: user.shopId })
+          .select("firstName lastName")
+          .lean(),
+        Vehicle.findOne({ _id: roMatch.vehicleId, shopId: user.shopId })
+          .select("year make model")
+          .lean(),
+      ]);
+      roResults.push({
+        kind: "ro",
+        id: String(roMatch._id),
+        number: roMatch.number,
+        status: roMatch.status,
+        label: `RO-${String(roMatch.number).padStart(4, "0")}`,
+        sublabel: [customerName(c), vehicleSummary(v), RO_STATUS_LABELS[roMatch.status] ?? roMatch.status]
+          .filter((s) => s && s !== "—")
+          .join(" · "),
+      });
+    }
 
     // Legacy rows (no plateNormalized yet) are normalized here; rows that hit
     // the indexed plateNormalized regex pass straight through.
@@ -142,7 +191,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       if (vehicleResults.length >= limit) break;
     }
 
-    const results: LookupResult[] = [...customerResults, ...vehicleResults].slice(0, limit);
+    // An exact RO-number hit goes first — the owner typed the number on purpose.
+    const results: LookupResult[] = [...roResults, ...customerResults, ...vehicleResults].slice(
+      0,
+      limit
+    );
     return ok({ results });
   } catch (err) {
     const known = handleKnownErrors(err);

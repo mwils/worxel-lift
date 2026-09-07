@@ -7,6 +7,7 @@ import {
   Card,
   Group,
   Loader,
+  NumberInput,
   Radio,
   Stack,
   Stepper,
@@ -53,6 +54,8 @@ interface VehicleOption {
   make: string | null;
   model: string | null;
   plate: string | null;
+  /** Last known odometer — prefills "Mileage in" on the concern step. */
+  mileage?: number | null;
 }
 
 interface CustomerWithVehicles {
@@ -81,6 +84,10 @@ export function NewRoRoute() {
 
   // Concern
   const [concern, setConcern] = useState("");
+  // Odometer at drop-off. Optional — prefilled from the car's last known
+  // reading, and left blank on a brand-new vehicle.
+  const [mileageIn, setMileageIn] = useState<string | number>("");
+  const [mileageTouched, setMileageTouched] = useState(false);
   // Optional drop-off time, interpreted in the shop's timezone. When set,
   // the RO is created in "scheduled" status instead of "in".
   const [scheduledDraft, setScheduledDraft] = useState<Date | null>(null);
@@ -186,6 +193,7 @@ export function NewRoRoute() {
         customerId: selectedCustomerId,
         vehicleId: selectedVehicleId,
         concern: concern || undefined,
+        mileageIn: mileageInValue ?? undefined,
         scheduledFor: scheduledDraft
           ? pickerDateToInstant(scheduledDraft, tz).toISOString()
           : undefined,
@@ -199,6 +207,23 @@ export function NewRoRoute() {
 
   const customerOptions = customerList?.customers ?? [];
   const vehicleOptions = selectedCustomerData?.vehicles ?? [];
+  const selectedVehicle = vehicleOptions.find((v) => v.id === selectedVehicleId) ?? null;
+
+  const mileageInValue = (() => {
+    if (mileageIn === "" || mileageIn == null) return null;
+    const n = Number(String(mileageIn).replace(/[^0-9]/g, ""));
+    return Number.isFinite(n) ? Math.round(n) : null;
+  })();
+
+  // Seed the field from the car's last reading once per vehicle, unless the
+  // owner has already typed something.
+  const seededMileageFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedVehicleId || seededMileageFor.current === selectedVehicleId) return;
+    seededMileageFor.current = selectedVehicleId;
+    if (mileageTouched) return;
+    setMileageIn(selectedVehicle?.mileage ?? "");
+  }, [selectedVehicleId, selectedVehicle, mileageTouched]);
 
   const canContinueStep1 = !!selectedCustomerId;
   const canContinueStep2 = !!selectedVehicleId;
@@ -443,6 +468,25 @@ export function NewRoRoute() {
               minRows={4}
               value={concern}
               onChange={(e) => setConcern(e.currentTarget.value)}
+            />
+            <NumberInput
+              label="Mileage in (optional)"
+              description={
+                selectedVehicle?.mileage != null
+                  ? `Last we saw: ${selectedVehicle.mileage.toLocaleString()} mi`
+                  : "Odometer at drop-off"
+              }
+              placeholder="48,120"
+              min={0}
+              max={9_999_999}
+              thousandSeparator=","
+              allowDecimal={false}
+              allowNegative={false}
+              value={mileageIn}
+              onChange={(v) => {
+                setMileageTouched(true);
+                setMileageIn(v);
+              }}
             />
             <DateTimePicker
               label="Scheduled drop-off (optional)"

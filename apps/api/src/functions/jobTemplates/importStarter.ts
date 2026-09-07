@@ -37,6 +37,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           shopId: user.shopId,
           name: s.name,
           category: s.category,
+          reminderCategory: s.reminderCategory,
           source: "starter",
           starterKey: s.starterKey,
           lineItems: s.lineItems.map((li) => ({

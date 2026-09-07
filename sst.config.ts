@@ -264,6 +264,10 @@ export default $config({
       "POST /customers/{id}/merge",
       fn("apps/api/src/functions/customers/merge.handler")
     );
+    api.route(
+      "POST /customers/{id}/history-link",
+      fn("apps/api/src/functions/customers/historyLink.handler")
+    );
 
     // vehicles
     api.route("POST /vehicles", fn("apps/api/src/functions/vehicles/create.handler"));
@@ -287,6 +291,11 @@ export default $config({
 
     // repair orders
     api.route("GET /repair-orders", fn("apps/api/src/functions/repairOrders/list.handler"));
+    // Must be registered before the {id} route so "history" isn't read as an id.
+    api.route(
+      "GET /repair-orders/history",
+      fn("apps/api/src/functions/repairOrders/history.handler")
+    );
     api.route("POST /repair-orders", fn("apps/api/src/functions/repairOrders/create.handler"));
     api.route("GET /repair-orders/{id}", fn("apps/api/src/functions/repairOrders/get.handler"));
     api.route("PATCH /repair-orders/{id}", fn("apps/api/src/functions/repairOrders/patch.handler"));
@@ -466,6 +475,7 @@ export default $config({
       fn("apps/api/src/functions/public/declineEstimate.handler")
     );
     api.route("GET /public/receipt/{token}", fn("apps/api/src/functions/public/getReceipt.handler"));
+    api.route("GET /public/account/{token}", fn("apps/api/src/functions/public/getAccount.handler"));
     api.route("GET /public/pay/{token}", fn("apps/api/src/functions/public/getPay.handler"));
     api.route("POST /public/pay/{token}", fn("apps/api/src/functions/public/pay.handler"));
     api.route(

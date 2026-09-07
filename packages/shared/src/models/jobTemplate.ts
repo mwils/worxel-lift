@@ -1,5 +1,5 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
-import { LINE_ITEM_KINDS } from "../constants.js";
+import { LINE_ITEM_KINDS, SERVICE_CATEGORIES } from "../constants.js";
 
 const JobTemplateLineItemSchema = new Schema(
   {
@@ -18,6 +18,10 @@ const JobTemplateSchema = new Schema(
     shopId: { type: Schema.Types.ObjectId, ref: "Shop", required: true, index: true },
     name: { type: String, required: true, trim: true },
     category: { type: String, trim: true },
+    // Which service reminder this job should schedule when it's on a
+    // picked-up RO (oil_change, tire_rotation…). Distinct from `category`,
+    // which is the shop's own free-text grouping ("Brakes", "HVAC").
+    reminderCategory: { type: String, enum: SERVICE_CATEGORIES },
     notes: String,
     lineItems: { type: [JobTemplateLineItemSchema], default: [] },
     source: { type: String, enum: ["custom", "starter"], default: "custom" },

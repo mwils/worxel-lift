@@ -11,6 +11,7 @@ import {
   Collapse,
   Divider,
   Group,
+  Menu,
   Modal,
   Stack,
   Text,
@@ -23,12 +24,16 @@ import {
   IconArchiveOff,
   IconChevronDown,
   IconChevronRight,
+  IconDotsVertical,
   IconPencil,
   IconPhone,
   IconPlus,
+  IconRefresh,
+  IconSend,
   IconUsers,
 } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import { notifyError } from "../../../lib/notify";
 import { MergeCustomerModal } from "../../../features/customer/MergeCustomerModal";
 import { formatMoney, formatPhone, formatRoNumber, relativeTime } from "../../../lib/format";
@@ -36,6 +41,7 @@ import { VehicleForm } from "../../../features/vehicle/VehicleForm";
 import { VehicleCard } from "../../../features/vehicle/VehicleCard";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { CustomerStatsStrip } from "../../../features/customer/CustomerStatsStrip";
+import { TextHistoryLinkModal } from "../../../features/customer/TextHistoryLinkModal";
 import { CustomerRemindersPanel } from "../../../features/reminders/CustomerRemindersPanel";
 import type { z } from "zod";
 import type { CreateVehicleDto } from "@lift/shared/dto";
@@ -158,11 +164,13 @@ export function CustomerDetailRoute() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { me } = useAuth();
   const [vehicleModal, vehicleModalCtl] = useDisclosure(false);
   const [editModal, editModalCtl] = useDisclosure(false);
   const [messagesOpen, messagesCtl] = useDisclosure(false);
   const [mergeModal, mergeModalCtl] = useDisclosure(false);
   const [archivedOpen, archivedCtl] = useDisclosure(false);
+  const [historyLinkModal, historyLinkModalCtl] = useDisclosure(false);
 
   // Floor for the default window. Stable for the life of the page so paging
   // can't drift onto a different boundary mid-scroll.
@@ -313,6 +321,19 @@ export function CustomerDetailRoute() {
     onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
   });
 
+  // Kills every history link already texted to this customer and mints a new
+  // one — for a phone that changed hands, or a customer who asks.
+  const rotateHistoryLink = useMutation({
+    mutationFn: () => api.post(`/customers/${id}/history-link`, { rotate: true }),
+    onSuccess: () => {
+      notifications.show({
+        color: "green",
+        message: "New history link made. The old one no longer works — text them the new one.",
+      });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't rotate the link" }),
+  });
+
   if (isPending) return <Text c="dimmed">Loading…</Text>;
   if (!data)
     return (
@@ -398,9 +419,15 @@ export function CustomerDetailRoute() {
               </Badge>
             )}
           </Stack>
-          <Group gap="xs" wrap="nowrap" justify="flex-end">
-            {/* Header actions. The "Text history link" button (customer public
-                account page) belongs here, left of New RO. */}
+          <Group gap="xs" wrap="nowrap" align="flex-start">
+            <Button
+              variant="default"
+              leftSection={<IconSend size={16} />}
+              style={{ minHeight: 44 }}
+              onClick={historyLinkModalCtl.open}
+            >
+              Text history link
+            </Button>
             <Button
               component={Link}
               to={`/ro/new?customerId=${customer.id}`}
@@ -409,6 +436,31 @@ export function CustomerDetailRoute() {
             >
               New RO
             </Button>
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  aria-label="More customer actions"
+                >
+                  <IconDotsVertical size={18} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  leftSection={<IconRefresh size={14} />}
+                  disabled={rotateHistoryLink.isPending}
+                  onClick={() => rotateHistoryLink.mutate()}
+                >
+                  Rotate history link
+                </Menu.Item>
+                {/* Rare and irreversible — a menu item, not a button. */}
+                <Menu.Item leftSection={<IconUsers size={14} />} onClick={mergeModalCtl.open}>
+                  Merge a duplicate in
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
 
@@ -764,19 +816,6 @@ export function CustomerDetailRoute() {
         )}
       </Stack>
 
-      {/* Merge lives at the bottom — rare, irreversible, not a primary action. */}
-      <Group justify="flex-end">
-        <Button
-          variant="subtle"
-          color="gray"
-          size="xs"
-          leftSection={<IconUsers size={14} />}
-          onClick={mergeModalCtl.open}
-        >
-          Merge a duplicate into this customer
-        </Button>
-      </Group>
-
       <MergeCustomerModal
         opened={mergeModal}
         onClose={mergeModalCtl.close}
@@ -786,6 +825,14 @@ export function CustomerDetailRoute() {
           qc.invalidateQueries({ queryKey: ["customer-history", customer.id] });
           qc.invalidateQueries({ queryKey: ["customer-messages", customer.id] });
         }}
+      />
+
+      <TextHistoryLinkModal
+        opened={historyLinkModal}
+        onClose={historyLinkModalCtl.close}
+        customer={{ id: customer.id, firstName: customer.firstName }}
+        shopName={me?.shop?.name ?? "the shop"}
+        onSent={() => qc.invalidateQueries({ queryKey: ["customer-history", id] })}
       />
 
       <Modal

@@ -392,6 +392,11 @@ export const handler: SNSHandler = async (event) => {
         openRo.estimate.approvedTotal = stamp.approvedTotal;
         openRo.estimate.approvedTaxTotal = stamp.approvedTaxTotal;
         openRo.estimate.approvedLineItems = stamp.approvedLineItems as any;
+        // A yes after a decline means they changed their mind — same as the
+        // public Approve button, the approval supersedes the decline.
+        openRo.estimate.declinedAt = undefined;
+        openRo.estimate.declineReason = undefined;
+        openRo.estimate.declineFollowedUpAt = undefined;
         openRo.status = "in_repair";
         await openRo.save();
 

@@ -10,7 +10,7 @@ import {
   type SpotlightFilterFunction,
   spotlight,
 } from "@mantine/spotlight";
-import { IconCar, IconSearch, IconUser } from "@tabler/icons-react";
+import { IconCar, IconClipboardList, IconSearch, IconUser } from "@tabler/icons-react";
 import { api } from "../../lib/api";
 import { formatPhone } from "../../lib/format";
 
@@ -27,7 +27,15 @@ interface LookupVehicle {
   label: string;
   sublabel: string;
 }
-type LookupResult = LookupCustomer | LookupVehicle;
+interface LookupRo {
+  kind: "ro";
+  id: string;
+  number: number;
+  status: string;
+  label: string;
+  sublabel: string;
+}
+type LookupResult = LookupCustomer | LookupVehicle | LookupRo;
 interface LookupResponse {
   results: LookupResult[];
 }
@@ -53,8 +61,24 @@ export function GlobalSearchBar() {
     const results = data?.results ?? [];
     const customers = results.filter((r): r is LookupCustomer => r.kind === "customer");
     const vehicles = results.filter((r): r is LookupVehicle => r.kind === "vehicle");
+    const ros = results.filter((r): r is LookupRo => r.kind === "ro");
 
     const groups: Array<SpotlightActionGroupData> = [];
+
+    // Exact RO-number hit ("0142" → RO-0142). Minimal row; grouping/layout of
+    // the whole list is a separate pass.
+    if (ros.length > 0) {
+      groups.push({
+        group: "Repair orders",
+        actions: ros.map((r) => ({
+          id: `ro-${r.id}`,
+          label: r.label,
+          description: r.sublabel,
+          leftSection: <IconClipboardList size={18} />,
+          onClick: () => navigate(`/ro/${r.id}`),
+        })),
+      });
+    }
 
     if (customers.length > 0) {
       groups.push({
@@ -106,9 +130,9 @@ export function GlobalSearchBar() {
         onQueryChange={setQuery}
         searchProps={{
           leftSection: <IconSearch size={18} />,
-          placeholder: "Search customers, plates, VINs…",
+          placeholder: "Search customers, plates, VINs, RO numbers…",
         }}
-        nothingFound={debounced ? "No matches" : "Type to search by name, phone, plate, or VIN"}
+        nothingFound={debounced ? "No matches" : "Type to search by name, phone, plate, VIN, or RO number"}
         shortcut={["mod + K", "mod + P"]}
         // Filter server-side; show actions as-is.
         filter={passthroughFilter}

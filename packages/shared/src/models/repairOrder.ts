@@ -6,6 +6,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   RO_STATUSES,
+  SERVICE_CATEGORIES,
   TAX_APPLIES_TO,
 } from "../constants.js";
 
@@ -18,6 +19,11 @@ const LineItemSchema = new Schema(
     qty: Number,
     unitPrice: Number, // cents
     total: { type: Number, required: true }, // cents
+    // Stamped when the line came from a saved job tagged with a reminder
+    // category (JobTemplate.reminderCategory). _inferReminders reads this
+    // ahead of keyword matching, so "LOF" vs "Lube, oil & filter" stops
+    // mattering once the shop uses its templates.
+    reminderCategory: { type: String, enum: SERVICE_CATEGORIES },
   },
   { _id: true }
 );
@@ -72,6 +78,12 @@ const RepairOrderSchema = new Schema(
       viewedAt: Date, // first open of the public estimate page
       approvedAt: Date,
       declinedAt: Date,
+      // Optional free-text the customer left on the public decline page.
+      declineReason: { type: String, maxlength: 200 },
+      // Set when the shop texts the customer after a decline (any outbound
+      // text on the RO, or the follow-up prompt on the RO page). Drives the
+      // "declined estimate needs a reply" board banner. Cleared on re-send.
+      declineFollowedUpAt: Date,
       publicToken: String,
       // Snapshot taken when the customer approves, so later line-item edits
       // can be flagged as "changed since approval" against the number the
@@ -144,11 +156,21 @@ const RepairOrderSchema = new Schema(
 
     scheduledFor: Date,
     completedAt: Date,
+
+    // Odometer at drop-off / pickup. Optional — Mike often skips it. The
+    // latest value is mirrored onto `vehicles.mileage` by repairOrders/
+    // create.ts + patch.ts (only ever moves forward), and onto the service
+    // reminders this RO spawns (`mileageAtService`).
+    mileageIn: Number,
+    mileageOut: Number,
   },
   { timestamps: true }
 );
 
 RepairOrderSchema.index({ shopId: 1, status: 1, updatedAt: -1 });
+// RO history (/repair-orders/history): the list date is `completedAt ?? updatedAt`,
+// queried as an $or so both branches ride this one index.
+RepairOrderSchema.index({ shopId: 1, completedAt: -1, updatedAt: -1 });
 RepairOrderSchema.index({ shopId: 1, number: 1 }, { unique: true });
 RepairOrderSchema.index({ shopId: 1, customerId: 1, createdAt: -1 });
 RepairOrderSchema.index({ shopId: 1, vehicleId: 1, createdAt: -1 });

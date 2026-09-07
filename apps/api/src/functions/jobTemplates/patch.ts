@@ -19,6 +19,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       if (dto.category === null) unset.category = "";
       else set.category = dto.category;
     }
+    if (dto.reminderCategory !== undefined) {
+      if (dto.reminderCategory === null) unset.reminderCategory = "";
+      else set.reminderCategory = dto.reminderCategory;
+    }
     if (dto.notes !== undefined) {
       if (dto.notes === null) unset.notes = "";
       else set.notes = dto.notes;
