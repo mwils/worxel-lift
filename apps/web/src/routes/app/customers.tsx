@@ -20,6 +20,11 @@ import { api } from "../../lib/api";
 import { notifyError } from "../../lib/notify";
 import { formatPhone, relativeTime } from "../../lib/format";
 import { CustomerForm } from "../../features/customer/CustomerForm";
+import {
+  DuplicateCustomerModal,
+  duplicatesFromError,
+  type DuplicateCandidate,
+} from "../../features/customer/DuplicateCustomerModal";
 import type { CreateCustomerInput } from "@lift/shared/dto";
 
 interface CustomerRow {
@@ -51,15 +56,29 @@ export function CustomersRoute() {
       api.get<ListResponse>(`/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   });
 
+  // Set when POST /customers answers 409 with look-alikes; the modal asks
+  // before a second record for the same person gets created.
+  const [dupes, setDupes] = useState<DuplicateCandidate[] | null>(null);
+  const [pendingValues, setPendingValues] = useState<CreateCustomerInput | null>(null);
+
   const createMut = useMutation({
-    mutationFn: (values: CreateCustomerInput) =>
+    mutationFn: (values: CreateCustomerInput & { force?: boolean }) =>
       api.post<{ customer: CustomerRow }>("/customers", values),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
       notifications.show({ color: "green", message: "Customer added" });
+      setDupes(null);
+      setPendingValues(null);
       close();
     },
-    onError: (err) => notifyError(err, { title: "Couldn't add customer" }),
+    onError: (err) => {
+      const candidates = duplicatesFromError(err);
+      if (candidates) {
+        setDupes(candidates);
+        return;
+      }
+      notifyError(err, { title: "Couldn't add customer" });
+    },
   });
 
   return (
@@ -129,10 +148,35 @@ export function CustomersRoute() {
           loading={createMut.isPending}
           onCancel={close}
           onSubmit={async (values) => {
-            await createMut.mutateAsync(values);
+            setPendingValues(values);
+            try {
+              await createMut.mutateAsync(values);
+            } catch {
+              // Handled in onError — a 409 opens the duplicate prompt.
+            }
           }}
         />
       </Modal>
+
+      <DuplicateCustomerModal
+        opened={!!dupes}
+        candidates={dupes ?? []}
+        typedName={
+          pendingValues
+            ? [pendingValues.firstName, pendingValues.lastName].filter(Boolean).join(" ")
+            : ""
+        }
+        loading={createMut.isPending}
+        onClose={() => setDupes(null)}
+        onUseExisting={(cid) => {
+          setDupes(null);
+          close();
+          navigate(`/customers/${cid}`);
+        }}
+        onCreateAnyway={() => {
+          if (pendingValues) createMut.mutate({ ...pendingValues, force: true });
+        }}
+      />
     </Stack>
   );
 }

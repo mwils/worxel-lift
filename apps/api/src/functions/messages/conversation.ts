@@ -1,12 +1,16 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { z } from "zod";
-import { Customer, Message } from "@lift/shared";
+import { Message } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { resolveCustomerByIdOrAlias } from "../customers/_resolve.js";
 
 const ConversationQuery = z.object({
   cursor: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+  // Window floor. The customer page asks for the last 12 months and drops
+  // this for "Show older"; the thread view never sends it.
+  since: z.string().datetime().optional(),
 });
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
@@ -15,20 +19,22 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     const customerId = event.pathParameters?.customerId;
     if (!customerId) return badRequest("Missing customer id");
 
-    const { cursor, limit } = parseQuery(event, ConversationQuery);
+    const { cursor, limit, since } = parseQuery(event, ConversationQuery);
 
-    const customer = await Customer.findOne({
-      _id: customerId,
-      shopId: user.shopId,
-    }).lean();
-    if (!customer) return notFound("Customer not found");
+    // Alias-aware so a link to a merged-away duplicate opens the survivor's thread.
+    const resolved = await resolveCustomerByIdOrAlias(user.shopId, customerId);
+    if (!resolved) return notFound("Customer not found");
+    const { customer } = resolved;
 
     const filter: Record<string, unknown> = {
       shopId: user.shopId,
       customerId: customer._id,
     };
-    if (cursor) {
-      filter.sentAt = { $lt: new Date(cursor) };
+    if (cursor || since) {
+      filter.sentAt = {
+        ...(cursor ? { $lt: new Date(cursor) } : {}),
+        ...(since ? { $gte: new Date(since) } : {}),
+      };
     }
 
     // Fetch newest-first so we can grab the most recent `limit` messages,

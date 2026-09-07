@@ -71,16 +71,22 @@ export async function matchVehicle(
   if (input.vin) {
     const vin = input.vin.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     if (vin.length === 17) {
-      const doc = await Vehicle.findOne({ shopId: input.shopId, vin }).lean();
+      const doc = await Vehicle.findOne({ shopId: input.shopId, vin, archivedAt: null }).lean();
       if (doc) await push(doc, "exact");
     }
   }
 
   // 2. Plate — compared on the normalized form (letters/digits, uppercase).
+  //    Archived (sold) cars are excluded from every match here — this feeds
+  //    a picker, and the owner can un-archive from the customer page.
   if (input.plate && out.length < 3) {
     const plateNormalized = normalizePlate(input.plate);
     if (plateNormalized) {
-      const doc = await Vehicle.findOne({ shopId: input.shopId, plateNormalized }).lean();
+      const doc = await Vehicle.findOne({
+        shopId: input.shopId,
+        plateNormalized,
+        archivedAt: null,
+      }).lean();
       if (doc) await push(doc, "exact");
     }
   }
@@ -91,7 +97,7 @@ export async function matchVehicle(
     out.length < 3 &&
     (input.year || input.make || input.model)
   ) {
-    const q: any = { shopId: input.shopId, customerId: input.customerId };
+    const q: any = { shopId: input.shopId, customerId: input.customerId, archivedAt: null };
     if (input.year) q.year = input.year;
     if (input.make) q.make = new RegExp(`^${escapeRegex(input.make)}$`, "i");
     if (input.model) q.model = new RegExp(`^${escapeRegex(input.model)}$`, "i");
