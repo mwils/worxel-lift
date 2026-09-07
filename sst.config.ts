@@ -261,6 +261,10 @@ export default $config({
       fn("apps/api/src/functions/customers/history.handler")
     );
     api.route(
+      "POST /customers/{id}/merge",
+      fn("apps/api/src/functions/customers/merge.handler")
+    );
+    api.route(
       "POST /customers/{id}/history-link",
       fn("apps/api/src/functions/customers/historyLink.handler")
     );
@@ -268,6 +272,14 @@ export default $config({
     // vehicles
     api.route("POST /vehicles", fn("apps/api/src/functions/vehicles/create.handler"));
     api.route("PATCH /vehicles/{id}", fn("apps/api/src/functions/vehicles/patch.handler"));
+    api.route(
+      "POST /vehicles/{id}/archive",
+      fn("apps/api/src/functions/vehicles/archive.archive")
+    );
+    api.route(
+      "POST /vehicles/{id}/unarchive",
+      fn("apps/api/src/functions/vehicles/archive.unarchive")
+    );
     api.route("POST /vehicles/decode-vin", fn("apps/api/src/functions/vehicles/decodeVin.handler"));
     api.route(
       "GET /vehicles/{id}/history",
@@ -382,6 +394,10 @@ export default $config({
     api.route(
       "PATCH /service-reminders/{id}",
       fn("apps/api/src/functions/serviceReminders/patch.handler")
+    );
+    api.route(
+      "POST /service-reminders/bulk-dismiss",
+      fn("apps/api/src/functions/serviceReminders/bulkDismiss.handler")
     );
     api.route(
       "POST /service-reminders/disable-for-vehicle",

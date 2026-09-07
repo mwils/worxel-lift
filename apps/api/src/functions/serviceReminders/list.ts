@@ -7,6 +7,7 @@ import {
   ServiceReminder,
   Vehicle,
   objectId,
+  type ServiceReminderStatus,
 } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok } from "../../lib/response.js";
@@ -16,6 +17,11 @@ const ListQuery = z.object({
   status: z.enum(SERVICE_REMINDER_STATUSES).optional(),
   customerId: objectId.optional(),
   vehicleId: objectId.optional(),
+  // Half-open due-date window [from, to). The client resolves "overdue" /
+  // "this week" / "this month" in the SHOP's timezone and sends instants, the
+  // same way the RO history page does.
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
   limit: z
     .string()
     .regex(/^\d+$/)
@@ -29,14 +35,27 @@ const ListQuery = z.object({
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
-    const { status, customerId, vehicleId, limit, cursor } = parseQuery(event, ListQuery);
+    const { status, customerId, vehicleId, from, to, limit, cursor } = parseQuery(
+      event,
+      ListQuery
+    );
 
-    const filter: Record<string, unknown> = { shopId: user.shopId };
+    // Everything except `status`: the chip counts need the same shop/customer/
+    // date scope as the page but must span every status.
+    const scope: Record<string, unknown> = { shopId: user.shopId };
+    if (customerId) scope.customerId = customerId;
+    if (vehicleId) scope.vehicleId = vehicleId;
+    if (from || to) {
+      const due: Record<string, Date> = {};
+      if (from) due.$gte = new Date(from);
+      if (to) due.$lt = new Date(to);
+      scope.dueAt = due;
+    }
+
+    const filter: Record<string, unknown> = { ...scope };
     if (status) filter.status = status;
-    if (customerId) filter.customerId = customerId;
-    if (vehicleId) filter.vehicleId = vehicleId;
 
-    const pageSize = limit ?? 50;
+    const pageSize = limit ?? 30;
 
     if (cursor) {
       // Cursor format: "<iso>|<id>" — strictly-greater on (dueAt, _id).
@@ -50,10 +69,32 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       }
     }
 
-    const reminders = await ServiceReminder.find(filter)
-      .sort({ dueAt: 1, _id: 1 })
-      .limit(pageSize + 1)
-      .lean();
+    // Per-status counts for the filter chips. First page only — they don't
+    // change while the caller pages. One indexed countDocuments per status
+    // (rather than an aggregation) so mongoose casts the string ids for us and
+    // each count rides the { shopId, status, dueAt } index.
+    const countsPromise = cursor
+      ? Promise.resolve(null)
+      : Promise.all(
+          SERVICE_REMINDER_STATUSES.map((s) =>
+            ServiceReminder.countDocuments({ ...scope, status: s })
+          )
+        );
+
+    const [reminders, countValues] = await Promise.all([
+      ServiceReminder.find(filter).sort({ dueAt: 1, _id: 1 }).limit(pageSize + 1).lean(),
+      countsPromise,
+    ]);
+
+    const counts = countValues
+      ? SERVICE_REMINDER_STATUSES.reduce<Record<ServiceReminderStatus, number>>(
+          (acc, s, i) => {
+            acc[s] = countValues[i] ?? 0;
+            return acc;
+          },
+          {} as Record<ServiceReminderStatus, number>
+        )
+      : null;
 
     const page = reminders.slice(0, pageSize);
     const hasMore = reminders.length > pageSize;
@@ -122,6 +163,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       })),
       nextCursor,
       hasMore,
+      counts,
     });
   } catch (err) {
     const known = handleKnownErrors(err);

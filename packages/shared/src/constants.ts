@@ -243,6 +243,16 @@ export const SERVICE_REMINDER_STATUSES = [
 ] as const;
 export type ServiceReminderStatus = (typeof SERVICE_REMINDER_STATUSES)[number];
 
+// Display labels for reminder status. Same contract as RO_STATUS_LABELS —
+// never render the raw enum (or a `replace("_", " ")` hack) in the UI.
+export const SERVICE_REMINDER_STATUS_LABELS: Record<ServiceReminderStatus, string> = {
+  pending: "Due",
+  sent: "Sent",
+  dismissed: "Dismissed",
+  opted_out: "Opted out",
+  failed: "Failed",
+};
+
 export const SERVICE_CATEGORIES = [
   "oil_change",
   "tire_rotation",

@@ -123,6 +123,15 @@ async function processReminder(
     _id: reminder.vehicleId,
     shopId: reminder.shopId,
   }).lean();
+  // Sold / totalled. Archiving dismisses pending reminders already; this is
+  // the backstop for anything that slipped through (e.g. a reminder inferred
+  // from an RO closed after the car was archived).
+  if (vehicle?.archivedAt) {
+    reminder.status = "dismissed";
+    reminder.dismissedAt = new Date();
+    await reminder.save();
+    return "skipped";
+  }
 
   // Owner email for the mock fallback path (no-op when real SMS is enabled).
   const ownerUser = shop.ownerUserId

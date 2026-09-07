@@ -211,7 +211,14 @@ export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
   lastName: cleanText.transform((s) => (s.length ? s : null)).nullable().optional(),
   email: z.string().email().nullable().optional(),
   notes: z.string().nullable().optional(),
+  // Only clearing is allowed here ("Not the same person"); booking sets it.
+  possibleDuplicateOf: z.null().optional(),
 });
+// POST /customers/{id}/merge — {id} is merged INTO `intoCustomerId` and deleted.
+export const MergeCustomerDto = z.object({
+  intoCustomerId: objectId,
+});
+export type MergeCustomerInput = z.infer<typeof MergeCustomerDto>;
 
 // ── vehicles ────────────────────────────────────────────────────
 export const CreateVehicleDto = z.object({
@@ -392,8 +399,18 @@ export const DisableServiceForVehicleDto = z.object({
   category: z.enum(SERVICE_CATEGORIES).optional(),
 });
 
+// POST /service-reminders/bulk-dismiss — the reminders list's multi-select.
+// Capped at 200 so one request can clear a page (30) or a year's backlog in a
+// handful of calls without turning into an unbounded updateMany.
+export const BulkDismissServiceRemindersDto = z.object({
+  ids: z.array(objectId).min(1).max(200),
+});
+
 export type UpdateServiceReminderInput = z.infer<typeof UpdateServiceReminderDto>;
 export type DisableServiceForVehicleInput = z.infer<typeof DisableServiceForVehicleDto>;
+export type BulkDismissServiceRemindersInput = z.infer<
+  typeof BulkDismissServiceRemindersDto
+>;
 
 // ── messages ────────────────────────────────────────────────────
 export const DraftMessageDto = z.object({

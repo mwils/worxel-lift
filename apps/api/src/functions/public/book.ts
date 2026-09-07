@@ -1,5 +1,6 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { randomBytes } from "node:crypto";
+import mongoose from "mongoose";
 import {
   CreateBookingDto,
   Customer,
@@ -10,6 +11,7 @@ import {
   Vehicle,
 } from "@lift/shared";
 import { resolveTaxSettings } from "@lift/shared/constants";
+import { findPossibleDuplicates } from "../../lib/findDuplicates.js";
 import { handleKnownErrors, parseBody, withErrorBoundary } from "../../lib/middleware.js";
 import { badRequest, conflict, created, notFound } from "../../lib/response.js";
 import { sendSms } from "../../lib/sms.js";
@@ -55,6 +57,25 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     // booked twice from the same phone.
     let customer = await Customer.findOne({ shopId: shop._id, phone: dto.customer.phone });
     if (!customer) {
+      // New phone, but same name AND same vehicle as someone on file? Never
+      // merge on that — a booker can't be asked, and "another Smith with an
+      // F-150" is possible. Create the record and flag it so the shop sees a
+      // Merge banner on the customer page. Name alone is not flagged.
+      let possibleDuplicateOf: mongoose.Types.ObjectId | undefined;
+      try {
+        const dup = (
+          await findPossibleDuplicates({
+            shopId: shop._id,
+            firstName: dto.customer.firstName,
+            lastName: dto.customer.lastName,
+            vehicle: dto.vehicle,
+            limit: 3,
+          })
+        ).find((c) => c.reasons.includes("name") && c.reasons.includes("vehicle"));
+        if (dup) possibleDuplicateOf = new mongoose.Types.ObjectId(dup.id);
+      } catch (err) {
+        console.error("[book] duplicate check failed — continuing", err);
+      }
       customer = await Customer.create({
         shopId: shop._id,
         firstName: dto.customer.firstName,
@@ -64,6 +85,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
         // The customer just submitted a form that includes the shop's opt-in
         // language; record consent at the booking timestamp.
         smsOptInAt: new Date(),
+        possibleDuplicateOf,
       });
     }
 
@@ -76,6 +98,7 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
     let vehicle = await Vehicle.findOne({
       shopId: shop._id,
       customerId: customer._id,
+      archivedAt: null, // a sold car booking again is a new car to us
       year: dto.vehicle.year,
       make: makeRe,
       model: modelRe,
