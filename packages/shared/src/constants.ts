@@ -202,6 +202,25 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const AI_TONES = ["plain", "friendly"] as const;
 export type AiTone = (typeof AI_TONES)[number];
 
+/**
+ * What happens when an RO lands in Ready (feature gap 6).
+ *   prompt (default) — open the prefilled text and wait for the owner to tap Send
+ *   auto             — send the same copy immediately, toast it, log it in the thread
+ *   off              — no prompt, no text
+ * "auto" is only ever reached by the owner ticking "Don't ask again" inside the
+ * prompt, so nothing goes out before they have read the copy at least once.
+ */
+export const READY_TEXT_MODES = ["prompt", "auto", "off"] as const;
+export type ReadyTextMode = (typeof READY_TEXT_MODES)[number];
+export const READY_TEXT_MODE_LABELS: Record<ReadyTextMode, string> = {
+  prompt: "Ask me first (recommended)",
+  auto: "Send it automatically",
+  off: "Don't text on Ready",
+};
+
+/** Shop-local hour the day-before appointment reminder cron aims for. */
+export const APPOINTMENT_REMINDER_LOCAL_HOUR = 17;
+
 export const PLAN_PRICE_USD = 79;
 export const PLAN_TRIAL_DAYS = 14;
 

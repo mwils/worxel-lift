@@ -36,6 +36,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     if (dto.settings?.serviceRemindersEnabled !== undefined) {
       update["settings.serviceRemindersEnabled"] = dto.settings.serviceRemindersEnabled;
     }
+    if (dto.settings?.readyTextMode !== undefined) {
+      update["settings.readyTextMode"] = dto.settings.readyTextMode;
+    }
+    if (dto.settings?.appointmentRemindersEnabled !== undefined) {
+      update["settings.appointmentRemindersEnabled"] = dto.settings.appointmentRemindersEnabled;
+    }
     if (dto.settings?.taxRateBps !== undefined || dto.settings?.taxAppliesTo !== undefined) {
       // Write both bps fields together so a save of just the rate also
       // converts the round-1 percent shape (and drops it) in one step.

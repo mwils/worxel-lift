@@ -517,6 +517,20 @@ export default $config({
       },
     });
 
+    // Day-before appointment reminders. HOURLY on purpose: the handler reads
+    // each shop's local clock and only texts when it's ~5 PM there, so one
+    // cron covers every timezone. Unlike the service-reminder scan this one
+    // still runs under MOCK_SMS=1 (one text per appointment, not 200).
+    new sst.aws.Cron("AppointmentReminderScan", {
+      schedule: "cron(0 * * * ? *)",
+      function: {
+        ...fn("apps/api/src/functions/serviceReminders/appointmentScan.handler"),
+        // Serial SMS sends across every shop that just hit 5 PM local.
+        timeout: "5 minutes" as const,
+        memory: "1024 MB" as const,
+      },
+    });
+
     // Blog queue top-up: flips overdue posts to published (bookkeeping) and
     // generates drafts up to a 7-post forward queue. 09:00 UTC = 3-4am
     // Central, hours before the 7am publish instant. Generation no-ops until

@@ -49,6 +49,9 @@ export const handler: APIGatewayProxyHandlerV2 = withVerifiedAuth(async ({ event
       mediaUrls: dto.mediaKeys ?? [],
       sentAt: new Date(),
       aiDrafted: dto.aiDrafted,
+      // Lift-composed sends the owner didn't type (auto-mode Ready texts) are
+      // flagged so the inbox thread rules don't read them as a human reply.
+      automated: dto.automated,
       awsMessageId: smsResult.messageId,
     });
 

@@ -1275,7 +1275,11 @@ export function RoDetailRoute() {
         vehicleSummary={vehicleSummary}
         shopName={me?.shop?.name ?? "the shop"}
         balanceCents={balanceCents}
+        collectedCents={collectedCents}
         paymentsReady={paymentsReady}
+        readyTextMode={me?.shop?.settings.readyTextMode ?? "prompt"}
+        businessHours={me?.shop?.settings.businessHours}
+        timezone={tz}
         onSent={() => qc.invalidateQueries({ queryKey: ["conversation"] })}
       />
 

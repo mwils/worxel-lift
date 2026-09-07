@@ -1,5 +1,5 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
-import { MAX_TAX_RATE_BPS, TAX_APPLIES_TO } from "../constants.js";
+import { MAX_TAX_RATE_BPS, READY_TEXT_MODES, TAX_APPLIES_TO } from "../constants.js";
 
 const ShopSchema = new Schema(
   {
@@ -66,6 +66,11 @@ const ShopSchema = new Schema(
       // Kill switch for service-due reminders. Defaults on; flipped off in
       // Settings if Mike wants to handle follow-ups manually.
       serviceRemindersEnabled: { type: Boolean, default: true },
+      // What the Ready status change does about texting the customer. Default
+      // "prompt" — the owner reviews the copy every time. See READY_TEXT_MODES.
+      readyTextMode: { type: String, enum: READY_TEXT_MODES, default: "prompt" },
+      // Kill switch for the day-before appointment reminder cron. Defaults on.
+      appointmentRemindersEnabled: { type: Boolean, default: true },
       businessHours: {
         // 0 = Sun … 6 = Sat
         type: [

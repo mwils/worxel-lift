@@ -7,6 +7,7 @@ import {
   MAX_TAX_RATE_BPS,
   MESSAGE_CLASSIFICATIONS,
   PAYMENT_STATUSES,
+  READY_TEXT_MODES,
   RO_STATUSES,
   SERVICE_CATEGORIES,
   SHOP_SLUG_REGEX,
@@ -168,6 +169,9 @@ export const UpdateShopDto = z.object({
       autoReplyEnabled: z.boolean().optional(),
       defaultLaborRate: money.optional(),
       serviceRemindersEnabled: z.boolean().optional(),
+      // Ready-status texting: prompt (default) / auto / off. See READY_TEXT_MODES.
+      readyTextMode: z.enum(READY_TEXT_MODES).optional(),
+      appointmentRemindersEnabled: z.boolean().optional(),
       // Basis points (825 = 8.25%) + what it applies to. See Shop model comment.
       taxRateBps: z.number().int().min(0).max(MAX_TAX_RATE_BPS).optional(),
       taxAppliesTo: z.enum(TAX_APPLIES_TO).optional(),
@@ -409,6 +413,10 @@ export const SendMessageDto = z.object({
   body: z.string().min(1).max(1600),
   aiDrafted: z.boolean().default(false),
   mediaKeys: z.array(z.string()).optional(),
+  // Sent by Lift on the shop's behalf rather than typed by the owner (auto-mode
+  // Ready texts). Inbox thread rules read this so an automated outbound isn't
+  // counted as the shop having replied.
+  automated: z.boolean().default(false),
 });
 
 // ── voice (shop-scoped, not RO-scoped) ──────────────────────────

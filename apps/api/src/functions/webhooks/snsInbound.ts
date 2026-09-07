@@ -44,8 +44,13 @@ function isStopKeyword(body: string): boolean {
 }
 
 const BOOKING_KEYWORD_RE = /\b(cancel|reschedul\w*)\b/i;
+// Bare "C" / "R" — the two replies the day-before appointment reminder offers
+// ("Reply C to cancel or R to reschedule"). Only a message that is nothing but
+// that one letter counts, so "R and R on the brakes" still goes to the
+// classifier. Runs after the STOP check, so it can't shadow an opt-out.
+const BOOKING_SHORTCUT_RE = /^\s*([cr])\s*[.!]*\s*$/i;
 function isBookingKeyword(body: string): boolean {
-  return BOOKING_KEYWORD_RE.test(body);
+  return BOOKING_KEYWORD_RE.test(body) || BOOKING_SHORTCUT_RE.test(body);
 }
 
 function parseClassification(text: string): {

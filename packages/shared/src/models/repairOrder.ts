@@ -157,6 +157,16 @@ const RepairOrderSchema = new Schema(
     scheduledFor: Date,
     completedAt: Date,
 
+    // Day-before appointment reminder bookkeeping (feature gap 6). Two fields
+    // rather than one flag so a reschedule re-arms the reminder for free:
+    // `appointmentReminderFor` records WHICH `scheduledFor` instant was
+    // reminded, so the hourly scan skips an RO only while the two match. No
+    // ServiceReminder row is used — those are vehicle+category+interval shaped
+    // (`dueAt = completedAt + interval`) and would show up in the Settings
+    // reminders list and GET /service-reminders as a fake service category.
+    appointmentReminderSentAt: Date,
+    appointmentReminderFor: Date,
+
     // Odometer at drop-off / pickup. Optional — Mike often skips it. The
     // latest value is mirrored onto `vehicles.mileage` by repairOrders/
     // create.ts + patch.ts (only ever moves forward), and onto the service

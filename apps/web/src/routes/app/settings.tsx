@@ -22,6 +22,8 @@ import { TimeInput } from "@mantine/dates";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import {
+  READY_TEXT_MODES,
+  READY_TEXT_MODE_LABELS,
   SERVICE_CATEGORIES,
   SERVICE_INTERVALS,
   SHOP_SLUG_REGEX,
@@ -35,6 +37,7 @@ import {
   pctToBps,
   resolveTaxSettings,
   slugifyShopName,
+  type ReadyTextMode,
   type TaxAppliesTo,
 } from "@lift/shared/constants";
 import {
@@ -131,6 +134,8 @@ export function SettingsRoute() {
         autoReplyEnabled?: boolean;
         defaultLaborRate?: number;
         serviceRemindersEnabled?: boolean;
+        readyTextMode?: ReadyTextMode;
+        appointmentRemindersEnabled?: boolean;
         taxRateBps?: number;
         taxAppliesTo?: TaxAppliesTo;
         booking?: BookingSettings;
@@ -534,6 +539,27 @@ export function SettingsRoute() {
           patchShop.mutate({ settings: { autoReplyEnabled: e.currentTarget.checked } })
         }
         description="If a customer asks ‘is my car ready,’ Lift answers automatically with the current status."
+      />
+
+      <Divider label="Status texts" />
+      <Select
+        label="When a car hits Ready"
+        data={READY_TEXT_MODES.map((m) => ({ value: m, label: READY_TEXT_MODE_LABELS[m] }))}
+        value={me?.shop?.settings.readyTextMode ?? "prompt"}
+        onChange={(v) =>
+          v && patchShop.mutate({ settings: { readyTextMode: v as ReadyTextMode } })
+        }
+        description="“Ask me first” shows you the text and waits. “Send it automatically” texts the same thing on its own and shows you what went out."
+      />
+      <Switch
+        label="Remind customers the day before their appointment"
+        checked={me?.shop?.settings.appointmentRemindersEnabled ?? true}
+        onChange={(e) =>
+          patchShop.mutate({
+            settings: { appointmentRemindersEnabled: e.currentTarget.checked },
+          })
+        }
+        description="One text around 5pm the day before, with a link to cancel or move the time. Nothing goes out for a job you already closed."
       />
 
       <Divider label="Service reminders" />
