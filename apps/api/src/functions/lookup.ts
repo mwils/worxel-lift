@@ -16,7 +16,10 @@ import { customerName, parseRoNumber, vehicleSummary } from "./repairOrders/_row
 
 const LookupQuery = z.object({
   q: z.string().min(1, "q required").max(100),
-  limit: z.coerce.number().int().min(1).max(25).default(10),
+  // Per-GROUP cap, not a total cap: at 800 customers "Smith" must not crowd
+  // the matching plate off the list. Counts come back separately so the client
+  // can render "+N more" into the fuller list.
+  limit: z.coerce.number().int().min(1).max(25).default(5),
 });
 
 function escapeRegex(s: string): string {
@@ -83,49 +86,74 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     // "0142", "142", "RO-0142" → the shop's RO with that number (exact, unique index).
     const roNumber = parseRoNumber(raw);
 
-    const [byPhone, byName, byPlate, byVin, roMatch] = (await Promise.all([
+    const phoneRx =
       isPhoneLike(raw) && phoneDigits.length >= 4
-        ? Customer.find({
-            shopId: user.shopId,
-            phone: new RegExp(escapeRegex(phoneDigits.replace(/^\+/, "")) + "$", "i"),
-          })
-            .limit(limit)
-            .lean<CustomerDoc[]>()
-        : Promise.resolve(noCustomers),
-      Customer.find({
-        shopId: user.shopId,
-        $or: [{ firstName: nameRx }, { lastName: nameRx }],
-      })
-        .sort({ lastName: 1, firstName: 1 })
-        .limit(limit)
-        .lean<CustomerDoc[]>(),
-      plateRx
-        ? Vehicle.find({
-            shopId: user.shopId,
-            $or: [
-              { plateNormalized: plateRx },
-              // Vehicles written before plateNormalized existed (pre-backfill):
-              // pull the raw plates and normalize in JS below.
-              { plateNormalized: { $exists: false }, plate: { $exists: true, $ne: null } },
-            ],
-          })
-            .limit(limit * 5)
-            .lean<VehicleDoc[]>()
-        : Promise.resolve(noVehicles),
-      vinSuffix
-        ? Vehicle.find({
-            shopId: user.shopId,
-            vin: new RegExp(escapeRegex(vinSuffix) + "$", "i"),
-          })
-            .limit(limit)
-            .lean<VehicleDoc[]>()
-        : Promise.resolve(noVehicles),
-      roNumber !== null
-        ? RepairOrder.findOne({ shopId: user.shopId, number: roNumber })
-            .select("number status customerId vehicleId")
-            .lean()
-        : Promise.resolve(null),
-    ])) as [CustomerDoc[], CustomerDoc[], VehicleDoc[], VehicleDoc[], RoLean | null];
+        ? new RegExp(escapeRegex(phoneDigits.replace(/^\+/, "")) + "$", "i")
+        : null;
+    const vinRx = vinSuffix ? new RegExp(escapeRegex(vinSuffix) + "$", "i") : null;
+
+    // Union filters used for the group counts. The page itself still runs the
+    // phone / name / plate / VIN queries separately so ordering stays
+    // deliberate (phone before name, plate before VIN).
+    const customerOr: Record<string, unknown>[] = [
+      { firstName: nameRx },
+      { lastName: nameRx },
+    ];
+    if (phoneRx) customerOr.push({ phone: phoneRx });
+    const vehicleOr: Record<string, unknown>[] = [];
+    if (plateRx) vehicleOr.push({ plateNormalized: plateRx });
+    if (vinRx) vehicleOr.push({ vin: vinRx });
+
+    const [byPhone, byName, byPlate, byVin, roMatch, customerCount, vehicleCount] =
+      (await Promise.all([
+        phoneRx
+          ? Customer.find({ shopId: user.shopId, phone: phoneRx })
+              .limit(limit)
+              .lean<CustomerDoc[]>()
+          : Promise.resolve(noCustomers),
+        Customer.find({
+          shopId: user.shopId,
+          $or: [{ firstName: nameRx }, { lastName: nameRx }],
+        })
+          .sort({ lastName: 1, firstName: 1 })
+          .limit(limit)
+          .lean<CustomerDoc[]>(),
+        plateRx
+          ? Vehicle.find({
+              shopId: user.shopId,
+              $or: [
+                { plateNormalized: plateRx },
+                // Vehicles written before plateNormalized existed (pre-backfill):
+                // pull the raw plates and normalize in JS below.
+                { plateNormalized: { $exists: false }, plate: { $exists: true, $ne: null } },
+              ],
+            })
+              .limit(limit * 5)
+              .lean<VehicleDoc[]>()
+          : Promise.resolve(noVehicles),
+        vinRx
+          ? Vehicle.find({ shopId: user.shopId, vin: vinRx })
+              .limit(limit)
+              .lean<VehicleDoc[]>()
+          : Promise.resolve(noVehicles),
+        roNumber !== null
+          ? RepairOrder.findOne({ shopId: user.shopId, number: roNumber })
+              .select("number status customerId vehicleId")
+              .lean()
+          : Promise.resolve(null),
+        Customer.countDocuments({ shopId: user.shopId, $or: customerOr }),
+        vehicleOr.length
+          ? Vehicle.countDocuments({ shopId: user.shopId, $or: vehicleOr })
+          : Promise.resolve(0),
+      ])) as [
+        CustomerDoc[],
+        CustomerDoc[],
+        VehicleDoc[],
+        VehicleDoc[],
+        RoLean | null,
+        number,
+        number,
+      ];
 
     const roResults: RoResult[] = [];
     if (roMatch) {
@@ -192,11 +220,22 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     }
 
     // An exact RO-number hit goes first — the owner typed the number on purpose.
-    const results: LookupResult[] = [...roResults, ...customerResults, ...vehicleResults].slice(
-      0,
-      limit
-    );
-    return ok({ results });
+    // Each group is already capped at `limit`; nothing is sliced off the end
+    // here, so a plate match can't be crowded out by a common surname.
+    const results: LookupResult[] = [...roResults, ...customerResults, ...vehicleResults];
+
+    return ok({
+      results,
+      // Total matches per group, so the client can render "12 · +7 more". The
+      // vehicle count comes off the indexed plate/VIN filters; pre-backfill rows
+      // matched in JS above can only push it up, never down.
+      counts: {
+        customers: customerCount,
+        vehicles: Math.max(vehicleCount, vehicleResults.length),
+        ros: roResults.length,
+      },
+      groupLimit: limit,
+    });
   } catch (err) {
     const known = handleKnownErrors(err);
     if (known) return known;

@@ -384,6 +384,10 @@ export default $config({
       fn("apps/api/src/functions/serviceReminders/patch.handler")
     );
     api.route(
+      "POST /service-reminders/bulk-dismiss",
+      fn("apps/api/src/functions/serviceReminders/bulkDismiss.handler")
+    );
+    api.route(
       "POST /service-reminders/disable-for-vehicle",
       fn("apps/api/src/functions/serviceReminders/disableForVehicle.handler")
     );

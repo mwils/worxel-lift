@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
   Card,
@@ -40,7 +40,9 @@ interface ListResponse {
 }
 
 export function CustomersRoute() {
-  const [q, setQ] = useState("");
+  // Seeded from ?q= so global search's "+N more" lands here already filtered.
+  const [params] = useSearchParams();
+  const [q, setQ] = useState(params.get("q") ?? "");
   const [opened, { open, close }] = useDisclosure(false);
   const qc = useQueryClient();
   const navigate = useNavigate();

@@ -388,8 +388,18 @@ export const DisableServiceForVehicleDto = z.object({
   category: z.enum(SERVICE_CATEGORIES).optional(),
 });
 
+// POST /service-reminders/bulk-dismiss — the reminders list's multi-select.
+// Capped at 200 so one request can clear a page (30) or a year's backlog in a
+// handful of calls without turning into an unbounded updateMany.
+export const BulkDismissServiceRemindersDto = z.object({
+  ids: z.array(objectId).min(1).max(200),
+});
+
 export type UpdateServiceReminderInput = z.infer<typeof UpdateServiceReminderDto>;
 export type DisableServiceForVehicleInput = z.infer<typeof DisableServiceForVehicleDto>;
+export type BulkDismissServiceRemindersInput = z.infer<
+  typeof BulkDismissServiceRemindersDto
+>;
 
 // ── messages ────────────────────────────────────────────────────
 export const DraftMessageDto = z.object({
