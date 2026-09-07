@@ -161,6 +161,16 @@ function ScopedStyles() {
         .lift-grid-2-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: flex-start; }
       }
       .lift-grid-2-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; }
+      @media (min-width: 768px) {
+        .lift-grid-2-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+        .lift-grid-hero { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+      }
+      .lift-secondary { color: ${COLORS.ink}; font-size: 1rem; text-underline-offset: 4px; padding: 12px 0; }
+      .lift-page a:focus-visible, .lift-faq-item summary:focus-visible { outline: 3px solid ${COLORS.blue}; outline-offset: 5px; }
+      .lift-page [id] { scroll-margin-top: 24px; }
+      @media (prefers-reduced-motion: reduce) {
+        .lift-page *, .lift-page *::before, .lift-page *::after { animation: none !important; transition: none !important; }
+      }
       .lift-masthead { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
       .lift-hero-headline { font-size: 4.5rem !important; line-height: 0.96 !important; max-width: 100%; }
       .lift-h2 { font-size: 3rem !important; line-height: 1.0 !important; max-width: 100%; }
@@ -244,7 +254,7 @@ function NavBar() {
           <a href="/blog" className="lift-link">Shop notes</a>
           <a href={CTA_BASE} className="lift-link">Sign in</a>
         </Group>
-        <a href={ctaHref("nav")} className="lift-cta lift-cta-small">Start trial →</a>
+        <a href={ctaHref("nav")} className="lift-cta lift-cta-small">Try it free →</a>
       </Group>
     </Container>
   );
@@ -272,11 +282,11 @@ function Hairline({ thick, labeled }: { thick?: boolean; labeled?: boolean } = {
 
 function Hero() {
   return (
-    <Container size="lg" px="md" py={{ base: 48, md: 96 }} style={{ position: "relative", zIndex: 1, overflow: "hidden" }}>
+    <Container size="lg" px="md" py={{ base: 36, md: 64 }} style={{ position: "relative", zIndex: 1, overflow: "hidden" }}>
       <Box className="lift-grid-2 lift-grid-hero">
         <Box style={{ minWidth: 0, overflowWrap: "break-word" }}>
           <Stack gap="xl">
-            <SectionLabel num="00" title="The Bay · Field Notes" />
+            <SectionLabel num="00" title="For 1–3 bay repair shops" />
             <Title
               order={1}
               className="lift-hero-headline"
@@ -288,12 +298,11 @@ function Hero() {
                 margin: 0,
               }}
             >
-              Run the whole<br />
-              shop from <span style={{ color: COLORS.red }}>the bay</span>.
+              Less phone tag.<br />
+              More <span style={{ color: COLORS.red }}>wrench time</span>.
             </Title>
 
             <Text
-              className="lift-drop"
               style={{
                 fontFamily: FONT.serif,
                 fontSize: "1.35rem",
@@ -302,182 +311,38 @@ function Hero() {
                 maxWidth: 560,
               }}
             >
-              Repair orders, photo inspections, status updates, invoices, pay links — all from your phone. The AI handles "is my car ready" so you stay under the hood.
+              Lift is shop management software for mechanics who also run the front desk. Send estimates, get approvals, and collect payment from your phone. Let AI answer routine “is my car ready?” texts.
             </Text>
 
-            <Group gap="lg" align="center">
-              <a href={ctaHref("hero")} className="lift-cta">Start your 14-day trial →</a>
-              <MonoLabel size={10}>$79/mo · No card · Cancel anytime</MonoLabel>
-            </Group>
+            <Stack gap="md">
+              <Group gap="lg">
+                <a href={ctaHref("hero")} className="lift-cta">Start my free trial →</a>
+                <a href="#wedge" className="lift-secondary">See how a job works ↓</a>
+              </Group>
+              <Text size="sm" style={{ color: COLORS.inkSoft }}>
+                14 days free · No credit card required · $79/month after trial
+              </Text>
+              <Text size="sm" style={{ color: COLORS.inkSoft }}>
+                Start with your email. Add your shop details. Create your first repair order.
+              </Text>
+            </Stack>
           </Stack>
         </Box>
 
         <Box className="lift-hero-diagram" style={{ minWidth: 0, maxWidth: "100%" }}>
-          <ExplodedDiagram />
+          <Box style={{ border: `2px solid ${COLORS.ink}`, padding: 24, background: COLORS.paperShade, boxShadow: `6px 6px 0 ${COLORS.ink}` }}>
+            <MonoLabel>Less back-and-forth</MonoLabel>
+            <Text mt="sm" mb="lg" style={{ fontFamily: FONT.display, fontSize: "1.5rem", lineHeight: 1.2 }}>
+              Your customer gets an answer. You keep working.
+            </Text>
+            <SmsThreadDemo />
+            <Text mt="lg" size="sm" style={{ color: COLORS.inkSoft }}>
+              You review outgoing drafts. Routine status replies can run automatically, with a switch to turn them off.
+            </Text>
+          </Box>
         </Box>
       </Box>
     </Container>
-  );
-}
-
-function ExplodedDiagram() {
-  // Stylized phone schematic with self-drawing leader lines pointing to labeled callouts.
-  return (
-    <Box style={{ position: "relative", padding: "48px 24px" }}>
-      <RegistrationFrame />
-
-      <svg viewBox="0 0 460 540" preserveAspectRatio="xMidYMid meet" style={{ display: "block", width: "100%", maxWidth: "100%", height: "auto", position: "relative", zIndex: 2 }}>
-        {/* Phone outline */}
-        <rect
-          x="160"
-          y="80"
-          width="180"
-          height="360"
-          rx="2"
-          ry="2"
-          fill={COLORS.paper}
-          stroke={COLORS.ink}
-          strokeWidth="1.5"
-        />
-        <line x1="160" y1="120" x2="340" y2="120" stroke={COLORS.ink} strokeWidth="0.75" />
-        <line x1="160" y1="400" x2="340" y2="400" stroke={COLORS.ink} strokeWidth="0.75" />
-        <circle cx="250" cy="420" r="6" fill="none" stroke={COLORS.ink} strokeWidth="1" />
-
-        {/* Phone header text */}
-        <text x="170" y="113" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft}>
-          LIFT · 12:42 PM
-        </text>
-
-        {/* Incoming message bubble */}
-        <rect x="172" y="138" width="120" height="36" fill={COLORS.paperShade} stroke={COLORS.ink} strokeWidth="0.75" />
-        <text x="178" y="152" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          hey is my car
-        </text>
-        <text x="178" y="164" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          ready
-        </text>
-
-        {/* Auto-reply bubble (red border = AI) */}
-        <rect x="188" y="188" width="140" height="46" fill={COLORS.paper} stroke={COLORS.red} strokeWidth="1.25" />
-        <text x="194" y="203" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          Hi Jess — we're
-        </text>
-        <text x="194" y="215" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          finishing brakes now,
-        </text>
-        <text x="194" y="227" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          ready by 4pm.
-        </text>
-
-        {/* Estimate card */}
-        <rect x="172" y="250" width="156" height="80" fill={COLORS.paper} stroke={COLORS.ink} strokeWidth="0.75" />
-        <text x="178" y="264" fontFamily={FONT.mono} fontSize="7" fill={COLORS.inkSoft}>
-          AI-DRAFTED ESTIMATE
-        </text>
-        <text x="178" y="280" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          Front brakes · pads
-        </text>
-        <text x="178" y="292" fontFamily={FONT.serif} fontSize="9" fill={COLORS.ink}>
-          + rotor turn
-        </text>
-        <text x="178" y="310" fontFamily={FONT.display} fontSize="14" fill={COLORS.ink}>
-          $284.00
-        </text>
-
-        {/* Approve button */}
-        <rect x="188" y="345" width="124" height="22" fill={COLORS.red} />
-        <text x="223" y="360" fontFamily={FONT.mono} fontSize="8" fill={COLORS.paper} fontWeight="700">
-          APPROVE →
-        </text>
-
-        {/* LEADER LINES — left side */}
-        <g>
-          <path
-            d="M 172 156 L 80 156 L 30 90"
-            fill="none"
-            stroke={COLORS.ink}
-            strokeWidth="1"
-            className="lift-leader"
-            style={{ ["--len" as never]: "220" }}
-          />
-          <circle cx="172" cy="156" r="2.5" fill={COLORS.ink} />
-        </g>
-        <g>
-          <path
-            d="M 188 211 L 70 211 L 30 245"
-            fill="none"
-            stroke={COLORS.red}
-            strokeWidth="1"
-            className="lift-leader"
-            style={{ ["--len" as never]: "200", animationDelay: "0.7s" } as CSSProperties}
-          />
-          <circle cx="188" cy="211" r="2.5" fill={COLORS.red} />
-        </g>
-
-        {/* LEADER LINES — right side */}
-        <g>
-          <path
-            d="M 328 290 L 410 290 L 430 250"
-            fill="none"
-            stroke={COLORS.ink}
-            strokeWidth="1"
-            className="lift-leader"
-            style={{ ["--len" as never]: "160", animationDelay: "1.0s" } as CSSProperties}
-          />
-          <circle cx="328" cy="290" r="2.5" fill={COLORS.ink} />
-        </g>
-        <g>
-          <path
-            d="M 312 356 L 410 356 L 430 410"
-            fill="none"
-            stroke={COLORS.red}
-            strokeWidth="1"
-            className="lift-leader"
-            style={{ ["--len" as never]: "180", animationDelay: "1.3s" } as CSSProperties}
-          />
-          <circle cx="312" cy="356" r="2.5" fill={COLORS.red} />
-        </g>
-
-        {/* Callout labels */}
-        <g className="lift-leader-label">
-          <text x="0" y="84" fontFamily={FONT.mono} fontSize="9" fill={COLORS.ink} fontWeight="700">
-            A — Customer
-          </text>
-          <text x="0" y="95" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft}>
-            inbound text
-          </text>
-        </g>
-        <g className="lift-leader-label" style={{ animationDelay: "1.8s" } as CSSProperties}>
-          <text x="0" y="240" fontFamily={FONT.mono} fontSize="9" fill={COLORS.red} fontWeight="700">
-            B — AI auto-reply
-          </text>
-          <text x="0" y="251" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft}>
-            status check
-          </text>
-        </g>
-        <g className="lift-leader-label" style={{ animationDelay: "2.1s" } as CSSProperties}>
-          <text x="395" y="244" fontFamily={FONT.mono} fontSize="9" fill={COLORS.ink} fontWeight="700">
-            C — Drafted
-          </text>
-          <text x="395" y="255" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft}>
-            estimate
-          </text>
-        </g>
-        <g className="lift-leader-label" style={{ animationDelay: "2.4s" } as CSSProperties}>
-          <text x="395" y="404" fontFamily={FONT.mono} fontSize="9" fill={COLORS.red} fontWeight="700">
-            D — One-tap
-          </text>
-          <text x="395" y="415" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft}>
-            approval
-          </text>
-        </g>
-
-        {/* Bottom plate */}
-        <text x="230" y="500" textAnchor="middle" fontFamily={FONT.mono} fontSize="8" fill={COLORS.inkSoft} letterSpacing="2">
-          FIG. 1 — RO TO PAID, ONE PHONE
-        </text>
-      </svg>
-    </Box>
   );
 }
 
@@ -510,7 +375,7 @@ function SectionWedge() {
   return (
     <Box id="wedge" style={{ position: "relative", zIndex: 1, background: COLORS.paperShade }}>
       <Container size="lg" px="md" py={96}>
-        <SectionLabel num="01" title="The Wedge" />
+        <SectionLabel num="01" title="How it works" />
         <Title
           order={2}
           className="lift-h2"
@@ -562,7 +427,7 @@ function SectionWedge() {
         </Box>
 
         <Group justify="flex-start" mt={56}>
-          <a href={ctaHref("wedge")} className="lift-cta">Start your 14-day trial →</a>
+          <a href={ctaHref("wedge")} className="lift-cta">Start my free trial →</a>
         </Group>
       </Container>
     </Box>
@@ -590,8 +455,8 @@ function SmsThreadDemo() {
   return (
     <Box style={{ position: "relative", border: `1px solid ${COLORS.ink}`, background: COLORS.paper, padding: "20px 22px" }}>
       <Group justify="space-between" mb="md">
-        <Text style={{ fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.15em", color: COLORS.inkSoft }}>
-          THREAD · JESS K. · 2026-MAY-23
+        <Text style={{ fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.08em", color: COLORS.inkSoft }}>
+          ILLUSTRATIVE CUSTOMER CONVERSATION
         </Text>
         <Box style={{ width: 8, height: 8, background: COLORS.red, borderRadius: "50%" }} />
       </Group>
@@ -653,7 +518,7 @@ function SectionWho() {
   return (
     <Box style={{ position: "relative", zIndex: 1 }}>
       <Container size="lg" px="md" py={96}>
-        <SectionLabel num="02" title="The Persona" />
+        <SectionLabel num="02" title="Built for your shop" />
         <Box className="lift-grid-2-top" mt={24}>
           <Box style={{ minWidth: 0 }}>
             <Title order={2} className="lift-h2" style={{ fontFamily: FONT.display, fontSize: "2.5rem", lineHeight: 1.0, textTransform: "uppercase", color: COLORS.ink, letterSpacing: "-0.02em", margin: 0 }}>
@@ -832,8 +697,8 @@ function SectionPricing() {
           $79/mo. One price.<br />No surprises.
         </Title>
         <Text style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "1.2rem", color: COLORS.inkSoft, maxWidth: 540, margin: "0 auto", textAlign: "center", lineHeight: 1.5 }}>
-          Most shops your size get quoted $300–$400/mo from the big platforms. Lift is $79
-          because we built it for you, not for a 10-bay multi-location.
+          Repair orders, customer texting, estimates, and payments in one plan.
+          Try Lift on your next job before you decide.
         </Text>
 
         <Box mt={48} style={{ position: "relative", border: `2px solid ${COLORS.ink}`, background: COLORS.paper, padding: 0 }}>
@@ -864,7 +729,7 @@ function SectionPricing() {
               {[
                 "Unlimited ROs, customers, vehicles, photos",
                 "Unlimited AI-drafted customer messages",
-                "Dedicated two-way SMS number for your shop",
+                "Two-way customer texting in your Lift inbox",
                 "Customer pay links via Stripe (card fees pass through at cost)",
                 "One-click CSV export of everything",
               ].map((line) => (
@@ -892,10 +757,10 @@ function SectionPricing() {
 
           <Box style={{ borderTop: `2px solid ${COLORS.ink}`, padding: "28px 32px", textAlign: "center" }}>
             <a href={ctaHref("pricing")} className="lift-cta" style={{ display: "inline-block" }}>
-              Start your 14-day trial →
+              Start my free trial →
             </a>
             <Text mt={14} style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "0.95rem", color: COLORS.inkSoft }}>
-              10-minute setup. First AI-drafted estimate goes out the same afternoon.
+              Start with your email and shop details. No credit card required.
             </Text>
           </Box>
         </Box>
@@ -914,11 +779,11 @@ function SectionFAQ() {
   const faq: { q: string; a: string }[] = [
     {
       q: "Will I waste my weekend setting it up?",
-      a: "No. Onboarding is three screens: shop info, test the SMS number, start the trial. About 10 minutes. You'll send your first AI-drafted estimate the same afternoon.",
+      a: "Start with your email, then add your shop details and start the trial. Setup has two screens, and you can skip adding a credit card. Create your first repair order when you're ready.",
     },
     {
       q: "Will my customers hate AI texts?",
-      a: "You approve every word before it sends. The only auto-replies are short status-check acknowledgements (\"we're finishing brakes, ready by 4pm\") — and you can switch them off in one tap. The AI rewrites mechanic-speak into plain English, so customers usually get clearer texts, not weirder ones.",
+      a: "You review AI-drafted messages before sending. Routine status checks can receive automatic replies based on the repair order, and you can turn auto-replies off in Settings.",
     },
     {
       q: "Can I get my data out if I leave?",
@@ -930,11 +795,11 @@ function SectionFAQ() {
     },
     {
       q: "Do I need a new phone or a new number?",
-      a: "No. Lift is a web app that installs to your home screen — works on the phone you already have. We give your shop a dedicated two-way SMS number so customer texts route into Lift, not your personal inbox.",
+      a: "Use the phone you already have. Lift runs in your browser and can be added to your home screen. Customer replies appear in your Lift inbox. Shops start on a shared Lift texting number; a dedicated number is not required to get started.",
     },
     {
       q: "How is this different from Shopmonkey or AutoLeap?",
-      a: "Those are built for 10-bay shops with a dedicated service advisor. You don't need 90% of what they ship — and you're paying $300–$400/mo for the parts you do use. Lift does one thing: keep you in the bay while customers get answers.",
+      a: "Lift is built around the daily work of a 1–3 bay independent shop: repair orders, estimates, customer texts, and payments from your phone. The plan is $79/month. Try those workflows during the free trial to decide whether Lift fits your shop.",
     },
   ];
 
@@ -976,13 +841,13 @@ function FinalCTA() {
             Stay <span style={{ color: COLORS.red }}>in</span> the bay.
           </Title>
           <Text style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "1.25rem", color: COLORS.inkSoft, maxWidth: 540, textAlign: "center", lineHeight: 1.5 }}>
-            $79/mo flat. RO, AI texts, pay link — same phone, same afternoon. 14-day trial, no card. Cancel in two taps. Take your data with you if you do.
+            Try your next repair order in Lift. Send an estimate, review a customer message, and see how it fits your shop. Free for 14 days, then $79/month.
           </Text>
           <Box mt={8}>
-            <a href={ctaHref("final")} className="lift-cta">Start your 14-day trial →</a>
+            <a href={ctaHref("final")} className="lift-cta">Start my free trial →</a>
           </Box>
           <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 4 }}>
-            First AI-drafted estimate · same afternoon
+            No credit card required · Cancel anytime
           </Text>
         </Stack>
       </Container>
