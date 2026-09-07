@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Customer, RepairOrder, RoStatusEnum, Vehicle } from "@lift/shared";
 import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok } from "../../lib/response.js";
+import { isEstimateDeclined } from "./_estimate.js";
 import { roPaymentSnapshot } from "./_payments.js";
 import { customerName, vehicleSummary } from "./_rows.js";
 
@@ -65,6 +66,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         updatedAt: r.updatedAt,
         // Board cards show the visit date for scheduled ROs.
         scheduledFor: r.scheduledFor ?? null,
+        // Declined-estimate marker + "needs a reply" banner. Null unless the
+        // customer declined and hasn't since approved.
+        estimateDeclinedAt: isEstimateDeclined(r.estimate) ? r.estimate?.declinedAt ?? null : null,
+        estimateDeclineFollowedUpAt: isEstimateDeclined(r.estimate)
+          ? r.estimate?.declineFollowedUpAt ?? null
+          : null,
       };
     });
 

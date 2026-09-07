@@ -429,9 +429,10 @@ export const SaveCardDto = z.object({ customerId: objectId });
 
 // ── public (token-scoped) ───────────────────────────────────────
 export const ApproveEstimateDto = z.object({ token: z.string().min(8) });
+// Body of POST /public/estimate/{token}/decline — the token is a path param.
+// Body is optional on the wire; the customer's reason is optional too.
 export const DeclineEstimateDto = z.object({
-  token: z.string().min(8),
-  reason: z.string().optional(),
+  reason: z.string().trim().max(200).optional(),
 });
 
 // ── public booking ──────────────────────────────────────────────

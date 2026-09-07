@@ -30,6 +30,8 @@ interface EstimateLike {
   viewedAt?: Date | null;
   approvedAt?: Date | null;
   declinedAt?: Date | null;
+  declineReason?: string | null;
+  declineFollowedUpAt?: Date | null;
   publicToken?: string | null;
   approvedTotal?: number | null;
   approvedTaxTotal?: number | null;
@@ -141,6 +143,15 @@ export function estimateChangedSinceApproval(ro: RoLike): boolean {
 }
 
 /**
+ * True when the customer declined and hasn't since approved. An approval
+ * always wins over an earlier decline (the customer changed their mind), so
+ * callers should never read `declinedAt` alone.
+ */
+export function isEstimateDeclined(est: EstimateLike | null | undefined): boolean {
+  return !!est?.declinedAt && !est?.approvedAt;
+}
+
+/**
  * The approved estimate as the customer agreed to it — what the public page
  * renders once `approvedAt` is set. Labor/parts split is derived from the
  * snapshot lines (fees roll into parts, same as `recomputeTotals`).
@@ -176,12 +187,15 @@ export function approvedSnapshotView(ro: RoLike) {
 export function serializeEstimate(ro: RoLike) {
   const est = ro.estimate;
   if (!est) return null;
+  const declined = isEstimateDeclined(est);
   const changedSinceApproval = estimateChangedSinceApproval(ro);
   return {
     sentAt: est.sentAt ?? null,
     viewedAt: est.viewedAt ?? null,
     approvedAt: est.approvedAt ?? null,
-    declinedAt: est.declinedAt ?? null,
+    declinedAt: declined ? est.declinedAt ?? null : null,
+    declineReason: declined ? est.declineReason ?? null : null,
+    declineFollowedUpAt: declined ? est.declineFollowedUpAt ?? null : null,
     approvedTotal: est.approvedAt ? est.approvedTotal ?? null : null,
     approvedTaxTotal: est.approvedAt ? est.approvedTaxTotal ?? null : null,
     changedSinceApproval,

@@ -72,6 +72,12 @@ const RepairOrderSchema = new Schema(
       viewedAt: Date, // first open of the public estimate page
       approvedAt: Date,
       declinedAt: Date,
+      // Optional free-text the customer left on the public decline page.
+      declineReason: { type: String, maxlength: 200 },
+      // Set when the shop texts the customer after a decline (any outbound
+      // text on the RO, or the follow-up prompt on the RO page). Drives the
+      // "declined estimate needs a reply" board banner. Cleared on re-send.
+      declineFollowedUpAt: Date,
       publicToken: String,
       // Snapshot taken when the customer approves, so later line-item edits
       // can be flagged as "changed since approval" against the number the
