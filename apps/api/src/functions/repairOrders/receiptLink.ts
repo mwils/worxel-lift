@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { RepairOrder } from "@lift/shared";
 import { handleKnownErrors, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { ensureCustomerHistoryUrl } from "../../lib/accountLink.js";
 
 export function publicReceiptUrl(token: string): string {
   const base = (process.env.WEB_APP_URL ?? "http://localhost:5173").replace(/\/+$/, "");
@@ -17,6 +18,9 @@ export function publicReceiptUrl(token: string): string {
  * POST /messages/send, so the text lands in the customer's thread like any
  * other owner-sent message. Separate from `publicToken` because that one also
  * opens the estimate / pay pages.
+ *
+ * Also returns the customer's history-page URL (minted on first use) so the
+ * receipt text can point at every past visit, not just this one.
  */
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
@@ -32,7 +36,13 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       await ro.save();
     }
 
-    return ok({ url: publicReceiptUrl(ro.receiptToken), token: ro.receiptToken });
+    const historyUrl = await ensureCustomerHistoryUrl(ro.customerId);
+
+    return ok({
+      url: publicReceiptUrl(ro.receiptToken),
+      token: ro.receiptToken,
+      historyUrl,
+    });
   } catch (err) {
     const known = handleKnownErrors(err);
     if (known) return known;

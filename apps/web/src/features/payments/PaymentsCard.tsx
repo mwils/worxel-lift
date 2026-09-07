@@ -278,6 +278,7 @@ function buildReceiptBody(args: {
   roNumber: number;
   balanceCents: number;
   url: string;
+  historyUrl?: string | null;
 }): string {
   const veh = args.vehicleSummary && args.vehicleSummary !== "—" ? args.vehicleSummary : "vehicle";
   const lines = [
@@ -286,6 +287,7 @@ function buildReceiptBody(args: {
     )}): ${args.url}`,
   ];
   if (args.balanceCents > 0) lines.push(`${formatMoney(args.balanceCents)} is still open on this one.`);
+  if (args.historyUrl) lines.push(`Your full history: ${args.historyUrl}`);
   lines.push("Reply here with any questions.");
   return lines.join(" ");
 }
@@ -306,7 +308,9 @@ function TextReceiptModal(props: TextReceiptModalProps) {
     let cancelled = false;
     setPreparing(true);
     api
-      .post<{ url: string }>(`/repair-orders/${repairOrderId}/receipt-link`)
+      .post<{ url: string; historyUrl?: string | null }>(
+        `/repair-orders/${repairOrderId}/receipt-link`
+      )
       .then((res) => {
         if (cancelled) return;
         setUrl(res.url);
@@ -318,6 +322,7 @@ function TextReceiptModal(props: TextReceiptModalProps) {
             roNumber,
             balanceCents,
             url: res.url,
+            historyUrl: res.historyUrl,
           })
         );
       })

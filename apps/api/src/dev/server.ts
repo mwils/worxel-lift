@@ -43,6 +43,7 @@ import { handler as customersCreate } from "../functions/customers/create.js";
 import { handler as customersGet } from "../functions/customers/get.js";
 import { handler as customersPatch } from "../functions/customers/patch.js";
 import { handler as customersHistory } from "../functions/customers/history.js";
+import { handler as customersHistoryLink } from "../functions/customers/historyLink.js";
 
 import { handler as vehiclesCreate } from "../functions/vehicles/create.js";
 import { handler as vehiclesPatch } from "../functions/vehicles/patch.js";
@@ -89,6 +90,7 @@ import { handler as publicApproveEstimate } from "../functions/public/approveEst
 import { handler as publicDeclineEstimate } from "../functions/public/declineEstimate.js";
 import { handler as publicGetPay } from "../functions/public/getPay.js";
 import { handler as publicPay } from "../functions/public/pay.js";
+import { handler as publicGetAccount } from "../functions/public/getAccount.js";
 
 // ── Server ──────────────────────────────────────────────────────
 const app = express();
@@ -139,6 +141,7 @@ app.post("/customers", toExpress(customersCreate));
 app.get("/customers/:id", toExpress(customersGet));
 app.patch("/customers/:id", toExpress(customersPatch));
 app.get("/customers/:id/history", toExpress(customersHistory));
+app.post("/customers/:id/history-link", toExpress(customersHistoryLink));
 
 // vehicles
 app.post("/vehicles", toExpress(vehiclesCreate));
@@ -187,6 +190,7 @@ app.post("/public/estimate/:token/approve", toExpress(publicApproveEstimate));
 app.post("/public/estimate/:token/decline", toExpress(publicDeclineEstimate));
 app.get("/public/pay/:token", toExpress(publicGetPay));
 app.post("/public/pay/:token", toExpress(publicPay));
+app.get("/public/account/:token", toExpress(publicGetAccount));
 
 // dev-only: simulate an inbound SMS by hand-rolling an SNS event and
 // invoking the snsInbound Lambda handler directly. Lets us exercise the

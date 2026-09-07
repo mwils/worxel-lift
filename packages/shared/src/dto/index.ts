@@ -196,6 +196,11 @@ export const CreateCustomerDto = z.object({
   notes: z.string().trim().optional(),
   taxExempt: z.boolean().optional(),
 });
+// POST /customers/:id/history-link. Body is optional; `rotate` mints a new
+// token and kills every history link already texted to this customer.
+export const CustomerHistoryLinkDto = z.object({
+  rotate: z.boolean().optional().default(false),
+});
 // PATCH semantics: undefined leaves a field alone, null clears it.
 export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
   // Blank after cleanup clears the field, same as an explicit null.
