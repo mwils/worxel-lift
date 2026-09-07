@@ -8,6 +8,7 @@ import {
   IconSettings,
   IconLogout,
   IconClipboardList,
+  IconHistory,
   IconMailExclamation,
   IconNews,
 } from "@tabler/icons-react";
@@ -60,6 +61,7 @@ function ConfirmEmailBanner({ email }: { email: string }) {
 
 const NAV = [
   { to: "/", label: "Board", icon: IconLayoutBoard, end: true },
+  { to: "/ros", label: "History", icon: IconHistory },
   { to: "/customers", label: "Customers", icon: IconUsers },
   { to: "/messages", label: "Messages", icon: IconMessage2 },
   { to: "/templates", label: "Saved jobs", icon: IconClipboardList },

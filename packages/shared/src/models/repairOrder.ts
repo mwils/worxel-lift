@@ -149,6 +149,9 @@ const RepairOrderSchema = new Schema(
 );
 
 RepairOrderSchema.index({ shopId: 1, status: 1, updatedAt: -1 });
+// RO history (/repair-orders/history): the list date is `completedAt ?? updatedAt`,
+// queried as an $or so both branches ride this one index.
+RepairOrderSchema.index({ shopId: 1, completedAt: -1, updatedAt: -1 });
 RepairOrderSchema.index({ shopId: 1, number: 1 }, { unique: true });
 RepairOrderSchema.index({ shopId: 1, customerId: 1, createdAt: -1 });
 RepairOrderSchema.index({ shopId: 1, vehicleId: 1, createdAt: -1 });

@@ -14,6 +14,7 @@ const NewRoRoute = lazy(() => import("./routes/app/ro/new").then((m) => ({ defau
 const RoDetailRoute = lazy(() =>
   import("./routes/app/ro/detail").then((m) => ({ default: m.RoDetailRoute }))
 );
+const RosRoute = lazy(() => import("./routes/app/ros").then((m) => ({ default: m.RosRoute })));
 const CustomersRoute = lazy(() =>
   import("./routes/app/customers").then((m) => ({ default: m.CustomersRoute }))
 );
@@ -116,6 +117,7 @@ export function App() {
           <Route index element={<BoardRoute />} />
           <Route path="ro/new" element={<NewRoRoute />} />
           <Route path="ro/:id" element={<RoDetailRoute />} />
+          <Route path="ros" element={<RosRoute />} />
           <Route path="customers" element={<CustomersRoute />} />
           <Route path="customers/:id" element={<CustomerDetailRoute />} />
           <Route path="vehicles/:id" element={<VehicleDetailRoute />} />
