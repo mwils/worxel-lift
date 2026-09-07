@@ -25,7 +25,11 @@ export const handler: APIGatewayProxyHandlerV2 = withErrorBoundary(async (event)
         "estimate.approvedLineItems": stamp.approvedLineItems,
         status: "in_repair",
       },
-      $unset: { "estimate.declinedAt": "" },
+      $unset: {
+        "estimate.declinedAt": "",
+        "estimate.declineReason": "",
+        "estimate.declineFollowedUpAt": "",
+      },
     },
     { new: true }
   );
