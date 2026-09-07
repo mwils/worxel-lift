@@ -53,6 +53,9 @@ const PublicInspectionRoute = lazy(() =>
 const PublicReceiptRoute = lazy(() =>
   import("./routes/public/receipt").then((m) => ({ default: m.PublicReceiptRoute }))
 );
+const PublicAccountRoute = lazy(() =>
+  import("./routes/public/account").then((m) => ({ default: m.PublicAccountRoute }))
+);
 
 function RouteFallback() {
   return (
@@ -81,6 +84,7 @@ export function App() {
         <Route path="/public/pay/:token" element={<PublicPayRoute />} />
         <Route path="/public/inspection/:token" element={<PublicInspectionRoute />} />
         <Route path="/public/receipt/:token" element={<PublicReceiptRoute />} />
+        <Route path="/public/account/:token" element={<PublicAccountRoute />} />
 
         {/* Auth flow */}
         <Route path="/login" element={me ? <Navigate to="/" replace /> : <LoginRoute />} />

@@ -260,6 +260,10 @@ export default $config({
       "GET /customers/{id}/history",
       fn("apps/api/src/functions/customers/history.handler")
     );
+    api.route(
+      "POST /customers/{id}/history-link",
+      fn("apps/api/src/functions/customers/historyLink.handler")
+    );
 
     // vehicles
     api.route("POST /vehicles", fn("apps/api/src/functions/vehicles/create.handler"));
@@ -454,6 +458,7 @@ export default $config({
       fn("apps/api/src/functions/public/declineEstimate.handler")
     );
     api.route("GET /public/receipt/{token}", fn("apps/api/src/functions/public/getReceipt.handler"));
+    api.route("GET /public/account/{token}", fn("apps/api/src/functions/public/getAccount.handler"));
     api.route("GET /public/pay/{token}", fn("apps/api/src/functions/public/getPay.handler"));
     api.route("POST /public/pay/{token}", fn("apps/api/src/functions/public/pay.handler"));
     api.route(

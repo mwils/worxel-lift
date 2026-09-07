@@ -8,6 +8,7 @@ import {
   Card,
   Collapse,
   Group,
+  Menu,
   Modal,
   Stack,
   Text,
@@ -18,17 +19,22 @@ import { notifications } from "@mantine/notifications";
 import {
   IconChevronDown,
   IconChevronRight,
+  IconDotsVertical,
   IconPencil,
   IconPhone,
   IconPlus,
+  IconRefresh,
+  IconSend,
 } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import { notifyError } from "../../../lib/notify";
 import { formatMoney, formatPhone, formatRoNumber, relativeTime } from "../../../lib/format";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
 import { VehicleCard } from "../../../features/vehicle/VehicleCard";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { CustomerStatsStrip } from "../../../features/customer/CustomerStatsStrip";
+import { TextHistoryLinkModal } from "../../../features/customer/TextHistoryLinkModal";
 import { CustomerRemindersPanel } from "../../../features/reminders/CustomerRemindersPanel";
 import type { z } from "zod";
 import type { CreateVehicleDto } from "@lift/shared/dto";
@@ -105,9 +111,11 @@ type VehicleInput = z.infer<typeof CreateVehicleDto>;
 export function CustomerDetailRoute() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { me } = useAuth();
   const [vehicleModal, vehicleModalCtl] = useDisclosure(false);
   const [editModal, editModalCtl] = useDisclosure(false);
   const [messagesOpen, messagesCtl] = useDisclosure(false);
+  const [historyLinkModal, historyLinkModalCtl] = useDisclosure(false);
 
   const { data, isPending } = useQuery({
     queryKey: ["customer-history", id],
@@ -142,6 +150,19 @@ export function CustomerDetailRoute() {
       editModalCtl.close();
     },
     onError: (err) => notifyError(err, { title: "Couldn't save changes" }),
+  });
+
+  // Kills every history link already texted to this customer and mints a new
+  // one — for a phone that changed hands, or a customer who asks.
+  const rotateHistoryLink = useMutation({
+    mutationFn: () => api.post(`/customers/${id}/history-link`, { rotate: true }),
+    onSuccess: () => {
+      notifications.show({
+        color: "green",
+        message: "New history link made. The old one no longer works — text them the new one.",
+      });
+    },
+    onError: (err) => notifyError(err, { title: "Couldn't rotate the link" }),
   });
 
   if (isPending) return <Text c="dimmed">Loading…</Text>;
@@ -223,14 +244,45 @@ export function CustomerDetailRoute() {
               </Badge>
             )}
           </Stack>
-          <Button
-            component={Link}
-            to={`/ro/new?customerId=${customer.id}`}
-            leftSection={<IconPlus size={16} />}
-            style={{ minHeight: 44 }}
-          >
-            New RO
-          </Button>
+          <Group gap="xs" wrap="nowrap" align="flex-start">
+            <Button
+              variant="default"
+              leftSection={<IconSend size={16} />}
+              style={{ minHeight: 44 }}
+              onClick={historyLinkModalCtl.open}
+            >
+              Text history link
+            </Button>
+            <Button
+              component={Link}
+              to={`/ro/new?customerId=${customer.id}`}
+              leftSection={<IconPlus size={16} />}
+              style={{ minHeight: 44 }}
+            >
+              New RO
+            </Button>
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  aria-label="More customer actions"
+                >
+                  <IconDotsVertical size={18} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  leftSection={<IconRefresh size={14} />}
+                  disabled={rotateHistoryLink.isPending}
+                  onClick={() => rotateHistoryLink.mutate()}
+                >
+                  Rotate history link
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
         </Group>
 
         {customer.notes && (
@@ -393,6 +445,14 @@ export function CustomerDetailRoute() {
           </Collapse>
         )}
       </Stack>
+
+      <TextHistoryLinkModal
+        opened={historyLinkModal}
+        onClose={historyLinkModalCtl.close}
+        customer={{ id: customer.id, firstName: customer.firstName }}
+        shopName={me?.shop?.name ?? "the shop"}
+        onSent={() => qc.invalidateQueries({ queryKey: ["customer-history", id] })}
+      />
 
       <Modal
         opened={editModal}

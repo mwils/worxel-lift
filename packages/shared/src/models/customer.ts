@@ -13,6 +13,11 @@ const CustomerSchema = new Schema(
     // Resale / farm / government accounts: no sales tax on their ROs.
     taxExempt: { type: Boolean, default: false },
     stripeCustomerId: String,
+    // Customer-side token for the public history page (/public/account/:token).
+    // Minted on first use (receipt text, booking confirmation, "Text history
+    // link"); rotated from the customer page. Sparse so unminted docs don't
+    // collide on the unique index.
+    publicToken: { type: String, unique: true, sparse: true, index: true },
     // Prior numbers, newest last. The thread stays keyed by customerId, so
     // this is how we know which texts went to which number.
     phoneHistory: {
