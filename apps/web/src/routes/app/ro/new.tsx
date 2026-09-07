@@ -26,6 +26,11 @@ import { useAuth } from "../../../lib/auth";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
 import { VehicleForm } from "../../../features/vehicle/VehicleForm";
 import { CustomerMatchBanner } from "../../../features/customer/CustomerMatchBanner";
+import {
+  DuplicateCustomerModal,
+  duplicatesFromError,
+  type DuplicateCandidate,
+} from "../../../features/customer/DuplicateCustomerModal";
 import { VehicleMatchBanner } from "../../../features/vehicle/VehicleMatchBanner";
 import { VoiceCaptureButton } from "../../../features/voice/VoiceCaptureButton";
 import type { CustomerMatch, VehicleMatch } from "../../../lib/useVoiceTranscribe";
@@ -144,16 +149,30 @@ export function NewRoRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 409 from POST /customers: same name, different phone. Ask before making
+  // a second record for the same person.
+  const [dupes, setDupes] = useState<DuplicateCandidate[] | null>(null);
+  const [pendingCustomer, setPendingCustomer] = useState<CreateCustomerInput | null>(null);
+
   const createCustomer = useMutation({
-    mutationFn: (values: CreateCustomerInput) =>
+    mutationFn: (values: CreateCustomerInput & { force?: boolean }) =>
       api.post<{ customer: CustomerOption }>("/customers", values),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["customers"] });
+      setDupes(null);
+      setPendingCustomer(null);
       setSelectedCustomerId(res.customer.id);
       setCustomerMode("existing");
       setStep(1);
     },
-    onError: (err) => notifyError(err, { title: "Couldn't add customer" }),
+    onError: (err) => {
+      const candidates = duplicatesFromError(err);
+      if (candidates) {
+        setDupes(candidates);
+        return;
+      }
+      notifyError(err, { title: "Couldn't add customer" });
+    },
   });
 
   const createVehicle = useMutation({
@@ -302,9 +321,39 @@ export function NewRoRoute() {
                   submitLabel="Create customer & continue"
                   loading={createCustomer.isPending}
                   onSubmit={async (values) => {
-                    await createCustomer.mutateAsync(values);
+                    setPendingCustomer(values);
+                    try {
+                      await createCustomer.mutateAsync(values);
+                    } catch {
+                      // Handled in onError — a 409 opens the duplicate prompt.
+                    }
                   }}
                   onMatchesFound={setCustomerMatches}
+                />
+                <DuplicateCustomerModal
+                  opened={!!dupes}
+                  candidates={dupes ?? []}
+                  typedName={
+                    pendingCustomer
+                      ? [pendingCustomer.firstName, pendingCustomer.lastName]
+                          .filter(Boolean)
+                          .join(" ")
+                      : ""
+                  }
+                  loading={createCustomer.isPending}
+                  onClose={() => setDupes(null)}
+                  onUseExisting={(cid) => {
+                    setDupes(null);
+                    setSelectedCustomerId(cid);
+                    setSelectedVehicleId(null);
+                    setCustomerMode("existing");
+                    setStep(1);
+                  }}
+                  onCreateAnyway={() => {
+                    if (pendingCustomer) {
+                      createCustomer.mutate({ ...pendingCustomer, force: true });
+                    }
+                  }}
                 />
               </Stack>
             )}

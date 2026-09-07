@@ -1,12 +1,28 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import mongoose from "mongoose";
-import { Customer, Message, Payment, RepairOrder, Vehicle } from "@lift/shared";
-import { withAuth } from "../../lib/middleware.js";
+import { z } from "zod";
+import { Customer, Payment, RepairOrder, Vehicle } from "@lift/shared";
+import { handleKnownErrors, parseQuery, withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
 import { roPaymentSnapshot } from "../repairOrders/_payments.js";
+import { resolveCustomerByIdOrAlias } from "./_resolve.js";
 
 const RECENT_RO_LIMIT = 10;
-const RECENT_MESSAGE_LIMIT = 20;
+
+/**
+ * Activity is paged newest-first with an `_id` cursor (same shape as
+ * vehicles/history). `since` scopes the page to a window — the customer page
+ * sends the last 12 months and drops it for "Show older" — while the stats
+ * facets stay all-time.
+ */
+const HistoryQuery = z.object({
+  cursor: z
+    .string()
+    .regex(/^[a-f0-9]{24}$/i, "invalid cursor")
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(RECENT_RO_LIMIT),
+  since: z.string().datetime().optional(),
+});
 
 // Spend sums Payment rows. ROs marked paid in round 1 have no row yet (until
 // scripts/backfillPayments.ts runs) — for those only, fall back to what the
@@ -26,25 +42,31 @@ const LEGACY_COLLECTED_EXPR = {
 };
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
+  try {
   if (!user.shopId) return badRequest("No shop on session");
   const id = event.pathParameters?.id;
   if (!id || !mongoose.isValidObjectId(id)) return badRequest("Missing customer id");
+  const { cursor, limit, since } = parseQuery(event, HistoryQuery);
 
-  const customer = await Customer.findOne({ _id: id, shopId: user.shopId }).lean();
-  if (!customer) return notFound("Customer not found");
+  const resolved = await resolveCustomerByIdOrAlias(user.shopId, id);
+  if (!resolved) return notFound("Customer not found");
+  const { customer, redirectedFrom } = resolved;
 
   const shopOid = new mongoose.Types.ObjectId(user.shopId);
   const customerOid = new mongoose.Types.ObjectId(String(customer._id));
 
+  // Activity page filter: the window (if any) plus the cursor.
+  const pageMatch: Record<string, unknown> = {};
+  if (since) pageMatch.createdAt = { $gte: new Date(since) };
+  if (cursor) pageMatch._id = { $lt: new mongoose.Types.ObjectId(cursor) };
+
   // Single aggregation: customer-level stats + per-vehicle stats + recent ROs.
   // Faceting trims us to one MongoDB round-trip instead of N + 3.
-  const [vehicles, messages, [agg], paymentsByVehicle] = await Promise.all([
+  const [allVehicles, [agg], paymentsByVehicle, duplicateOf] = await Promise.all([
+    // Archived (sold / totalled) cars come back too — they're split into
+    // their own section below, not dropped.
     Vehicle.find({ shopId: user.shopId, customerId: customer._id })
       .sort({ updatedAt: -1 })
-      .lean(),
-    Message.find({ shopId: user.shopId, customerId: customer._id })
-      .sort({ sentAt: -1 })
-      .limit(RECENT_MESSAGE_LIMIT)
       .lean(),
     RepairOrder.aggregate<{
       customerStats: Array<{
@@ -109,8 +131,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
             },
           ],
           recentRepairOrders: [
-            { $sort: { createdAt: -1 } },
-            { $limit: RECENT_RO_LIMIT },
+            ...(Object.keys(pageMatch).length ? [{ $match: pageMatch }] : []),
+            { $sort: { createdAt: -1, _id: -1 } },
+            // +1 row tells us whether an older page exists.
+            { $limit: limit + 1 },
             {
               $project: {
                 _id: 1,
@@ -136,6 +160,14 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       { $match: { shopId: shopOid, customerId: customerOid, status: "succeeded" } },
       { $group: { _id: "$vehicleId", cents: { $sum: "$amountCents" } } },
     ]),
+    // Online booking flagged this record as maybe the same person as an
+    // existing one (same name + same vehicle, different phone). Surfaces the
+    // Merge banner on the customer page.
+    customer.possibleDuplicateOf
+      ? Customer.findOne({ _id: customer.possibleDuplicateOf, shopId: user.shopId })
+          .select({ firstName: 1, lastName: 1, phone: 1, email: 1 })
+          .lean()
+      : Promise.resolve(null),
   ]);
 
   const customerStats = agg?.customerStats?.[0] ?? {
@@ -159,7 +191,42 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
     perVehicleMap.set(String(v._id), v);
   }
 
+  const vehicles = allVehicles.filter((v) => !v.archivedAt);
+  const archivedVehicles = allVehicles.filter((v) => !!v.archivedAt);
+
+  const roPage = agg?.recentRepairOrders ?? [];
+  const hasMoreActivity = roPage.length > limit;
+  const activity = hasMoreActivity ? roPage.slice(0, limit) : roPage;
+  const nextActivityCursor = hasMoreActivity
+    ? String(activity[activity.length - 1]?._id ?? "")
+    : null;
+
+  function serializeVehicle(v: (typeof allVehicles)[number]) {
+    const s = perVehicleMap.get(String(v._id));
+    return {
+      id: String(v._id),
+      vin: v.vin ?? null,
+      year: v.year ?? null,
+      make: v.make ?? null,
+      model: v.model ?? null,
+      trim: v.trim ?? null,
+      engine: v.engine ?? null,
+      mileage: v.mileage ?? null,
+      plate: v.plate ?? null,
+      color: v.color ?? null,
+      notes: v.notes ?? null,
+      archivedAt: v.archivedAt ?? null,
+      roCount: s?.roCount ?? 0,
+      lastServicedAt: s?.lastServicedAt ?? null,
+      lastConcern: s?.lastConcern ?? null,
+      lifetimeSpendCents: (paidByVehicle.get(String(v._id)) ?? 0) + (s?.legacySpendCents ?? 0),
+    };
+  }
+
   return ok({
+    // Set when the requested id was a merged-away duplicate — the UI swaps
+    // the URL for the survivor's.
+    redirectedFrom,
     customer: {
       id: String(customer._id),
       firstName: customer.firstName,
@@ -170,7 +237,24 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       smsOptInAt: customer.smsOptInAt ?? null,
       smsOptOutAt: customer.smsOptOutAt ?? null,
       createdAt: customer.createdAt,
+      // Names/phones of customers merged into this one — shown under the
+      // header so "who was Dale Obrien?" has an answer.
+      aliases: (customer.aliases ?? []).map((a) => ({
+        firstName: a.firstName,
+        lastName: a.lastName ?? null,
+        phone: a.phone,
+        mergedAt: a.mergedAt,
+      })),
     },
+    possibleDuplicate: duplicateOf
+      ? {
+          id: String(duplicateOf._id),
+          firstName: duplicateOf.firstName,
+          lastName: duplicateOf.lastName ?? null,
+          phone: duplicateOf.phone,
+          email: duplicateOf.email ?? null,
+        }
+      : null,
     stats: {
       vehicleCount: vehicles.length,
       roCount: customerStats.roCount,
@@ -179,27 +263,11 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       firstVisitAt: customerStats.firstVisitAt,
       lastVisitAt: customerStats.lastVisitAt,
     },
-    vehicles: vehicles.map((v) => {
-      const s = perVehicleMap.get(String(v._id));
-      return {
-        id: String(v._id),
-        vin: v.vin ?? null,
-        year: v.year ?? null,
-        make: v.make ?? null,
-        model: v.model ?? null,
-        trim: v.trim ?? null,
-        engine: v.engine ?? null,
-        mileage: v.mileage ?? null,
-        plate: v.plate ?? null,
-        color: v.color ?? null,
-        notes: v.notes ?? null,
-        roCount: s?.roCount ?? 0,
-        lastServicedAt: s?.lastServicedAt ?? null,
-        lastConcern: s?.lastConcern ?? null,
-        lifetimeSpendCents: (paidByVehicle.get(String(v._id)) ?? 0) + (s?.legacySpendCents ?? 0),
-      };
-    }),
-    recentRepairOrders: (agg?.recentRepairOrders ?? []).map((r) => ({
+    vehicles: vehicles.map(serializeVehicle),
+    archivedVehicles: archivedVehicles.map(serializeVehicle),
+    hasMoreActivity,
+    nextActivityCursor,
+    recentRepairOrders: activity.map((r) => ({
       id: String(r._id),
       number: r.number,
       status: r.status,
@@ -213,17 +281,10 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       updatedAt: r.updatedAt,
       completedAt: r.completedAt ?? null,
     })),
-    recentMessages: messages.map((m) => ({
-      id: String(m._id),
-      direction: m.direction,
-      kind: m.kind ?? "sms",
-      body: m.body,
-      sentAt: m.sentAt,
-      aiDrafted: m.aiDrafted,
-      inboundClassification: m.inboundClassification ?? null,
-      autoReplied: m.autoReplied,
-      automated: m.automated ?? false,
-      deliveryStatus: m.deliveryStatus ?? null,
-    })),
   });
+  } catch (err) {
+    const known = handleKnownErrors(err);
+    if (known) return known;
+    throw err;
+  }
 });

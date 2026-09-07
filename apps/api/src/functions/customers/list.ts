@@ -72,6 +72,12 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         { lastName: rx },
         { phone: rx },
         { email: rx },
+        // Merged-away duplicates: their old name and number still find the
+        // survivor (see customers/merge.ts).
+        { "aliases.firstName": rx },
+        { "aliases.lastName": rx },
+        { "aliases.phone": rx },
+        { "phoneHistory.phone": rx },
         ...(matchedCustomerIds.length > 0 ? [{ _id: { $in: matchedCustomerIds } }] : []),
       ];
     }

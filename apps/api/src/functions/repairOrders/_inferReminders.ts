@@ -5,6 +5,7 @@ import {
   SERVICE_INTERVALS,
   SERVICE_KEYWORDS,
   ServiceReminder,
+  Vehicle,
   type ServiceCategory,
 } from "@lift/shared";
 
@@ -49,6 +50,14 @@ export async function inferServiceReminders(args: {
     .select("smsOptOutAt")
     .lean();
   if (customer?.smsOptOutAt) {
+    return { created: 0, updated: 0, skipped: true };
+  }
+
+  // Archived (sold / totalled) vehicle: no future service to remind about.
+  const vehicle = await Vehicle.findOne({ _id: ro.vehicleId, shopId: args.shopId })
+    .select("archivedAt")
+    .lean();
+  if (vehicle?.archivedAt) {
     return { created: 0, updated: 0, skipped: true };
   }
 

@@ -207,7 +207,14 @@ export const UpdateCustomerDto = CreateCustomerDto.partial().extend({
   lastName: cleanText.transform((s) => (s.length ? s : null)).nullable().optional(),
   email: z.string().email().nullable().optional(),
   notes: z.string().nullable().optional(),
+  // Only clearing is allowed here ("Not the same person"); booking sets it.
+  possibleDuplicateOf: z.null().optional(),
 });
+// POST /customers/{id}/merge — {id} is merged INTO `intoCustomerId` and deleted.
+export const MergeCustomerDto = z.object({
+  intoCustomerId: objectId,
+});
+export type MergeCustomerInput = z.infer<typeof MergeCustomerDto>;
 
 // ── vehicles ────────────────────────────────────────────────────
 export const CreateVehicleDto = z.object({

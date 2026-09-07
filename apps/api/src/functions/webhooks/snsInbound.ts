@@ -105,6 +105,16 @@ export const handler: SNSHandler = async (event) => {
       let customer = shop
         ? await Customer.findOne({ shopId: shop._id, phone: originationNumber }).lean()
         : null;
+      // A merged-away duplicate's number lives in the survivor's phoneHistory.
+      // Dedicated-number mode only — the shop is known, so this can't cross tenants.
+      if (shop && !customer) {
+        customer = await Customer.findOne({
+          shopId: shop._id,
+          "phoneHistory.phone": originationNumber,
+        })
+          .sort({ updatedAt: -1 })
+          .lean();
+      }
 
       if (!shop) {
         const candidates = await Customer.find({ phone: originationNumber }).limit(2).lean();

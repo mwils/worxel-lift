@@ -18,6 +18,10 @@ const VehicleSchema = new Schema(
     plateNormalized: String,
     color: String,
     notes: String,
+    // Sold / totalled. Hidden from pickers, booking match and service
+    // reminders; still attached to its historical ROs and listed under
+    // "Archived" on the customer page. Unset = active.
+    archivedAt: Date,
   },
   { timestamps: true }
 );

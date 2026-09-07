@@ -32,6 +32,29 @@ const CustomerSchema = new Schema(
       ],
       default: undefined,
     },
+    // Set by online booking when the booker's name + vehicle match an
+    // existing customer whose phone differs. Never auto-merged — the shop
+    // sees a banner offering Merge / Not the same. Cleared on either.
+    possibleDuplicateOf: { type: Schema.Types.ObjectId, ref: "Customer" },
+    // Customers merged INTO this one. The merged record is deleted; its
+    // identity lives on here so old links redirect and both names/phones
+    // stay searchable. `customerId` is the deleted record's id.
+    aliases: {
+      type: [
+        new Schema(
+          {
+            customerId: { type: Schema.Types.ObjectId, required: true },
+            firstName: { type: String, required: true },
+            lastName: String,
+            phone: { type: String, required: true }, // E.164
+            email: String,
+            mergedAt: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: undefined,
+    },
   },
   { timestamps: true }
 );
@@ -41,6 +64,9 @@ CustomerSchema.index({ shopId: 1, phone: 1 }, { unique: true });
 // routed to a shop by looking up the sender's phone (see snsInbound).
 CustomerSchema.index({ phone: 1 });
 CustomerSchema.index({ shopId: 1, lastName: 1, firstName: 1 });
+// Old links to a merged-away customer resolve to the survivor through this.
+CustomerSchema.index({ shopId: 1, "aliases.customerId": 1 }, { sparse: true });
+CustomerSchema.index({ shopId: 1, possibleDuplicateOf: 1 }, { sparse: true });
 
 export type CustomerDoc = InferSchemaType<typeof CustomerSchema> & { _id: mongoose.Types.ObjectId };
 

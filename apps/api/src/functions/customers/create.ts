@@ -1,13 +1,19 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
+import { z } from "zod";
 import { CreateCustomerDto, Customer } from "@lift/shared";
+import { findPossibleDuplicates } from "../../lib/findDuplicates.js";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
-import { badRequest, created, ok } from "../../lib/response.js";
+import { badRequest, conflict, created, ok } from "../../lib/response.js";
 import { sendOptInConfirmation } from "./_optIn.js";
+
+// `force` is create-only (the UI's "Create anyway"); kept out of the shared
+// DTO so UpdateCustomerDto's $set loop can never write it to a document.
+const CreateBody = CreateCustomerDto.extend({ force: z.boolean().optional() });
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   try {
     if (!user.shopId) return badRequest("No shop on session");
-    const dto = await parseBody(event, CreateCustomerDto);
+    const dto = await parseBody(event, CreateBody);
 
     // Idempotent on the unique (shopId, phone) index: if this phone already exists,
     // return the existing customer instead of throwing a duplicate-key error.
@@ -24,6 +30,25 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
           smsOptInAt: existing.smsOptInAt ?? null,
         },
       });
+    }
+
+    // Same person, different phone? Ask before creating a second record.
+    // Phone matched nothing, so this is name (last name + first initial,
+    // punctuation-insensitive) or email. 409 with the candidates; the UI
+    // re-posts with force:true for "Create anyway".
+    if (!dto.force) {
+      const candidates = await findPossibleDuplicates({
+        shopId: user.shopId,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        email: dto.email,
+      });
+      if (candidates.length > 0) {
+        return conflict("A customer with a similar name already exists", {
+          reason: "possible_duplicates",
+          candidates,
+        });
+      }
     }
 
     const customer = await Customer.create({

@@ -1,17 +1,26 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { Customer, Vehicle } from "@lift/shared";
+import { Vehicle } from "@lift/shared";
 import { withAuth } from "../../lib/middleware.js";
 import { badRequest, notFound, ok } from "../../lib/response.js";
+import { resolveCustomerByIdOrAlias } from "./_resolve.js";
 
 export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }) => {
   if (!user.shopId) return badRequest("No shop on session");
   const id = event.pathParameters?.id;
   if (!id) return badRequest("Missing customer id");
 
-  const customer = await Customer.findOne({ _id: id, shopId: user.shopId }).lean();
-  if (!customer) return notFound("Customer not found");
+  // Follows the merge trail so links to a merged-away duplicate still work.
+  const resolved = await resolveCustomerByIdOrAlias(user.shopId, id);
+  if (!resolved) return notFound("Customer not found");
+  const { customer } = resolved;
 
-  const vehicles = await Vehicle.find({ shopId: user.shopId, customerId: customer._id })
+  // Pickers (RO wizard) read this — archived (sold / totalled) cars stay
+  // out. The customer page uses /history, which returns them separately.
+  const vehicles = await Vehicle.find({
+    shopId: user.shopId,
+    customerId: customer._id,
+    archivedAt: null,
+  })
     .sort({ updatedAt: -1 })
     .lean();
 
