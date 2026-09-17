@@ -24,15 +24,26 @@ export const handler: APIGatewayProxyHandlerV2 = withOwnerAuth(async ({ user }) 
   let accountId = shop.stripe?.connectAccountId;
   if (!accountId) {
     const owner = await User.findById(shop.ownerUserId).lean();
-    const account = await s.accounts.create(
-      {
-        type: "standard",
-        email: owner?.email,
-        business_profile: { name: shop.name },
-        metadata: { shopId: String(shop._id) },
-      },
-      { idempotencyKey: `connect-account-${String(shop._id)}` }
-    );
+    // Idempotency key is per ATTEMPT, not per shop. Overlapping clicks or a
+    // Lambda retry share the key and yield one account; a failed attempt burns
+    // its key so the next click is a real request, not a ~24h replay of the
+    // cached error (Stripe's fraud-check block looked permanent because of this).
+    const attempt = shop.stripe?.connectCreateAttempt ?? 0;
+    let account;
+    try {
+      account = await s.accounts.create(
+        {
+          type: "standard",
+          email: owner?.email,
+          business_profile: { name: shop.name },
+          metadata: { shopId: String(shop._id) },
+        },
+        { idempotencyKey: `connect-account-${String(shop._id)}-${attempt}` }
+      );
+    } catch (err) {
+      await Shop.updateOne({ _id: shop._id }, { $inc: { "stripe.connectCreateAttempt": 1 } });
+      throw err;
+    }
     accountId = account.id;
     shop.set("stripe.connectAccountId", accountId);
     shop.set("stripe.connectChargesEnabled", false);

@@ -42,6 +42,10 @@ const ShopSchema = new Schema(
       connectAccountId: String,
       connectChargesEnabled: Boolean,
       connectDetailsSubmitted: Boolean,
+      // Bumped after each FAILED accounts.create so the next try gets a fresh
+      // idempotency key. Stripe replays a cached error under the same key for
+      // ~24h, which kept a lifted fraud-check block looking active.
+      connectCreateAttempt: Number,
     },
 
     billing: {
