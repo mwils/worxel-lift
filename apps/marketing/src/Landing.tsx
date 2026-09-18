@@ -50,6 +50,10 @@ const track = (name: string, params?: Record<string, string>) => {
   if (typeof g === "function") g("event", name, params ?? {});
 };
 
+/** Business contact line for the founder section and footer (call or text). */
+const CONTACT_PHONE_DISPLAY = "(864) 310-0337";
+const CONTACT_PHONE_HREF = "tel:+18643100337";
+
 /** One label everywhere. The brief forbids rotating CTA copy. */
 const CTA_LABEL = "Try it on one RO →";
 
@@ -805,6 +809,10 @@ function SectionFounder() {
               <Anchor href="mailto:lift@worxel.com" style={{ fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "none", color: COLORS.ink, textDecoration: "underline", textUnderlineOffset: 3 }}>
                 lift@worxel.com
               </Anchor>
+              {" "}·{" "}
+              <Anchor href={CONTACT_PHONE_HREF} style={{ fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "none", color: COLORS.ink, textDecoration: "underline", textUnderlineOffset: 3, whiteSpace: "nowrap" }}>
+                {CONTACT_PHONE_DISPLAY}
+              </Anchor>
             </Text>
           </Box>
         </Box>
@@ -982,6 +990,7 @@ function Colophon() {
             <FooterLink href="/terms">Terms</FooterLink>
             <FooterLink href="/privacy">Privacy</FooterLink>
             <FooterLink href="mailto:lift@worxel.com">lift@worxel.com</FooterLink>
+            <FooterLink href={CONTACT_PHONE_HREF}>{CONTACT_PHONE_DISPLAY}</FooterLink>
           </Group>
           <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: COLORS.paperShade }}>
             © {new Date().getFullYear()} ·{" "}
