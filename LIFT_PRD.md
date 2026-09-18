@@ -1,3 +1,4 @@
+# Archival document. Now see ./aidlc-docs
 # Lift — Product Requirements Document (v1)
 
 **Product:** Lift
