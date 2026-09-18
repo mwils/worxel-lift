@@ -43,16 +43,6 @@ export function VinScanner({ opened, onClose, onScan }: VinScannerProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (opened) {
-      void start();
-    } else {
-      stop();
-    }
-    return stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opened]);
-
   async function start() {
     setErrMsg(null);
     setPhase("starting");
@@ -62,7 +52,7 @@ export function VinScanner({ opened, onClose, onScan }: VinScannerProps) {
       return;
     }
 
-    let formats: string[] = [];
+    let formats: string[];
     try {
       formats = await window.BarcodeDetector.getSupportedFormats();
     } catch {
@@ -145,6 +135,19 @@ export function VinScanner({ opened, onClose, onScan }: VinScannerProps) {
     if (videoRef.current) videoRef.current.srcObject = null;
     setPhase("idle");
   }
+
+  // Declared after start/stop so the effect closes over the final bindings.
+  // start/stop read the latest props via closure; re-running on every render
+  // would restart the camera, so the effect keys on `opened` alone.
+  useEffect(() => {
+    if (opened) {
+      void start();
+    } else {
+      stop();
+    }
+    return stop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
 
   return (
     <Modal opened={opened} onClose={onClose} title="Scan VIN" centered size="md">

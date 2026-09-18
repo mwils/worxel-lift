@@ -16,7 +16,6 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { DateTimePicker } from "@mantine/dates";
 import { IconSearch } from "@tabler/icons-react";
 import { api } from "../../../lib/api";

@@ -56,7 +56,6 @@ export async function runTranscribe(s3Key: string): Promise<string> {
 
   const start = Date.now();
   const budgetMs = 26_000;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (Date.now() - start > budgetMs) {
       throw new Error("Transcription timed out");

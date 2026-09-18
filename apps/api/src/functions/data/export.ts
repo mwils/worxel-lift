@@ -3,7 +3,6 @@ import { createRequire } from "node:module";
 // archiver is CJS-only and its `module.exports = fn` shape doesn't bundle under
 // esbuild's strict ESM resolution. createRequire sidesteps the bundler.
 const requireCjs = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const archiver = requireCjs("archiver") as typeof import("archiver");
 import { Customer, Message, Payment, RepairOrder, Vehicle } from "@lift/shared";
 import { bpsToPct } from "@lift/shared/constants";

@@ -289,6 +289,7 @@ function VisitLine({ ro, tz }: { ro: BoardRO; tz: string }) {
     );
   }
 
+  // eslint-disable-next-line react-hooks/purity -- "overdue" is a display hint; refreshing on the next data refetch is enough.
   const overdue = new Date(ro.scheduledFor).getTime() < Date.now();
   return (
     <Group gap={4} wrap="nowrap">

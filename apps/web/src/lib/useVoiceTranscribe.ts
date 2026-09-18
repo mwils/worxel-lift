@@ -104,7 +104,6 @@ export function useVoiceTranscribe({ kind, customerId, onResult }: UseVoiceTrans
       stopTimer();
       stopStream();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function stopTimer() {

@@ -254,7 +254,9 @@ export function LineItemEditor({ items, onCreate, onUpdate, onDelete, busy }: Li
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
   const pending = useRef(new Set<string>());
   const onDeleteRef = useRef(onDelete);
-  onDeleteRef.current = onDelete;
+  useEffect(() => {
+    onDeleteRef.current = onDelete;
+  });
 
   const unhide = (id: string) =>
     setHiddenIds((prev) => {

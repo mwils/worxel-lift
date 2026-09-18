@@ -29,7 +29,6 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
 
     const shopOid = new mongoose.Types.ObjectId(user.shopId);
     const vehicleOid = new mongoose.Types.ObjectId(String(vehicle._id));
-    const customerOid = new mongoose.Types.ObjectId(String(vehicle.customerId));
 
     // Stats aggregate is small (one vehicle) — runs in parallel with the page query.
     const [customer, [statsAgg], [paidAgg], rows] = await Promise.all([

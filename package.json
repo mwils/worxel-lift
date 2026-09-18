@@ -16,14 +16,21 @@
     "build:web": "pnpm --filter @lift/web build",
     "build:marketing": "pnpm --filter @lift/marketing build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
     "test": "pnpm -r test",
     "deploy:dev": "sst deploy --stage dev",
     "deploy:prod": "sst deploy --stage prod"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.14.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
     "sst": "^3.3.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.70.0"
   }
 }

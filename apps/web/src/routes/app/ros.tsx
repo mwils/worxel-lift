@@ -144,8 +144,10 @@ export function RosRoute() {
 
   const resolved = useMemo(() => {
     if (range === "custom") {
-      if (!customPick[0] || !customPick[1]) return null;
-      return customRange(customPick[0], customPick[1], tz);
+      const from = customFrom ? ymdToLocal(customFrom) : null;
+      const to = customTo ? ymdToLocal(customTo) : null;
+      if (!from || !to) return null;
+      return customRange(from, to, tz);
     }
     if (range) return presetRange(range, tz);
     return null;

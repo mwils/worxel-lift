@@ -66,6 +66,7 @@ lift/
 - **Multi-tenancy:** every collection except `users` and `VinDecodeCache` has `shopId`. Every query path has a compound index starting with `shopId`. Always filter by `shopId` from the session — never trust a body-supplied shopId.
 - **Lambda handlers:** export `handler` from each file. Wrap with `withAuth` or `withErrorBoundary`. Never `mongoose.connect` directly — middleware calls `connectDb()` first.
 - **Stubs:** unimplemented routes use `todoHandler("METHOD /path")` from `apps/api/src/functions/_stub.ts` so wiring is testable. Replace as you implement.
+- **Lint:** one root `eslint.config.mjs` covers every workspace (browser rules for `apps/web` + `apps/marketing`, Node rules for `apps/api` + `packages/shared` + tooling). `pnpm lint` must report **0 errors** before a commit. Warnings (`no-explicit-any`, `react-refresh/only-export-components`) are tracked debt — don't add new ones, and burn them down when touching a file. `react-hooks/set-state-in-effect` is off pending a refactor of the ~20 prop-sync effects; don't rely on that pattern in new code.
 - **AI calls:** always log to `aiInteractions` with `inputTokens`, `outputTokens`, `costCents`, `durationMs`. Cost guardrail is < $0.05/RO.
 
 ## Commands
@@ -78,6 +79,8 @@ corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 pnpm install
 pnpm -r typecheck                      # all workspaces
+pnpm lint                              # ESLint flat config at repo root (eslint.config.mjs); errors gate, warnings are the backlog
+pnpm lint:fix                          # auto-fix what ESLint can
 pnpm -r build                          # all workspaces
 
 pnpm --filter @lift/web dev            # Vite dev server on :5173

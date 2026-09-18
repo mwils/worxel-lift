@@ -20,6 +20,9 @@ import { api } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
 import type { JobTemplate } from "./types";
 
+// Stable fallback so `all` keeps its identity between renders while loading.
+const NO_TEMPLATES: JobTemplate[] = [];
+
 export interface TemplatePickerProps {
   opened: boolean;
   onClose: () => void;
@@ -90,7 +93,7 @@ function PickerBody({ onPick, busy, onClose }: PickerBodyProps) {
     queryFn: () => api.get<{ templates: JobTemplate[] }>("/job-templates"),
   });
 
-  const all = templatesQ.data?.templates ?? [];
+  const all = templatesQ.data?.templates ?? NO_TEMPLATES;
 
   const { mostUsed, grouped } = useMemo(() => {
     const filtered = all.filter((t) => matches(t, q));

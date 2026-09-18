@@ -15,7 +15,7 @@
  *   StripeWebhookSecret, StripePriceLift79, SesFromEmail, SmsPoolId
  */
 export default $config({
-  app(input) {
+  app(_input) {
     return {
       name: "lift",
       // Live customer traffic runs on stage `dev` (only one environment for v1).
@@ -613,7 +613,7 @@ export default $config({
     // Parent-company page at the apex. Exists mostly for 10DLC brand vetting:
     // the registered brand (AICHEETAH IO LLC dba Worxel) needs a website that
     // ties both products' campaigns to one end brand. Plain static HTML, no build.
-    const company = new sst.aws.StaticSite("Company", {
+    new sst.aws.StaticSite("Company", {
       path: "apps/company",
       domain: { name: "worxel.com", redirects: ["www.worxel.com"] },
     });
