@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Spectral:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f4eedf;color:#1a1714;font-family:Spectral,Georgia,serif}
+  .frame{position:absolute;inset:24px;border:3px solid #1a1714;background:#f4eedf}
+  .dots{position:absolute;inset:0;opacity:.14;background-image:radial-gradient(#1a1714 .6px, transparent .7px);background-size:5px 5px}
+  .mono{font-family:"Space Mono",monospace;text-transform:uppercase;letter-spacing:.2em}
+  .eyebrow{position:absolute;left:60px;top:58px;font-size:15px;color:#605849}
+  .eyebrow b{color:#c8261d;margin-right:14px}
+  h1{position:absolute;left:60px;top:104px;margin:0;width:580px;font-family:"Archivo Black",sans-serif;font-size:52px;line-height:.98;text-transform:uppercase;letter-spacing:-.02em}
+  h1 span{color:#c8261d}
+  .sub{position:absolute;left:60px;top:380px;width:540px;font-size:22px;line-height:1.4;color:#3f3a32}
+  .logo{position:absolute;left:60px;bottom:44px;font-family:"Archivo Black",sans-serif;font-size:34px;text-transform:uppercase;letter-spacing:-.02em}
+  .badge{position:absolute;right:60px;bottom:40px;padding:16px 22px;border:2px solid #1a1714;background:#c8261d;color:#f4eedf;font-family:"Space Mono",monospace;font-weight:700;font-size:16px;letter-spacing:.15em;text-transform:uppercase;box-shadow:6px 6px 0 #1a1714}
+  .board{position:absolute;right:60px;top:52px;width:430px;border:2px solid #1a1714;background:#f4eedf;box-shadow:8px 8px 0 #1a1714}
+  .board .hd{display:flex;justify-content:space-between;padding:12px 18px;background:#1a1714;color:#f4eedf;font-size:12px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-top:1px dashed #8c8270}
+  .row:first-of-type{border-top:0}
+  .row .n{font-weight:600;font-size:17px}
+  .row .v{font-family:"Space Mono",monospace;font-size:11.5px;color:#605849;margin-top:3px}
+  .row .t{font-family:"Space Mono",monospace;font-weight:700;font-size:15px;text-align:right}
+  .st{display:inline-block;margin-top:5px;padding:3px 8px;font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid #1a1714}
+  .st.red{background:#c8261d;border-color:#c8261d;color:#f4eedf}.st.blue{background:#1e3a6b;border-color:#1e3a6b;color:#f4eedf}.st.ink{background:#1a1714;color:#f4eedf}.st.ored{color:#c8261d;border-color:#c8261d}
+</style></head>
+<body>
+<div class="frame"><div class="dots"></div>
+  <div class="eyebrow mono"><b>§</b>Simple shop management · 1–3 bay shops</div>
+  <h1>Simple shop management for people who still <span>turn wrenches</span>.</h1>
+  <div class="sub">Repair orders, estimates, approvals, job tracking, invoices, and payments—from your phone.</div>
+  <div class="logo">Lift</div>
+  <div class="badge">$79/mo flat · 14-day free trial</div>
+  <div class="board">
+    <div class="hd mono"><span>Today · Mike's Auto</span><span>5 open</span></div>
+    <div class="row"><div><div class="n">Jess Ramirez</div><div class="v">2016 Honda CR-V · Front brakes</div></div><div class="t">$612.40<br><span class="st ored">Awaiting approval</span></div></div>
+    <div class="row"><div><div class="n">Tom Okafor</div><div class="v">2012 Ford F-150 · Oil + rotation</div></div><div class="t">$118.75<br><span class="st">Scheduled · 2:30</span></div></div>
+    <div class="row"><div><div class="n">Dana Whitfield</div><div class="v">2019 Subaru Outback · Alternator</div></div><div class="t">$784.10<br><span class="st blue">In repair</span></div></div>
+    <div class="row"><div><div class="n">Luis Herrera</div><div class="v">2008 Chevy Silverado · Water pump</div></div><div class="t">$933.22<br><span class="st red">Ready for pickup</span></div></div>
+    <div class="row"><div><div class="n">Kim Park</div><div class="v">2015 Toyota Camry · Rear pads</div></div><div class="t">$498.60<br><span class="st ink">Paid</span></div></div>
+  </div>
+</div>
+</body></html>

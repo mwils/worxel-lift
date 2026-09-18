@@ -21,6 +21,7 @@ import { DateTimePicker } from "@mantine/dates";
 import { IconSearch } from "@tabler/icons-react";
 import { api } from "../../../lib/api";
 import { notifyError } from "../../../lib/notify";
+import { track, trackOnce } from "../../../lib/analytics";
 import { formatPhone, pickerDateToInstant, shopTimezone } from "../../../lib/format";
 import { useAuth } from "../../../lib/auth";
 import { CustomerForm } from "../../../features/customer/CustomerForm";
@@ -189,7 +190,7 @@ export function NewRoRoute() {
 
   const createRo = useMutation({
     mutationFn: () =>
-      api.post<{ repairOrder: { id: string } }>("/repair-orders", {
+      api.post<{ repairOrder: { id: string; number?: number } }>("/repair-orders", {
         customerId: selectedCustomerId,
         vehicleId: selectedVehicleId,
         concern: concern || undefined,
@@ -200,6 +201,10 @@ export function NewRoRoute() {
       }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["ros"] });
+      track("ro_created");
+      // RO numbers are per-shop and start at 1, so #1 is the shop's first —
+      // the activation event the funnel actually cares about.
+      if (res.repairOrder.number === 1) trackOnce("first_ro_created");
       navigate(`/ro/${res.repairOrder.id}`);
     },
     onError: (err) => notifyError(err, { title: "Couldn't create RO" }),

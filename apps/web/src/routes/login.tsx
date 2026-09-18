@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { notifyError } from "../lib/notify";
+import { captureUtmFromUrl, track } from "../lib/analytics";
 
 // Phone sign-in is hidden until the AWS End User Messaging 10DLC campaign
 // is approved. Re-introduce the SegmentedControl + phone branch when ready.
@@ -23,6 +24,9 @@ export function LoginRoute() {
         localStorage.setItem("lift_pid", pid);
       } catch { /* private mode / disabled storage — ignore */ }
     }
+    // Same idea for utm_* from the marketing CTAs / printed brochure — they
+    // ride along on funnel events and land on the shop record at onboarding.
+    captureUtmFromUrl();
   }, []);
 
   const form = useForm({
@@ -31,11 +35,13 @@ export function LoginRoute() {
 
   async function onSubmit(values: typeof form.values) {
     setSending(true);
+    track("signup_started", { method: "email" });
     try {
       const res = await api.post<{ ok: true; signedIn?: boolean }>("/auth/magic-link", {
         email: values.email,
       });
       if (res.signedIn) {
+        track("account_created", { method: "email" });
         // Brand-new account — the API set the session cookie directly, no
         // email round-trip. Refetch `me` so the route guards see it, then
         // straight into onboarding.

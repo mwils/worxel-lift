@@ -118,6 +118,18 @@ export const OnboardShopDto = z.object({
   // Cold-email tracking id forwarded from lift.worxel.com via the marketing CTA.
   // Optional — only present when the user came in through a cold-outreach email.
   pid: z.string().regex(/^[a-fA-F0-9]{24}$/).optional(),
+  // utm_* captured on the app's /login page from the marketing CTA link (or
+  // the printed brochure's QR URL). Stored on the shop as `attribution` so a
+  // trial can be credited to its campaign after the magic-link round trip.
+  utm: z
+    .object({
+      utm_source: z.string().max(200).optional(),
+      utm_medium: z.string().max(200).optional(),
+      utm_campaign: z.string().max(200).optional(),
+      utm_content: z.string().max(200).optional(),
+      utm_term: z.string().max(200).optional(),
+    })
+    .optional(),
 });
 
 // ── shop ────────────────────────────────────────────────────────

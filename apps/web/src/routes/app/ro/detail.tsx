@@ -51,6 +51,7 @@ import {
   shopTimezone,
 } from "../../../lib/format";
 import { notifyError } from "../../../lib/notify";
+import { track, trackOnce } from "../../../lib/analytics";
 import {
   LineItemEditor,
   type LineItemDraft,
@@ -345,6 +346,9 @@ export function RoDetailRoute() {
       notifications.show({ color: "green", message: "Estimate sent." });
       setEstimateOpen(false);
       qc.invalidateQueries({ queryKey: ["ro", id] });
+      track("estimate_sent");
+      // Once per browser — a close-enough proxy for the shop's first estimate.
+      trackOnce("first_estimate_sent");
     },
     onError: (err) => notifyError(err, { title: "Couldn't send estimate" }),
   });

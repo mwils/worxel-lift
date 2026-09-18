@@ -89,6 +89,18 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         // the imported jobs agree.
         defaultLaborRate: dto.defaultLaborRate ?? STARTER_DEFAULT_LABOR_RATE_CENTS,
       },
+      ...(dto.utm || dto.pid
+        ? {
+            attribution: {
+              utmSource: dto.utm?.utm_source,
+              utmMedium: dto.utm?.utm_medium,
+              utmCampaign: dto.utm?.utm_campaign,
+              utmContent: dto.utm?.utm_content,
+              utmTerm: dto.utm?.utm_term,
+              pid: dto.pid,
+            },
+          }
+        : {}),
     });
 
     await User.updateOne({ _id: user.userId }, { $set: { shopId: shop._id } });

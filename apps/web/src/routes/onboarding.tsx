@@ -27,6 +27,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatPhone } from "../lib/format";
 import { notifyError } from "../lib/notify";
+import { clearUtm, readUtm, track } from "../lib/analytics";
 import { PaymentSheet } from "../features/payments/PaymentSheet";
 
 interface StripeSetupResp {
@@ -108,6 +109,7 @@ export function OnboardingRoute() {
         try {
           pid = localStorage.getItem("lift_pid");
         } catch { /* private mode — ignore */ }
+        const utm = readUtm();
         await api.post("/onboard/shop", {
           name: shopName,
           address,
@@ -116,12 +118,16 @@ export function OnboardingRoute() {
           ...(tz ? { timezone: tz } : {}),
           ...(rateCents ? { defaultLaborRate: rateCents } : {}),
           ...(pid ? { pid } : {}),
+          ...(utm ? { utm } : {}),
         });
+        // Fire before clearing so the event still carries the campaign params.
+        track("shop_details_completed");
         if (pid) {
           try {
             localStorage.removeItem("lift_pid");
           } catch { /* ignore */ }
         }
+        clearUtm();
         setShopCreated(true);
       }
       await qc.invalidateQueries({ queryKey: ["me"] });

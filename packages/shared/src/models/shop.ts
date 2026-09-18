@@ -115,6 +115,18 @@ const ShopSchema = new Schema(
       // per-shop atomic counters (e.g. RO numbering)
       ro: { type: Number, default: 0 },
     },
+
+    // Where the trial came from. Written once at onboarding from the utm_*
+    // the marketing site (or printed brochure) put on the /login link, plus
+    // the cold-email `pid` when present. Never shown to the shop owner.
+    attribution: {
+      utmSource: String,
+      utmMedium: String,
+      utmCampaign: String,
+      utmContent: String,
+      utmTerm: String,
+      pid: String,
+    },
   },
   { timestamps: true }
 );
