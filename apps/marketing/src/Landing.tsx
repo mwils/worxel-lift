@@ -50,7 +50,7 @@ const track = (name: string, params?: Record<string, string>) => {
   if (typeof g === "function") g("event", name, params ?? {});
 };
 
-/** Business contact line for the founder section and footer (call or text). */
+/** Founder contact for the founder section and footer. Takes calls and texts. */
 const CONTACT_PHONE_DISPLAY = "(864) 310-0337";
 const CONTACT_PHONE_HREF = "tel:+18643100337";
 
@@ -806,7 +806,7 @@ function SectionFounder() {
           </Title>
           <Box style={{ minWidth: 0, borderLeft: `3px solid ${COLORS.red}`, paddingLeft: 20 }}>
             <Text style={{ fontFamily: FONT.serif, fontSize: "1.15rem", lineHeight: 1.55, color: COLORS.ink }}>
-              I built Lift for small shops where the owner also does the repairs. Have a question or need help getting started? Call or email me directly.
+              I built Lift for small shops where the owner also does the repairs. Have a question or need help getting started? Call, text, or email me directly.
             </Text>
             <Text mt={16} style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.inkSoft }}>
               — Matthew ·{" "}
