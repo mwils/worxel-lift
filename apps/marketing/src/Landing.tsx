@@ -55,7 +55,7 @@ const CONTACT_PHONE_DISPLAY = "(864) 310-0337";
 const CONTACT_PHONE_HREF = "tel:+18643100337";
 
 /** One label everywhere. The brief forbids rotating CTA copy. */
-const CTA_LABEL = "Try it on one RO →";
+const CTA_LABEL = "Try Lift free →";
 
 const COLORS = {
   paper: "#f4eedf",
@@ -322,7 +322,7 @@ function Hero() {
                 maxWidth: 560,
               }}
             >
-              Repair orders, estimates, approvals, job tracking, invoices, and payments—all in one straightforward app that works from your phone.
+              Write repair orders, track jobs, get customer approval, and get paid—all from your phone.
             </Text>
 
             <Stack gap="sm">
@@ -335,7 +335,10 @@ function Hero() {
                 </a>
               </Group>
               <Text size="sm" style={{ color: COLORS.inkSoft, fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                14 days free · No credit card · $79/month flat
+                14 days free · No credit card · Then $79/month
+              </Text>
+              <Text size="sm" style={{ color: COLORS.inkSoft, fontFamily: FONT.serif, fontStyle: "italic", fontSize: "0.98rem" }}>
+                Start with one job. No need to move everything over.
               </Text>
             </Stack>
           </Stack>
@@ -356,9 +359,9 @@ function Hero() {
  */
 function JobBoardDemo() {
   const jobs: { name: string; vehicle: string; job: string; total: string; status: string; tone: "outline-red" | "outline" | "blue" | "red" | "ink" }[] = [
-    { name: "Jess Ramirez", vehicle: "2016 Honda CR-V", job: "Front brakes", total: "$612.40", status: "Awaiting approval", tone: "outline-red" },
-    { name: "Tom Okafor", vehicle: "2012 Ford F-150", job: "Oil + rotation", total: "$118.75", status: "Scheduled · 2:30", tone: "outline" },
-    { name: "Dana Whitfield", vehicle: "2019 Subaru Outback", job: "Alternator", total: "$784.10", status: "In repair", tone: "blue" },
+    { name: "Dana Whitfield", vehicle: "2019 Subaru Outback", job: "Alternator", total: "$784.10", status: "Awaiting approval", tone: "outline-red" },
+    { name: "Tom Okafor", vehicle: "2012 Ford F-150", job: "Oil + rotation", total: "$118.75", status: "Scheduled · 2:30 PM", tone: "outline" },
+    { name: "Jess Ramirez", vehicle: "2016 Honda CR-V", job: "Front brakes", total: "$608.91", status: "In repair", tone: "blue" },
     { name: "Luis Herrera", vehicle: "2008 Chevy Silverado", job: "Water pump", total: "$933.22", status: "Ready for pickup", tone: "red" },
     { name: "Kim Park", vehicle: "2015 Toyota Camry", job: "Rear pads + rotors", total: "$498.60", status: "Paid", tone: "ink" },
   ];
@@ -366,7 +369,7 @@ function JobBoardDemo() {
     <Box aria-label="Illustration of the Lift job board" role="img" style={{ border: `2px solid ${COLORS.ink}`, background: COLORS.paper, boxShadow: `6px 6px 0 ${COLORS.ink}` }}>
       <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 18px", background: COLORS.ink, color: COLORS.paper }}>
         <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase" }}>Today · Mike's Auto</Text>
-        <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: COLORS.paperShade }}>5 open</Text>
+        <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: COLORS.paperShade }}>5 jobs</Text>
       </Box>
       <Box style={{ padding: "6px 18px 10px" }}>
         {jobs.map((j) => (
@@ -388,6 +391,9 @@ function JobBoardDemo() {
         <Text style={{ fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.06em", color: COLORS.inkSoft, lineHeight: 1.6 }}>
           9:42 AM · Jess approved the brake estimate<br />
           11:05 AM · Kim paid $498.60 by card
+        </Text>
+        <Text style={{ fontFamily: FONT.mono, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.inkFaint, marginTop: 6 }}>
+          Example shop data
         </Text>
       </Box>
     </Box>
@@ -443,7 +449,7 @@ function SectionStatement() {
             Less paperwork.<br />More <span style={{ color: COLORS.red }}>wrench time</span>.
           </Title>
           <Text style={{ fontFamily: FONT.serif, fontSize: "1.2rem", lineHeight: 1.5, color: COLORS.ink, maxWidth: 520, alignSelf: "center" }}>
-            Lift handles the write-up and keeps every job organized, so you spend less time at a desk and more time doing the work.
+            Keep your jobs, customer approvals, and invoices together—without the paper pile.
           </Text>
         </Box>
       </Container>
@@ -481,22 +487,22 @@ function SectionWorkflow() {
               <ManualFeature
                 tag="01"
                 title="Create the repair order"
-                body="Add the customer, vehicle, work, parts, labor, and photos from your phone. Use saved jobs or talk through what you found when that is faster."
+                body="Add the customer, vehicle, parts, labor, and photos. Use a saved job or dictate the work to save typing."
               />
               <ManualFeature
                 tag="02"
                 title="Review and send the estimate"
-                body="Check the work, make any changes, and send it to the customer. They review the estimate and tap once to approve."
+                body="Review the estimate and text it to the customer. They open the link and approve the work."
               />
               <ManualFeature
                 tag="03"
                 title="Keep every job moving"
-                body="One board shows what is awaiting approval, scheduled, in repair, ready for pickup, or paid. No paper pile and no guessing where a job stands."
+                body="See which jobs need approval, which are in repair, and which are ready for pickup—all on one board."
               />
               <ManualFeature
                 tag="04"
                 title="Invoice and collect payment"
-                body="When the work is finished, send the invoice and payment link by text. The invoice and payment stay attached to the repair order."
+                body="Text the invoice and payment link when the work is done. Keep the invoice and payment record with the RO."
               />
             </Stack>
           </Box>
@@ -559,14 +565,23 @@ function EstimateCardDemo() {
             <Text style={{ fontFamily: FONT.mono, fontSize: 13, color: COLORS.ink, whiteSpace: "nowrap" }}>{l.amt}</Text>
           </Box>
         ))}
-        <Box style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px" }}>
-          <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: COLORS.inkSoft }}>Total w/ tax</Text>
-          <Text style={{ fontFamily: FONT.display, fontSize: 18, color: COLORS.ink }}>$612.40</Text>
+        <Box style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0" }}>
+          <Text style={{ fontFamily: FONT.mono, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.inkSoft }}>Subtotal</Text>
+          <Text style={{ fontFamily: FONT.mono, fontSize: 12, color: COLORS.inkSoft }}>$562.50</Text>
+        </Box>
+        <Box style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 0" }}>
+          <Text style={{ fontFamily: FONT.mono, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.inkSoft }}>Tax · 8.25%</Text>
+          <Text style={{ fontFamily: FONT.mono, fontSize: 12, color: COLORS.inkSoft }}>$46.41</Text>
+        </Box>
+        <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0 4px", borderTop: `1px solid ${COLORS.ink}`, marginTop: 6 }}>
+          <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: COLORS.ink }}>Total</Text>
+          <Text style={{ fontFamily: FONT.display, fontSize: 18, color: COLORS.ink }}>$608.91</Text>
         </Box>
       </Box>
       <Box style={{ borderTop: `1px solid ${COLORS.ink}`, padding: "12px 18px", display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", background: COLORS.paperShade }}>
         <StatusStamp tone="red">Approved by customer · 9:42 AM</StatusStamp>
-        <StatusStamp tone="outline">Invoice + pay link sent</StatusStamp>
+        <StatusStamp tone="blue">In repair</StatusStamp>
+        <Text style={{ fontFamily: FONT.mono, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.inkFaint, marginLeft: "auto" }}>Example shop data</Text>
       </Box>
     </Box>
   );
@@ -586,17 +601,13 @@ function SectionPricing() {
         <Title order={2} className="lift-h2" style={{ fontFamily: FONT.display, letterSpacing: "-0.02em", textTransform: "uppercase", color: COLORS.ink, margin: "20px 0 12px", textAlign: "center" }}>
           One shop. One price.<br />$79/month.
         </Title>
-        <Text style={{ fontFamily: FONT.serif, fontSize: "1.15rem", color: COLORS.inkSoft, maxWidth: 540, margin: "0 auto", textAlign: "center", lineHeight: 1.5 }}>
-          Repair orders, job tracking, estimates, approvals, invoices, and payments in one simple plan.
-        </Text>
-
         <Box mt={28} style={{ position: "relative", border: `2px solid ${COLORS.ink}`, background: COLORS.paper, padding: 0 }}>
           <RegistrationFrame />
 
           {/* Stamped header band */}
           <Box style={{ borderBottom: `2px solid ${COLORS.ink}`, padding: "14px 28px", background: COLORS.ink, color: COLORS.paper, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase" }}>
-              Plan · Lift Standard · No. 1
+              Lift · Monthly plan
             </Text>
             <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase" }}>
               14-day trial · No card
@@ -616,21 +627,20 @@ function SectionPricing() {
             </Text>
             <Box style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px 24px" }}>
               {[
-                "Unlimited repair orders, customers, vehicles, and photos",
-                "Voice-assisted repair-order creation",
-                "Estimate and approval links",
-                "Invoices and customer payment links",
-                "Estimate, approval, invoice, and payment messages included",
-                "Complete vehicle and repair history",
-                "One-click CSV export",
-                "No per-tech or per-RO fees",
-                "No add-ons or contract",
+                "Repair orders, estimates, and customer approvals",
+                "Job tracking and customer/vehicle history",
+                "Invoices and payment links",
+                "Voice entry, saved jobs, and photos",
+                "Data export",
               ].map((line) => (
                 <CheckRow key={line} mark="✓" color={COLORS.ink}>{line}</CheckRow>
               ))}
             </Box>
-            <Text mt={18} style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "0.95rem", color: COLORS.inkSoft }}>
-              Card payments run through your own Stripe account. Standard Stripe processing fees apply; Lift adds nothing on top.
+            <Text mt={18} style={{ fontFamily: FONT.serif, fontWeight: 600, fontSize: "1.02rem", color: COLORS.ink }}>
+              All features included. No per-tech fees. No contract.
+            </Text>
+            <Text mt={8} style={{ fontFamily: FONT.serif, fontStyle: "italic", fontSize: "0.95rem", color: COLORS.inkSoft }}>
+              Accept card payments through your Stripe account. Stripe's processing fees apply; Lift adds no payment-processing fee.
             </Text>
           </Box>
 
@@ -681,17 +691,17 @@ function SectionFeatures() {
     {
       tag: "A",
       title: "Write it up",
-      items: ["Repair orders from your phone", "Parts and labor line items", "Voice-to-RO", "Saved common jobs", "Photo inspections"],
+      items: ["Repair orders from your phone", "Add parts and labor", "Create ROs by voice", "Save jobs you do often", "Photo inspections"],
     },
     {
       tag: "B",
       title: "Run the day",
-      items: ["Simple job-status board", "Customers and vehicles", "Complete repair history", "Simple booking", "Vehicle-specific service reminders"],
+      items: ["Track jobs on one board", "Customer and vehicle records", "Service history by vehicle", "Customer booking link", "Reminders for the next service"],
     },
     {
       tag: "C",
       title: "Close the job",
-      items: ["Texted estimates", "Customer approval links", "Invoices and payment links", "Secure card processing", "One-click data export"],
+      items: ["Text estimates for approval", "Customer approval links", "Invoices and payment links", "Card payments through Stripe"],
     },
   ];
 
@@ -700,7 +710,7 @@ function SectionFeatures() {
       <Container size="lg" px="md" py={{ base: 36, md: 56 }}>
         <SectionLabel num="03" title="The Toolbox" />
         <Title order={2} className="lift-h2" style={{ fontFamily: FONT.display, letterSpacing: "-0.02em", textTransform: "uppercase", color: COLORS.ink, margin: "20px 0 0", maxWidth: 720 }}>
-          Just what a 1–3 bay shop runs on.
+          Everything stays with the job.
         </Title>
 
         <Box className="lift-grid-3" mt={28}>
@@ -737,7 +747,7 @@ function VoiceFeature() {
         You talk. Lift writes it up.
       </Text>
       <Text style={{ fontFamily: FONT.serif, fontSize: "0.98rem", lineHeight: 1.5, color: COLORS.inkSoft, marginTop: 8 }}>
-        Walk around the vehicle and describe what you found. Lift turns it into editable parts and labor on the repair order.
+        Describe the work. Lift creates parts and labor line items for you to review and edit.
       </Text>
     </Box>
   );
@@ -758,24 +768,21 @@ function SectionFit() {
               Built for the owner who's also the tech.
             </Title>
             <Text mt={16} style={{ fontFamily: FONT.serif, fontSize: "1.15rem", lineHeight: 1.5, color: COLORS.inkSoft, maxWidth: 520 }}>
-              Lift fits best when you run a 1–3 bay shop, spend most of the day under a hood, and still have to write the ROs, track the jobs, send the invoices, and collect the payments.
+              You write the estimate, do the repair, and collect the payment. Lift keeps the paperwork together so you can keep the work moving.
             </Text>
           </Box>
 
           <Box style={{ minWidth: 0 }}>
             <Stack gap={12}>
               {[
-                "You operate a 1–3 bay independent shop.",
-                "You write the repair orders and do the repair work.",
-                "Your jobs currently live on paper, a whiteboard, in Notes, or in your head.",
-                "You need something simpler than software built for large shops.",
-                "You want the complete job, customer, vehicle, invoice, and payment history in one place.",
+                "Built for independent 1–3 bay shops.",
+                "Start with one job; add customers and vehicles as you go.",
               ].map((line) => (
                 <CheckRow key={line} mark="✓" color={COLORS.ink}>{line}</CheckRow>
               ))}
             </Stack>
             <Text mt={22} style={{ fontFamily: FONT.serif, fontSize: "0.98rem", lineHeight: 1.5, color: COLORS.inkSoft, borderTop: `1px dashed ${COLORS.inkFaint}`, paddingTop: 14 }}>
-              <strong style={{ color: COLORS.ink }}>Probably not a fit:</strong> multi-location shops, fleet-heavy operations, or shops with a full front-office team.
+              <strong style={{ color: COLORS.ink }}>Not built for:</strong> multi-location management or fleet billing.
             </Text>
           </Box>
         </Box>
@@ -795,14 +802,11 @@ function SectionFounder() {
         <SectionLabel num="05" title="Who built this" />
         <Box className="lift-grid-2-top" mt={20}>
           <Title order={2} className="lift-h2" style={{ fontFamily: FONT.display, textTransform: "uppercase", color: COLORS.ink, letterSpacing: "-0.02em", margin: 0 }}>
-            Built by someone who knows both sides.
+            I'm Matthew—a mechanic and software engineer.
           </Title>
           <Box style={{ minWidth: 0, borderLeft: `3px solid ${COLORS.red}`, paddingLeft: 20 }}>
             <Text style={{ fontFamily: FONT.serif, fontSize: "1.15rem", lineHeight: 1.55, color: COLORS.ink }}>
-              I'm Matthew—a mechanic and software engineer. I built Lift for shops where the same person diagnoses the car, writes the estimate, tracks the work, and collects the payment.
-            </Text>
-            <Text mt={14} style={{ fontFamily: FONT.serif, fontSize: "1.15rem", lineHeight: 1.55, color: COLORS.ink }}>
-              If something is broken or confusing, you'll reach me—not a call center or a ticket number.
+              I built Lift for small shops where the owner also does the repairs. Have a question or need help getting started? Call or email me directly.
             </Text>
             <Text mt={16} style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.inkSoft }}>
               — Matthew ·{" "}
@@ -830,8 +834,8 @@ function SectionFAQ() {
   // match the visible copy, so update both together.
   const faq: { q: string; a: string }[] = [
     {
-      q: "Will I waste my weekend setting it up?",
-      a: "No. Setup is two screens: your email, then your shop details. No credit card. Create your first repair order the same afternoon.",
+      q: "What do I need to get started?",
+      a: "Your email, your shop's name and location, and your labor rate if it differs from the default. No credit card for the trial. Then create your first repair order. You connect Stripe only when you're ready to accept card payments.",
     },
     {
       q: "Can I try Lift without moving my whole shop over?",
@@ -843,32 +847,32 @@ function SectionFAQ() {
     },
     {
       q: "How do customer estimates and approvals work?",
-      a: "You build the estimate on the repair order and send it by text. The customer opens a link, sees the line items and total, and taps Approve or Decline. Their decision is recorded on the repair order, and the job moves along on your board.",
+      a: "You build the estimate on the repair order and text it to the customer. They open a link, see the line items and total, and tap Approve or Decline. Their response is saved on the repair order, and an approval moves the job to In repair.",
     },
     {
       q: "What payment-processing fees apply?",
-      a: "Card payments run through your own Stripe account, so Stripe's standard processing fees apply and are charged by Stripe. Lift takes no cut and adds no per-payment fee. Your $79/month is the only thing you pay Lift.",
+      a: "Card payments run through your own Stripe account, so Stripe's processing fees apply and are charged by Stripe. Lift adds no per-payment fee.",
     },
     {
       q: "Does it sync with QuickBooks?",
-      a: "Not natively yet. Today: CSV export in QuickBooks Import format. Native sync is on the roadmap for 2026.",
+      a: "Not natively. Export your customers, repair orders, line items, and payments as CSV files and import them into QuickBooks or hand them to your bookkeeper.",
     },
     {
       q: "Can I take my data if I leave?",
-      a: "Yes. One-click CSV export of customers, vehicles, repair orders, messages, and payments — anytime, including after you cancel. No lock-in and no exit fees.",
+      a: "Yes. Export customers, vehicles, repair orders, line items, messages, and payments as CSV files at any time, including after you cancel. No exit fees.",
     },
     {
       q: "How is Lift different from Shopmonkey or AutoLeap?",
-      a: "Shopmonkey and AutoLeap are designed for larger shops and more complex workflows. Lift is built for an owner-operated 1–3 bay shop that wants repair orders, job tracking, approvals, invoices, and payments without the extra complexity or price.",
+      a: "Lift focuses on the everyday work of a small independent shop: repair orders, estimates, approvals, job tracking, invoices, and payments. It's $79/month with no per-tech fees. Try it on a job to see whether it covers what your shop needs.",
     },
   ];
 
   return (
     <Box id="faq" className="lift-faq-pad" style={{ position: "relative", zIndex: 1, background: COLORS.paperShade }}>
       <Container size="md" px="md" py={{ base: 36, md: 56 }}>
-        <SectionLabel num="06" title="Honest Answers" />
+        <SectionLabel num="06" title="Questions" />
         <Title order={2} className="lift-h2" style={{ fontFamily: FONT.display, letterSpacing: "-0.02em", textTransform: "uppercase", color: COLORS.ink, margin: "20px 0 20px" }}>
-          Questions, answered<br />without spin.
+          Before you get started.
         </Title>
 
         <Box>
@@ -898,10 +902,10 @@ function FinalCTA() {
         <Stack align="center" gap="md">
           <SectionLabel num="07" title="The Close" />
           <Title order={2} className="lift-final-h2" style={{ fontFamily: FONT.display, textTransform: "uppercase", color: COLORS.ink, letterSpacing: "-0.03em", textAlign: "center", margin: "12px 0 0" }}>
-            Start with <span style={{ color: COLORS.red }}>one</span> RO.
+            Start with your <span style={{ color: COLORS.red }}>next</span> job.
           </Title>
           <Text style={{ fontFamily: FONT.serif, fontSize: "1.2rem", color: COLORS.inkSoft, maxWidth: 540, textAlign: "center", lineHeight: 1.5 }}>
-            Write up your next job in Lift. Send the estimate, watch it move across the board, and collect the payment. Free for 14 days, then $79/month.
+            Create an RO, send the estimate, and keep the job organized through payment. No need to move your whole shop over.
           </Text>
           <Box mt={4} style={{ width: "100%", maxWidth: 420, textAlign: "center" }}>
             <a id="final-cta" href={ctaHref("final")} className="lift-cta lift-cta-primary" onClick={() => track("final_cta_click", { cta_position: "final" })}>
@@ -909,7 +913,7 @@ function FinalCTA() {
             </a>
           </Box>
           <Text style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 2, textAlign: "center" }}>
-            No credit card required · Cancel anytime
+            14 days free · No credit card · Then $79/month
           </Text>
         </Stack>
       </Container>
@@ -956,7 +960,7 @@ function StickyCta() {
       <a href={ctaHref("sticky")} tabIndex={show ? 0 : -1} onClick={() => track("sticky_cta_click", { cta_position: "sticky" })}>
         <span className="price">$79/mo</span>
         <span aria-hidden>·</span>
-        <span>Try one RO free →</span>
+        <span>Try Lift free →</span>
       </a>
     </Box>
   );
