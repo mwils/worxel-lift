@@ -1,6 +1,6 @@
 import { noisePreamble } from "./_noise.js";
 
-export const VOICE_CUSTOMER_PROMPT_VERSION = "voice_customer.v1";
+export const VOICE_CUSTOMER_PROMPT_VERSION = "voice_customer.v2";
 
 export interface VoiceCustomerInput {
   transcript: string;
@@ -29,12 +29,13 @@ didn't clearly state):
   "firstName": "<string>",
   "lastName": "<string>",
   "phone": "<string as spoken — digits + separators are fine>",
-  "email": "<string>",
+  "email": "<written form, e.g. mike.jones@gmail.com — no spaces>",
   "notes": "<string — anything noteworthy the speaker mentioned about the customer that isn't another field>"
 }
 
 Rules:
 - If the speaker only said a single name, put it in firstName.
+- Spoken emails ("mike jones at gmail dot com") become written ones: "at" → @, "dot" → ., no spaces.
 - Do NOT include "vehicle" or "concern" details in notes — those go elsewhere.
 - No prose, no markdown fences. JSON only.
 `.trim();

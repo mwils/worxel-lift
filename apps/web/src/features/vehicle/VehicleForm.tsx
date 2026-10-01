@@ -12,11 +12,6 @@ import { VinScanner, isVinScannerSupported } from "./VinScanner";
 import { VoiceCaptureButton } from "../voice/VoiceCaptureButton";
 import type { VehicleMatch } from "../../lib/useVoiceTranscribe";
 
-// VIN-barcode scanner is hidden while we debug the iPad Chrome UX.
-// Flip to `true` to re-enable — the component + handlers are kept in place
-// so re-enabling is a one-line change.
-const SCAN_ENABLED = false;
-
 type VehicleInput = z.infer<typeof CreateVehicleDto>;
 
 export interface VehicleFormProps {
@@ -67,7 +62,7 @@ export function VehicleForm({
 }: VehicleFormProps) {
   const [decoding, setDecoding] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const scanSupported = SCAN_ENABLED && isVinScannerSupported();
+  const scanSupported = isVinScannerSupported();
   const isSmall = useMediaQuery("(max-width: 48em)");
   const form = useForm<VehicleInput>({
     initialValues: { ...emptyValues(customerId), ...initialValues },

@@ -76,6 +76,19 @@ export function normalizePlate(s: string | null | undefined): string {
   return (s ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
 }
 
+/** Turn a transcribed email ("Mike Jones at gmail dot com") into its written
+ *  form. Emails can't contain whitespace, so every space is dropped last. */
+export function normalizeSpokenEmail(s: string | null | undefined): string | undefined {
+  if (!s) return undefined;
+  const out = ` ${s.toLowerCase()} `
+    .replace(/\s+at\s+/g, "@")
+    .replace(/\s+(?:dot|period)\s+/g, ".")
+    .replace(/\s+underscore\s+/g, "_")
+    .replace(/\s+(?:dash|hyphen)\s+/g, "-")
+    .replace(/\s+/g, "");
+  return out || undefined;
+}
+
 // ── auth ────────────────────────────────────────────────────────
 export const RequestMagicLinkDto = z.object({ email: z.string().email() });
 export const RequestSmsCodeDto = z.object({ phone: e164 });
@@ -235,7 +248,7 @@ export type MergeCustomerInput = z.infer<typeof MergeCustomerDto>;
 // ── vehicles ────────────────────────────────────────────────────
 export const CreateVehicleDto = z.object({
   customerId: objectId,
-  vin: vin17.optional(),
+  vin: z.preprocess(blankToUndefined, vin17.optional()),
   year: z.number().int().min(1900).max(2100).optional(),
   make: optionalText,
   model: optionalText,

@@ -4,27 +4,31 @@ import { Alert, Button, Group, Loader, Modal, Stack, Text } from "@mantine/core"
 // VIN: 17 chars, alphanumeric, excluding I, O, Q (per the standard).
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/i;
 
-// TypeScript's DOM lib doesn't ship BarcodeDetector types yet across targets.
-// We declare the minimum we use.
-interface BcdResult {
-  rawValue: string;
-  format: string;
+// VIN labels are mostly Code 39; newer door-jamb stickers also carry Code 128
+// or a 2D code.
+const VIN_FORMATS = ["code_39", "code_128", "data_matrix", "qr_code"] as const;
+
+interface Detector {
+  detect(src: HTMLVideoElement): Promise<Array<{ rawValue: string }>>;
 }
-interface BcdInstance {
-  detect(src: HTMLVideoElement): Promise<BcdResult[]>;
-}
-interface BcdCtor {
-  new (opts?: { formats?: string[] }): BcdInstance;
-  getSupportedFormats(): Promise<string[]>;
-}
-declare global {
-  interface Window {
-    BarcodeDetector?: BcdCtor;
+
+// iOS (Safari and Chrome are both WebKit) has no native BarcodeDetector, so
+// fall back to the ZXing-wasm ponyfill, loaded only when the scanner opens.
+async function createDetector(): Promise<Detector> {
+  const Native = (window as { BarcodeDetector?: typeof import("barcode-detector/ponyfill").BarcodeDetector })
+    .BarcodeDetector;
+  if (Native) {
+    const supported = await Native.getSupportedFormats().catch((): string[] => []);
+    if (supported.includes("code_39")) {
+      return new Native({ formats: VIN_FORMATS.filter((f) => supported.includes(f)) });
+    }
   }
+  const { BarcodeDetector } = await import("barcode-detector/ponyfill");
+  return new BarcodeDetector({ formats: [...VIN_FORMATS] });
 }
 
 export function isVinScannerSupported(): boolean {
-  return typeof window !== "undefined" && "BarcodeDetector" in window;
+  return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 }
 
 export interface VinScannerProps {
@@ -47,24 +51,13 @@ export function VinScanner({ opened, onClose, onScan }: VinScannerProps) {
     setErrMsg(null);
     setPhase("starting");
 
-    if (!window.BarcodeDetector) {
-      setPhase("unsupported");
-      return;
-    }
-
-    let formats: string[];
+    let detector: Detector;
     try {
-      formats = await window.BarcodeDetector.getSupportedFormats();
+      detector = await createDetector();
     } catch {
       setPhase("unsupported");
       return;
     }
-    if (!formats.includes("code_39")) {
-      setPhase("unsupported");
-      return;
-    }
-
-    const detector = new window.BarcodeDetector({ formats: ["code_39"] });
 
     let stream: MediaStream;
     try {

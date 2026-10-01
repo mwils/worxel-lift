@@ -25,6 +25,7 @@ import {
   VOICE_CONCERN_PROMPT_VERSION,
   VOICE_CUSTOMER_PROMPT_VERSION,
   VOICE_VEHICLE_PROMPT_VERSION,
+  normalizeSpokenEmail,
 } from "@lift/shared";
 import { handleKnownErrors, parseBody, withAuth } from "../../lib/middleware.js";
 import { badRequest, ok, serverError } from "../../lib/response.js";
@@ -163,6 +164,7 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
         email?: string;
         notes?: string;
       }>(invokeResult.text) ?? {};
+      extracted.email = normalizeSpokenEmail(extracted.email);
       const matches = await matchCustomer({
         shopId: String(user.shopId),
         firstName: extracted.firstName,
@@ -185,6 +187,9 @@ export const handler: APIGatewayProxyHandlerV2 = withAuth(async ({ event, user }
       color?: string;
       notes?: string;
     }>(invokeResult.text) ?? {};
+    // A misheard VIN would fail the 17-char check and block the save; drop it.
+    const vin = extracted.vin?.replace(/[^a-z0-9]/gi, "").toUpperCase();
+    extracted.vin = vin?.length === 17 ? vin : undefined;
     const matches = await matchVehicle({
       shopId: String(user.shopId),
       customerId: dto.customerId,
